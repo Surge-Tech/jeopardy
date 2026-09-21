@@ -43,7 +43,7 @@ The host runs the game from the Host Panel. The board display goes on the main s
 
 ```bash
 # 1. Clone and install
-git clone [https://github.com/natah0303/jeopardy.git](https://github.com/Surge-Tech/jeopardy.git)
+git clone https://github.com/Surge-Tech/jeopardy.git
 cd jeopardy
 npm run install:all
 

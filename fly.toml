@@ -1,0 +1,33 @@
+# fly.toml — Fly.io deployment configuration
+# See https://fly.io/docs/reference/configuration/ for reference.
+# Before deploying: run `fly launch` to generate your own app name, or change
+# the `app` value below to your chosen app name and run `fly deploy`.
+
+app = 'your-app-name'
+primary_region = 'iad'
+
+[build]
+[env]
+  DATA_DIR = '/app/data'
+  NODE_ENV = 'production'
+  PORT = '3001'
+
+[[mounts]]
+  source = 'jeopardy_data'
+  destination = '/app/data'
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = 'requests'
+    hard_limit = 100
+    soft_limit = 80
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'

@@ -1,0 +1,176 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { socket } from '../socket';
+import { useGameStore } from '../store/gameStore';
+import type { GameState } from '../types';
+
+type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'open' | 'winner' | 'too-late';
+
+export default function Buzzer() {
+  const { roomCode } = useParams<{ roomCode: string }>();
+  const { gameState, setGameState, setMyPlayer } = useGameStore();
+  const [phase, setPhase] = useState<BuzzerPhase>('join');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [winnerName, setWinnerName] = useState('');
+  const [myId, setMyId] = useState('');
+
+  useEffect(() => {
+    socket.on('game:state', (state: GameState) => {
+      setGameState(state);
+      if (phase !== 'join' && phase !== 'lobby') {
+        if (state.buzzerState === 'open') setPhase('open');
+        if (state.buzzerState === 'idle') setPhase('waiting');
+      }
+    });
+    socket.on('player:joined', ({ player, state }: { player: { id: string; name: string }; state: GameState }) => {
+      setMyId(player.id);
+      setMyPlayer(player as any);
+      setGameState(state);
+      setPhase('waiting');
+    });
+    socket.on('buzz:winner', ({ playerId, playerName }: { playerId: string; playerName: string }) => {
+      if (playerId === myId) {
+        setWinnerName(playerName);
+        setPhase('winner');
+      } else {
+        setWinnerName(playerName);
+        setPhase('too-late');
+      }
+      setTimeout(() => setPhase(prev => prev === 'winner' || prev === 'too-late' ? 'waiting' : prev), 5000);
+    });
+    socket.on('buzzer:open', () => setPhase('open'));
+    socket.on('buzzer:locked', () => setPhase('waiting'));
+    socket.on('error', ({ message }: { message: string }) => setError(message));
+    return () => {
+      socket.off('game:state');
+      socket.off('player:joined');
+      socket.off('buzz:winner');
+      socket.off('buzzer:open');
+      socket.off('buzzer:locked');
+      socket.off('error');
+    };
+  }, [myId, phase]);
+
+  function joinGame() {
+    if (!name.trim()) { setError('Enter your name'); return; }
+    setError('');
+    socket.emit('player:join', { roomCode, name: name.trim(), color: randomColor() });
+  }
+
+  function buzz() {
+    if (phase !== 'open') return;
+    socket.emit('buzz');
+    setPhase('waiting');
+  }
+
+  const myScore = gameState?.players.find(p => p.id === myId)?.score ?? 0;
+
+  return (
+    <div className="min-h-screen bg-jeopardy-dark flex flex-col items-center justify-center p-4 select-none">
+
+      {/* Room code display */}
+      <div className="text-gray-500 text-sm mb-6 text-center">
+        Room: <span className="text-jeopardy-gold font-bold tracking-widest">{roomCode}</span>
+      </div>
+
+      {/* JOIN phase */}
+      {phase === 'join' && (
+        <div className="w-full max-w-sm">
+          <h1 className="text-4xl font-black text-jeopardy-gold text-center mb-8" style={{ textShadow: '2px 2px 0 #000' }}>
+            JEOPARDY!
+          </h1>
+          <input
+            autoFocus
+            className="input-field text-xl py-4 text-center mb-4"
+            placeholder="Your name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && joinGame()}
+          />
+          {error && <p className="text-red-400 text-center mb-3">{error}</p>}
+          <button className="btn-primary w-full text-xl py-4" onClick={joinGame}>
+            Join Game
+          </button>
+        </div>
+      )}
+
+      {/* WAITING phase */}
+      {phase === 'waiting' && (
+        <div className="text-center">
+          <p className="text-3xl font-black text-white mb-2">{name}</p>
+          <p className="text-jeopardy-gold font-black text-2xl mb-8">
+            {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+          </p>
+          <div className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto">
+            <span className="text-gray-500 text-xl font-bold text-center px-4">Waiting...</span>
+          </div>
+        </div>
+      )}
+
+      {/* OPEN phase — buzzer ready */}
+      {phase === 'open' && (
+        <div className="text-center">
+          <p className="text-3xl font-black text-white mb-2">{name}</p>
+          <p className="text-jeopardy-gold font-black text-2xl mb-8">
+            {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+          </p>
+          <button
+            className="w-56 h-56 rounded-full border-8 border-jeopardy-gold bg-jeopardy-blue flex items-center justify-center mx-auto buzzer-active cursor-pointer"
+            style={{ fontSize: '1.5rem', fontWeight: 900, color: '#FFD700', touchAction: 'manipulation' }}
+            onClick={buzz}
+            onTouchStart={e => { e.preventDefault(); buzz(); }}
+          >
+            BUZZ!
+          </button>
+          <p className="text-green-400 font-bold mt-6 animate-pulse">Buzzers are open!</p>
+        </div>
+      )}
+
+      {/* WINNER phase */}
+      {phase === 'winner' && (
+        <div className="text-center flip-in">
+          <div className="text-6xl mb-4">⚡</div>
+          <h2 className="text-4xl font-black text-jeopardy-gold mb-2" style={{ textShadow: '2px 2px 0 #000' }}>
+            YOU BUZZED IN!
+          </h2>
+          <p className="text-white text-xl">{name}</p>
+        </div>
+      )}
+
+      {/* TOO LATE phase */}
+      {phase === 'too-late' && (
+        <div className="text-center flip-in">
+          <div className="text-6xl mb-4">❌</div>
+          <h2 className="text-3xl font-black text-red-400 mb-2">Too slow!</h2>
+          <p className="text-gray-400">{winnerName} buzzed in first</p>
+        </div>
+      )}
+
+      {/* Players list (compact) */}
+      {gameState && gameState.players.length > 0 && phase !== 'join' && (
+        <div className="mt-12 w-full max-w-sm">
+          <h3 className="text-gray-500 text-xs uppercase tracking-widest mb-2 text-center">Scoreboard</h3>
+          <div className="space-y-1">
+            {[...gameState.players].sort((a, b) => b.score - a.score).map(p => (
+              <div key={p.id} className="flex justify-between items-center px-3 py-1 rounded bg-gray-900">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+                  <span className={`text-sm ${p.id === myId ? 'text-white font-bold' : 'text-gray-400'}`}>{p.name}</span>
+                </div>
+                <span className="font-bold text-sm" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
+                  {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function randomColor() {
+  const colors = ['#FFD700', '#4ade80', '#60a5fa', '#f87171', '#c084fc', '#fb923c', '#34d399', '#f472b6'];
+  return colors[Math.floor(Math.random() * colors.length)];
+}

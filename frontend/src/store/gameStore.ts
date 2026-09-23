@@ -4,7 +4,7 @@ import type { GameState, Player } from '../types';
 export interface LogEntry {
   id: string;
   ts: string;
-  type: 'open' | 'dd' | 'buzz' | 'correct' | 'wrong' | 'close' | 'score';
+  type: 'open' | 'dd' | 'buzz' | 'correct' | 'wrong' | 'close' | 'score' | 'fj' | 'wager' | 'answer';
   msg: string;
   player?: string;
 }

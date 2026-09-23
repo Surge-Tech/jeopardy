@@ -3,17 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '../types';
-import { playBuzzerReady, playCorrect, playWrong, playDailyDouble, playQuestionOpen } from '../utils/sounds';
+import HostFinalPanel from '../components/final/HostFinalPanel';
+import DDHostPanel from '../components/dailydouble/DDHostPanel';
 
 const API = '/api';
 const PLAYER_COLORS = ['#FFD700', '#4ade80', '#60a5fa', '#f87171', '#c084fc', '#fb923c', '#34d399', '#f472b6'];
 
 const LOG_ICONS: Record<string, string> = {
   open: '📋', dd: '⭐', buzz: '⚡', correct: '✅', wrong: '❌', close: '✖', score: '💰',
+  fj: '⚡', wager: '🎲', answer: '📝',
 };
 const LOG_COLORS: Record<string, string> = {
   open: 'text-blue-300', dd: 'text-yellow-300', buzz: 'text-orange-300',
   correct: 'text-green-400', wrong: 'text-red-400', close: 'text-gray-400', score: 'text-purple-300',
+  fj: 'text-jeopardy-gold', wager: 'text-yellow-300', answer: 'text-blue-300',
 };
 
 export default function Host() {
@@ -44,6 +47,9 @@ export default function Host() {
       clearLog();
       addLog({ type: 'open', msg: 'Game session started' });
     });
+    socket.on('fj:host-log', ({ msg }: { msg: string }) => {
+      addLog({ type: 'fj', msg });
+    });
 
     socket.emit('host:create', { boardId });
 
@@ -51,6 +57,7 @@ export default function Host() {
       socket.off('game:state');
       socket.off('buzz:winner');
       socket.off('host:created');
+      socket.off('fj:host-log');
     };
   }, [boardId]);
 
@@ -73,12 +80,11 @@ export default function Host() {
 
   function openQuestion(q: Question) {
     setBuzzWinner(null);
-    socket.emit('host:open-question', { roomCode, questionId: q.id, isDailyDouble: !!q.isDailyDouble });
+    const boardHighValue = Math.max(...board!.pointValues);
+    socket.emit('host:open-question', { roomCode, questionId: q.id, isDailyDouble: !!q.isDailyDouble, boardHighValue });
     if (q.isDailyDouble) {
-      playDailyDouble();
       addLog({ type: 'dd', msg: `Daily Double opened — $${q.value} (${getCatName(q)})` });
     } else {
-      playQuestionOpen();
       addLog({ type: 'open', msg: `Opened $${q.value} — ${getCatName(q)}` });
     }
   }
@@ -98,7 +104,6 @@ export default function Host() {
   function enableBuzzer() {
     setBuzzWinner(null);
     socket.emit('host:enable-buzzer', { roomCode });
-    playBuzzerReady();
   }
 
   function lockBuzzer() {
@@ -108,7 +113,6 @@ export default function Host() {
   function resetBuzzer() {
     setBuzzWinner(null);
     socket.emit('host:reset-buzzer', { roomCode });
-    playBuzzerReady();
   }
 
   function showAnswer() {
@@ -116,15 +120,14 @@ export default function Host() {
   }
 
   function awardPoints(playerId: string, correct: boolean) {
-    const value = activeQ?.value ?? 0;
+    const isDD = !!activeQ?.isDailyDouble && gameState!.dailyDouble?.stage === 'ready';
+    const value = isDD ? (gameState!.dailyDouble!.wager ?? 0) : (activeQ?.value ?? 0);
     const delta = correct ? value : -value;
     const player = gameState!.players.find(p => p.id === playerId);
-    socket.emit('host:score', { roomCode, playerId, delta });
+    socket.emit('host:score', { roomCode, playerId, delta, outcome: correct ? 'correct' : 'wrong', isDailyDouble: isDD });
     if (correct) {
-      playCorrect();
       addLog({ type: 'correct', msg: `${player?.name} answered correctly (+$${value})`, player: player?.name });
     } else {
-      playWrong();
       addLog({ type: 'wrong', msg: `${player?.name} answered wrong (-$${value})`, player: player?.name });
     }
     // close without double-logging
@@ -141,7 +144,7 @@ export default function Host() {
   function addPlayer() {
     if (!addPlayerName.trim()) return;
     const color = PLAYER_COLORS[(gameState?.players.length ?? 0) % PLAYER_COLORS.length];
-    socket.emit('player:join', { roomCode, name: addPlayerName.trim(), color });
+    socket.emit('host:add-player', { roomCode, name: addPlayerName.trim(), color });
     setAddPlayerName('');
   }
 
@@ -149,9 +152,15 @@ export default function Host() {
     socket.emit('host:remove-player', { roomCode, playerId });
   }
 
+  function startFinalJeopardy() {
+    const totalQuestions = board!.categories.reduce((n, c) => n + c.questions.length, 0);
+    const remaining = totalQuestions - gameState!.answeredQuestions.length;
+    if (remaining > 0 && !confirm(`${remaining} clue(s) haven't been played yet. Start Final Jeopardy anyway?`)) return;
+    socket.emit('host:fj-start', { roomCode });
+  }
+
   const boardUrl = `${window.location.origin}/board/${roomCode}`;
   const buzzUrl = `${window.location.origin}/buzz/${roomCode}`;
-  const isDDUnrevealed = activeQ?.isDailyDouble && !gameState.dailyDoubleRevealed;
 
   // Derive per-player stats from the log
   const playerStats = gameState.players.map(p => {
@@ -220,6 +229,16 @@ export default function Host() {
             </div>
           </div>
 
+          {/* Final Jeopardy launcher */}
+          {board.finalJeopardy && !gameState.finalJeopardy && (
+            <button
+              className="mt-4 w-full bg-jeopardy-gold text-jeopardy-dark font-black py-3 rounded-lg hover:brightness-110 transition-all"
+              onClick={startFinalJeopardy}
+            >
+              ⚡ Start Final Jeopardy
+            </button>
+          )}
+
           {/* Share links */}
           <div className="mt-4 space-y-2">
             <ShareLink label="Board view (project this)" url={boardUrl} />
@@ -233,94 +252,77 @@ export default function Host() {
           {/* Active question panel */}
           <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <h2 className="text-sm font-bold text-gray-400 uppercase mb-3">Active Question</h2>
-            {activeQ ? (
+            {gameState.finalJeopardy ? (
+              <HostFinalPanel roomCode={roomCode} gameState={gameState} board={board} />
+            ) : activeQ?.isDailyDouble && gameState.dailyDouble ? (
+              <DDHostPanel
+                roomCode={roomCode}
+                gameState={gameState}
+                activeQ={activeQ}
+                onAward={awardPoints}
+                onReveal={revealDD}
+                onClose={closeQuestion}
+              />
+            ) : activeQ ? (
               <div className="space-y-3">
-                <div className="text-jeopardy-gold font-black text-xl">${activeQ.value}
-                  {activeQ.isDailyDouble && <span className="ml-2 text-yellow-300 text-sm">Daily Double!</span>}
+                <div className="text-jeopardy-gold font-black text-xl">${activeQ.value}</div>
+
+                <div className="bg-gray-800 rounded p-3 text-sm text-white leading-relaxed">{activeQ.clue}</div>
+
+                {/* Answer always visible to host */}
+                <div className="bg-green-950 border border-green-700 rounded p-3 text-sm text-green-300">
+                  <div className="text-[10px] text-gray-500 uppercase mb-1">Answer</div>
+                  {activeQ.response}
                 </div>
 
-                {isDDUnrevealed ? (
-                  <div className="space-y-3">
-                    <div className="bg-yellow-900 border border-yellow-500 rounded p-3 text-sm text-yellow-200 text-center">
-                      Daily Double splash shown on board.<br />Reveal the clue when ready.
-                    </div>
-                    {/* Always show clue + answer to host even before board reveal */}
-                    <div className="bg-gray-800 rounded p-3 text-sm text-white leading-relaxed opacity-70">
-                      <div className="text-[10px] text-gray-500 uppercase mb-1">Clue (host only)</div>
-                      {activeQ.clue}
-                    </div>
-                    <div className="bg-green-950 border border-green-700 rounded p-3 text-sm text-green-300 opacity-70">
-                      <div className="text-[10px] text-gray-500 uppercase mb-1">Answer (host only)</div>
-                      {activeQ.response}
-                    </div>
-                    <button
-                      className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-2 rounded transition-colors"
-                      onClick={revealDD}
-                    >
-                      ▶ Reveal Question
-                    </button>
-                    <button className="btn-danger text-sm w-full" onClick={closeQuestion}>Close Question</button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="bg-gray-800 rounded p-3 text-sm text-white leading-relaxed">{activeQ.clue}</div>
-
-                    {/* Answer always visible to host */}
-                    <div className="bg-green-950 border border-green-700 rounded p-3 text-sm text-green-300">
-                      <div className="text-[10px] text-gray-500 uppercase mb-1">Answer</div>
-                      {activeQ.response}
-                    </div>
-
-                    {/* Show on board button — only relevant until revealed */}
-                    {!gameState.responseVisible && (
-                      <button className="btn-ghost text-sm w-full" onClick={showAnswer}>Show Answer on Board</button>
-                    )}
-
-                    {/* Buzzer controls */}
-                    <div className="space-y-2">
-                      {gameState.buzzerState === 'idle' && (
-                        <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors" onClick={enableBuzzer}>
-                          🔔 Open Buzzers
-                        </button>
-                      )}
-                      {gameState.buzzerState === 'open' && (
-                        <button className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 rounded transition-colors" onClick={lockBuzzer}>
-                          🔒 Lock Buzzers
-                        </button>
-                      )}
-                      {gameState.buzzerState === 'locked' && buzzWinner && (
-                        <div className="bg-jeopardy-blue border-2 border-jeopardy-gold rounded p-3 text-center">
-                          <div className="text-gray-300 text-sm">Buzzed In:</div>
-                          <div className="text-jeopardy-gold font-black text-lg">{buzzWinner}</div>
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-1 rounded text-sm"
-                              onClick={() => {
-                                const p = gameState.players.find(p => p.name === buzzWinner);
-                                if (p) awardPoints(p.id, true);
-                              }}
-                            >✓ Correct</button>
-                            <button
-                              className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1 rounded text-sm"
-                              onClick={() => {
-                                const p = gameState.players.find(p => p.name === buzzWinner);
-                                if (p) awardPoints(p.id, false);
-                              }}
-                            >✗ Wrong</button>
-                            <button className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm" onClick={resetBuzzer}>↺</button>
-                          </div>
-                        </div>
-                      )}
-                      {gameState.buzzerState === 'locked' && !buzzWinner && (
-                        <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors" onClick={resetBuzzer}>
-                          🔔 Re-open Buzzers
-                        </button>
-                      )}
-                    </div>
-
-                    <button className="btn-danger text-sm w-full" onClick={closeQuestion}>Close Question</button>
-                  </>
+                {/* Show on board button — only relevant until revealed */}
+                {!gameState.responseVisible && (
+                  <button className="btn-ghost text-sm w-full" onClick={showAnswer}>Show Answer on Board</button>
                 )}
+
+                {/* Buzzer controls */}
+                <div className="space-y-2">
+                  {gameState.buzzerState === 'idle' && (
+                    <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors" onClick={enableBuzzer}>
+                      🔔 Open Buzzers
+                    </button>
+                  )}
+                  {gameState.buzzerState === 'open' && (
+                    <button className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 rounded transition-colors" onClick={lockBuzzer}>
+                      🔒 Lock Buzzers
+                    </button>
+                  )}
+                  {gameState.buzzerState === 'locked' && buzzWinner && (
+                    <div className="bg-jeopardy-blue border-2 border-jeopardy-gold rounded p-3 text-center">
+                      <div className="text-gray-300 text-sm">Buzzed In:</div>
+                      <div className="text-jeopardy-gold font-black text-lg">{buzzWinner}</div>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-1 rounded text-sm"
+                          onClick={() => {
+                            const p = gameState.players.find(p => p.name === buzzWinner);
+                            if (p) awardPoints(p.id, true);
+                          }}
+                        >✓ Correct</button>
+                        <button
+                          className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1 rounded text-sm"
+                          onClick={() => {
+                            const p = gameState.players.find(p => p.name === buzzWinner);
+                            if (p) awardPoints(p.id, false);
+                          }}
+                        >✗ Wrong</button>
+                        <button className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm" onClick={resetBuzzer}>↺</button>
+                      </div>
+                    </div>
+                  )}
+                  {gameState.buzzerState === 'locked' && !buzzWinner && (
+                    <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors" onClick={resetBuzzer}>
+                      🔔 Re-open Buzzers
+                    </button>
+                  )}
+                </div>
+
+                <button className="btn-danger text-sm w-full" onClick={closeQuestion}>Close Question</button>
               </div>
             ) : (
               <p className="text-gray-500 text-sm">Click a question on the board to open it.</p>

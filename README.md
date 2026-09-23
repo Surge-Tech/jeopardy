@@ -9,6 +9,7 @@ A self-hosted, fully customizable Jeopardy game platform. Build your own boards,
 - **Board Editor** — Create unlimited Jeopardy boards with up to 6 categories and 5 clues each. Supports text, images, and video clues.
 - **Real-time Buzzer System** — Players connect on any device via a browser. First buzz wins, ties are impossible.
 - **Daily Doubles** — Mark any clue as a Daily Double. The host controls when to reveal it.
+- **Final Jeopardy** — A full wager-clue-reveal round with live wagers, a synced countdown timer, a dramatic per-contestant reveal, and a final scoreboard.
 - **Projection View** — A fullscreen board view designed for a TV or shared screen.
 - **Host Control Panel** — Score tracking, manual score adjustments, game history log, per-player stats, and roll-back support.
 - **Sound Effects** — Synthesized audio cues for buzz-ins, Daily Doubles, and more. No audio files needed.

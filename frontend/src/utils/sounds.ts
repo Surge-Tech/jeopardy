@@ -65,3 +65,49 @@ export function playWrong() {
 export function playQuestionOpen() {
   tone(660, 0.12, 'sine', 0.2, 0, 880);
 }
+
+// Low brass-like swell announcing Final Jeopardy
+export function playFinalJeopardy() {
+  tone(98, 1.6, 'sawtooth', 0.25, 0, 130.81);
+  tone(65.41, 1.8, 'triangle', 0.3, 0.1, 98);
+  tone(196, 1.4, 'sine', 0.15, 0.3, 261.63);
+}
+
+// A single soft tick, used for the last 5 seconds of the Final Jeopardy timer
+export function playTick() {
+  tone(1200, 0.06, 'square', 0.15);
+}
+
+// Buzzer-style stamp when time runs out
+export function playTimesUp() {
+  tone(180, 0.5, 'sawtooth', 0.4, 0, 60);
+}
+
+// Bright, quick reveal chime used per-contestant during the reveal sequence
+export function playReveal() {
+  tone(440, 0.15, 'sine', 0.3, 0);
+  tone(660, 0.2, 'sine', 0.3, 0.1);
+}
+
+// Triumphant ascending fanfare for the final scoreboard winner
+export function playWinnerFanfare() {
+  const notes = [392, 523.25, 659.25, 783.99, 1046.5];
+  notes.forEach((f, i) => tone(f, i < 4 ? 0.16 : 0.7, 'sine', 0.4, i * 0.11));
+}
+
+// Quiet, original ambient "thinking" pulse — NOT the copyrighted "Think!" melody.
+// A soft repeating low pulse to fill the silence during the countdown; call
+// stopThinkingPulse() at time-up.
+let thinkingInterval: number | null = null;
+export function playThinkingPulse() {
+  if (thinkingInterval !== null) return;
+  const beat = () => tone(220, 0.2, 'sine', 0.08, 0, 196);
+  beat();
+  thinkingInterval = window.setInterval(beat, 900);
+}
+export function stopThinkingPulse() {
+  if (thinkingInterval !== null) {
+    window.clearInterval(thinkingInterval);
+    thinkingInterval = null;
+  }
+}

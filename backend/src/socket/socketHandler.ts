@@ -1,16 +1,20 @@
 import type { Server, Socket } from 'socket.io';
 import * as gm from './gameManager.js';
+import { registerFinalHandlers, cleanup as cleanupFinal } from './finalJeopardy.js';
 
 // Track which socket owns which player in which room
 const socketPlayers = new Map<string, { roomCode: string; playerId: string; playerName: string }>();
 
 export function registerSocketHandlers(io: Server) {
   io.on('connection', (socket: Socket) => {
+    registerFinalHandlers(io, socket, socketPlayers);
+
     // ── HOST: create a game session ──────────────────────────────────────
     socket.on('host:create', ({ boardId }: { boardId: string }) => {
       const session = gm.createSession(boardId);
       socket.join(session.roomCode);
       socket.join(`host:${session.roomCode}`);
+      socket.join(`hostpanel:${session.roomCode}`);
       socket.emit('host:created', { roomCode: session.roomCode, state: session });
     });
 
@@ -20,6 +24,7 @@ export function registerSocketHandlers(io: Server) {
       if (!session) return socket.emit('error', { message: 'Room not found' });
       socket.join(roomCode);
       socket.join(`host:${roomCode}`);
+      socket.join(`hostpanel:${roomCode}`);
       socket.emit('game:state', session);
     });
 
@@ -33,6 +38,30 @@ export function registerSocketHandlers(io: Server) {
       socket.join(roomCode);
       socket.emit('player:joined', { player, state: gm.getSession(roomCode) });
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
+    // ── HOST: add a player with no phone of their own ─────────────────────
+    // Deliberately does NOT touch socketPlayers — that map means "this
+    // socket acts on this player's behalf from their own device," which is
+    // never true for a host-added player (their entry would otherwise
+    // falsely point at the host's own socket).
+    socket.on('host:add-player', ({ roomCode, name, color }: { roomCode: string; name: string; color: string }) => {
+      const session = gm.getSession(roomCode);
+      if (!session) return socket.emit('error', { message: 'Room not found' });
+      const player = gm.addPlayer(roomCode, name, color);
+      if (!player) return socket.emit('error', { message: 'Could not add player' });
+      io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
+    // ── PLAYER: rejoin after reconnect (e.g. phone screen locked) ────────
+    socket.on('player:rejoin', ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+      const session = gm.getSession(roomCode);
+      if (!session) return socket.emit('error', { message: 'Room not found' });
+      const player = session.players.find(p => p.id === playerId);
+      if (!player) return socket.emit('error', { message: 'Player no longer in this game' });
+      socketPlayers.set(socket.id, { roomCode, playerId: player.id, playerName: player.name });
+      socket.join(roomCode);
+      socket.emit('player:joined', { player, state: session });
     });
 
     // ── PLAYER: buzz in ──────────────────────────────────────────────────
@@ -74,9 +103,40 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: open a question ────────────────────────────────────────────
-    socket.on('host:open-question', ({ roomCode, questionId, isDailyDouble }: { roomCode: string; questionId: string; isDailyDouble: boolean }) => {
+    socket.on('host:open-question', ({ roomCode, questionId, isDailyDouble, boardHighValue }: { roomCode: string; questionId: string; isDailyDouble: boolean; boardHighValue?: number }) => {
       gm.openQuestion(roomCode, questionId, isDailyDouble);
+      if (isDailyDouble) {
+        const session = gm.getSession(roomCode);
+        const lastCorrect = session?.lastCorrectPlayerId ?? null;
+        const hasDevice = lastCorrect
+          ? [...socketPlayers.values()].some(v => v.roomCode === roomCode && v.playerId === lastCorrect)
+          : false;
+        gm.startDailyDoubleWager(roomCode, lastCorrect, boardHighValue ?? 0, hasDevice);
+      }
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
+    // ── HOST: fallback pick of the Daily Double contestant ────────────────
+    socket.on('host:dd-pick-player', ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+      const hasDevice = [...socketPlayers.values()].some(v => v.roomCode === roomCode && v.playerId === playerId);
+      gm.pickDDContestant(roomCode, playerId, hasDevice);
+      io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
+    // ── HOST: correct/enter a Daily Double wager on behalf of a player ────
+    socket.on('host:dd-override-wager', ({ roomCode, amount }: { roomCode: string; amount: number }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+      const res = gm.overrideDDWager(roomCode, amount);
+      ack?.(res);
+      io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
+    // ── PLAYER: submit a Daily Double wager ────────────────────────────────
+    socket.on('dd:wager', ({ amount }: { amount: number }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+      const info = socketPlayers.get(socket.id);
+      if (!info) return ack?.({ ok: false, error: 'Not joined' });
+      const res = gm.submitDDWager(info.roomCode, info.playerId, amount);
+      ack?.(res);
+      io.to(info.roomCode).emit('game:state', gm.getSession(info.roomCode));
     });
 
     // ── HOST: reveal DD clue (after DD splash screen) ────────────────────
@@ -98,8 +158,13 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: award / deduct points ──────────────────────────────────────
-    socket.on('host:score', ({ roomCode, playerId, delta }: { roomCode: string; playerId: string; delta: number }) => {
+    socket.on('host:score', ({ roomCode, playerId, delta, outcome, isDailyDouble }: { roomCode: string; playerId: string; delta: number; outcome?: 'correct' | 'wrong'; isDailyDouble?: boolean }) => {
       gm.updateScore(roomCode, playerId, delta);
+      if (outcome) {
+        gm.recordOutcome(roomCode, playerId, outcome);
+        if (outcome === 'correct' && !isDailyDouble) gm.setLastCorrectPlayer(roomCode, playerId);
+        io.to(roomCode).emit('score:result', { playerId, correct: outcome === 'correct' });
+      }
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
@@ -123,6 +188,7 @@ export function registerSocketHandlers(io: Server) {
     // ── HOST: end / delete session ───────────────────────────────────────
     socket.on('host:end', ({ roomCode }: { roomCode: string }) => {
       io.to(roomCode).emit('game:ended');
+      cleanupFinal(roomCode);
       gm.deleteSession(roomCode);
     });
 

@@ -3,8 +3,14 @@ import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { GameState } from '../types';
+import PlayerFinal from '../components/final/PlayerFinal';
+import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 
 type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'open' | 'winner' | 'too-late';
+
+function rejoinKey(roomCode: string | undefined) {
+  return `jeopardy:player:${roomCode ?? ''}`;
+}
 
 export default function Buzzer() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -15,10 +21,22 @@ export default function Buzzer() {
   const [winnerName, setWinnerName] = useState('');
   const [myId, setMyId] = useState('');
 
+  // Try to rejoin (e.g. after a phone screen sleeps and drops the socket).
+  useEffect(() => {
+    if (!roomCode) return;
+    function tryRejoin() {
+      const savedId = localStorage.getItem(rejoinKey(roomCode));
+      if (savedId) socket.emit('player:rejoin', { roomCode, playerId: savedId });
+    }
+    tryRejoin();
+    socket.on('connect', tryRejoin);
+    return () => { socket.off('connect', tryRejoin); };
+  }, [roomCode]);
+
   useEffect(() => {
     socket.on('game:state', (state: GameState) => {
       setGameState(state);
-      if (phase !== 'join' && phase !== 'lobby') {
+      if (!state.finalJeopardy && phase !== 'join' && phase !== 'lobby') {
         if (state.buzzerState === 'open') setPhase('open');
         if (state.buzzerState === 'idle') setPhase('waiting');
       }
@@ -28,6 +46,7 @@ export default function Buzzer() {
       setMyPlayer(player as any);
       setGameState(state);
       setPhase('waiting');
+      if (roomCode) localStorage.setItem(rejoinKey(roomCode), player.id);
     });
     socket.on('buzz:winner', ({ playerId, playerName }: { playerId: string; playerName: string }) => {
       if (playerId === myId) {
@@ -65,6 +84,8 @@ export default function Buzzer() {
   }
 
   const myScore = gameState?.players.find(p => p.id === myId)?.score ?? 0;
+  const isDDWagering = !!(gameState?.dailyDouble && gameState.dailyDouble.playerId === myId
+    && gameState.dailyDouble.stage === 'wagering' && gameState.dailyDouble.hasDevice);
 
   return (
     <div className="min-h-screen bg-jeopardy-dark flex flex-col items-center justify-center p-4 select-none">
@@ -95,8 +116,18 @@ export default function Buzzer() {
         </div>
       )}
 
+      {/* Final Jeopardy takes over once it starts */}
+      {phase !== 'join' && gameState?.finalJeopardy && myId && (
+        <PlayerFinal gameState={gameState} myId={myId} />
+      )}
+
+      {/* Daily Double wager — only the assigned contestant sees this */}
+      {phase !== 'join' && !gameState?.finalJeopardy && isDDWagering && gameState?.dailyDouble && (
+        <DDPlayerWager dailyDouble={gameState.dailyDouble} />
+      )}
+
       {/* WAITING phase */}
-      {phase === 'waiting' && (
+      {!gameState?.finalJeopardy && !isDDWagering && phase === 'waiting' && (
         <div className="text-center">
           <p className="text-3xl font-black text-white mb-2">{name}</p>
           <p className="text-jeopardy-gold font-black text-2xl mb-8">
@@ -109,7 +140,7 @@ export default function Buzzer() {
       )}
 
       {/* OPEN phase — buzzer ready */}
-      {phase === 'open' && (
+      {!gameState?.finalJeopardy && !isDDWagering && phase === 'open' && (
         <div className="text-center">
           <p className="text-3xl font-black text-white mb-2">{name}</p>
           <p className="text-jeopardy-gold font-black text-2xl mb-8">
@@ -128,7 +159,7 @@ export default function Buzzer() {
       )}
 
       {/* WINNER phase */}
-      {phase === 'winner' && (
+      {!gameState?.finalJeopardy && phase === 'winner' && (
         <div className="text-center flip-in">
           <div className="text-6xl mb-4">⚡</div>
           <h2 className="text-4xl font-black text-jeopardy-gold mb-2" style={{ textShadow: '2px 2px 0 #000' }}>
@@ -139,7 +170,7 @@ export default function Buzzer() {
       )}
 
       {/* TOO LATE phase */}
-      {phase === 'too-late' && (
+      {!gameState?.finalJeopardy && phase === 'too-late' && (
         <div className="text-center flip-in">
           <div className="text-6xl mb-4">❌</div>
           <h2 className="text-3xl font-black text-red-400 mb-2">Too slow!</h2>
@@ -148,7 +179,7 @@ export default function Buzzer() {
       )}
 
       {/* Players list (compact) */}
-      {gameState && gameState.players.length > 0 && phase !== 'join' && (
+      {!gameState?.finalJeopardy && gameState && gameState.players.length > 0 && phase !== 'join' && (
         <div className="mt-12 w-full max-w-sm">
           <h3 className="text-gray-500 text-xs uppercase tracking-widest mb-2 text-center">Scoreboard</h3>
           <div className="space-y-1">

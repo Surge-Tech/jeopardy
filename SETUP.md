@@ -12,9 +12,11 @@ Everything you need to run your own Jeopardy game night — local, LAN, or fully
 4. [Case 2: Online / Remote Game Night (Fly.io)](#case-2-online--remote-game-night-flyio)
 5. [Creating Your First Board](#creating-your-first-board)
 6. [Running a Game](#running-a-game)
-7. [Player Instructions](#player-instructions)
-8. [Environment Variables](#environment-variables)
-9. [Docker (Self-Hosting)](#docker-self-hosting)
+7. [Daily Double Wagering](#daily-double-wagering)
+8. [Final Jeopardy](#final-jeopardy)
+9. [Player Instructions](#player-instructions)
+10. [Environment Variables](#environment-variables)
+11. [Docker (Self-Hosting)](#docker-self-hosting)
 
 ---
 
@@ -169,6 +171,7 @@ No credit card required for the free tier.
    - Click any point cell to add a clue
    - Each clue has a **Question**, **Answer**, and optional **image/video**
    - Toggle **Daily Double** on any clue
+   - Click **⚡ Final Jeopardy** in the top bar to set up the closing round (category, clue, response, optional media, and an answer timer — defaults to 30s). This is optional; boards without it simply skip Final Jeopardy.
 6. Click **Save Board** when done
 
 Boards are saved as JSON files in `backend/data/boards/`. You can back them up or share them by copying those files.
@@ -193,15 +196,39 @@ Boards are saved as JSON files in `backend/data/boards/`. You can back them up o
 | **✓ Correct / ✗ Wrong** | Awards or deducts points, closes the clue |
 | **Lock Buzzers** | Closes buzzers if open without selecting a winner |
 | **Adjust Score** | Manual ±point correction on any player |
+| **⚡ Start Final Jeopardy** | Appears once the board's Final Jeopardy is configured; begins the closing round |
 | **Log tab** | Full history of the current game |
 | **Stats tab** | Per-player leaderboard and correct/wrong breakdown |
 
-### Daily Double Flow
+---
 
-1. Host clicks a Daily Double tile
-2. Board view shows the DD splash screen — host announces it
-3. Host clicks **Reveal Clue** to show the question
-4. After the player answers, host marks Correct or Wrong
+## Daily Double Wagering
+
+Picking a Daily Double tile no longer just shows the clue — the host panel walks through a wager step first, all sound effects and the "DAILY DOUBLE!" splash play on the board/TV, not the host's own device:
+
+1. **Host clicks a Daily Double tile.** The board shows the "DAILY DOUBLE!" splash and holds there through the wager step.
+2. **The game picks who's wagering** — whoever most recently answered a *regular* clue correctly. That player's phone shows a wager screen (numeric entry plus $0 / Half / All-in quick buttons and a confirm step, since a locked wager can't be changed). Their max wager is `max(their current score, the board's highest point value)`, per standard Jeopardy rules, with a $0 floor.
+   - **No player has answered correctly yet** (e.g. this is the very first clue of the game)? The host panel shows a picker so you can choose the contestant manually.
+   - **The assigned player has no phone** (added directly from the host panel)? The host's override field is usable immediately, since no phone submission will ever arrive.
+   - **The assigned player does have a phone?** The host's override field stays disabled until they submit — it's there to fix a mistake, not to skip their turn.
+3. Once the wager is locked, click **Reveal Question** to show the clue on the board, exactly as before.
+4. Mark **✓ Correct / ✗ Wrong** — the score changes by the locked wager, not the clue's face value.
+
+---
+
+## Final Jeopardy
+
+If a board has Final Jeopardy configured (see [Creating Your First Board](#creating-your-first-board)), a **⚡ Start Final Jeopardy** button appears under the board grid once every regular clue is played (it'll ask you to confirm if any are still unplayed).
+
+The round runs as a fixed sequence, driven entirely by the host panel — the board and player phones just follow along:
+
+1. **Intro** — a gold "FINAL JEOPARDY!" splash plays on the board with a low ambient swell.
+2. **Reveal Category** — the category card flips in on the board.
+3. **Wagering** — every player's phone shows a wager screen (same numeric-entry-plus-quick-buttons UI as Daily Double). Players at $0 or below are automatically locked at a $0 wager so nobody gets stuck waiting on them. The host can force a reveal once wagers are in (missing wagers default to $0), or enter a wager on behalf of a player with no phone.
+4. **Reveal Clue → Start Timer** — the clue appears with an on-screen countdown ring, synced across the board, phones, and host panel. A soft ambient pulse fills the silence while players think, with ticks in the final 5 seconds.
+5. **Answering** — players type their answer on their phone; drafts sync live to the host panel as they type, and a Submit button locks it in early. Whatever's typed when time runs out counts — a blank answer means that player is out.
+6. **Reveal** — the host steps through each contestant, lowest score first: name → wager → answer → judge (✓/✗), with an Undo available before moving on. The board updates live at each step.
+7. **Correct Response → Final Scoreboard** — the host reveals the correct answer, then a podium-and-stats scoreboard with a winner's fanfare closes out the game.
 
 ---
 
@@ -214,6 +241,9 @@ Share this with your players:
 > 2. Enter your name and click **Join**
 > 3. When the host opens a question, a big button appears — tap it to buzz in
 > 4. First tap wins — keep your phone awake and ready!
+>
+> **If you land a Daily Double or reach Final Jeopardy:**
+> Your phone will show a wager screen instead of the buzzer — type an amount (or use the $0 / Half / All-in buttons), then confirm. Once locked, it can't be changed, so double-check before confirming. During Final Jeopardy, you'll then get a text box to type your answer — you can keep editing it until you hit Submit or time runs out, whichever comes first.
 
 ---
 

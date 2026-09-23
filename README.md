@@ -8,11 +8,11 @@ A self-hosted, fully customizable Jeopardy game platform. Build your own boards,
 
 - **Board Editor** — Create unlimited Jeopardy boards with up to 6 categories and 5 clues each. Supports text, images, and video clues.
 - **Real-time Buzzer System** — Players connect on any device via a browser. First buzz wins, ties are impossible.
-- **Daily Doubles** — Mark any clue as a Daily Double. The host controls when to reveal it.
-- **Final Jeopardy** — A full wager-clue-reveal round with live wagers, a synced countdown timer, a dramatic per-contestant reveal, and a final scoreboard.
+- **Daily Doubles with Wagering** — Mark any clue as a Daily Double. The host reveals it and the game automatically prompts the right player to wager on their phone (with a host override, and a manual picker for the rare case no player has answered correctly yet) — scoring then uses their wager instead of the clue's face value.
+- **Final Jeopardy** — A full wager-clue-reveal round with live wagers, a synced countdown timer, ambient music during the countdown, a dramatic per-contestant reveal, and a final scoreboard with a podium and stats.
 - **Projection View** — A fullscreen board view designed for a TV or shared screen.
 - **Host Control Panel** — Score tracking, manual score adjustments, game history log, per-player stats, and roll-back support.
-- **Sound Effects** — Synthesized audio cues for buzz-ins, Daily Doubles, and more. No audio files needed.
+- **Sound Effects** — Synthesized audio cues for buzz-ins, Daily Doubles, Final Jeopardy, and more, played on the board/TV so the room hears them. No audio files needed.
 - **Persistent Storage** — Boards are saved as JSON files on disk. No database required.
 - **Works Everywhere** — Run it on your laptop for an in-person game night, or deploy it to the cloud for a remote game night. Players connect from anywhere with a link.
 
@@ -81,8 +81,9 @@ jeopardy/
 │   │   │   ├── boards.ts       # Board CRUD API
 │   │   │   └── media.ts        # Image/video upload
 │   │   ├── socket/
-│   │   │   ├── gameManager.ts  # In-memory game sessions
-│   │   │   └── socketHandler.ts
+│   │   │   ├── gameManager.ts    # In-memory game sessions
+│   │   │   ├── socketHandler.ts  # Core game + buzzer + Daily Double events
+│   │   │   └── finalJeopardy.ts  # Final Jeopardy state machine + events
 │   │   └── storage/
 │   │       └── boardStorage.ts # JSON file persistence
 │   └── package.json
@@ -93,7 +94,11 @@ jeopardy/
 │       │   ├── Editor.tsx      # Board editor
 │       │   ├── Host.tsx        # Host control panel
 │       │   ├── BoardView.tsx   # Projection screen
-│       │   └── Buzzer.tsx      # Player buzzer (phone)
+│       │   └── Buzzer.tsx      # Player buzzer / wager (phone)
+│       ├── components/
+│       │   ├── final/          # Final Jeopardy: board screens, host panel, editor
+│       │   ├── dailydouble/    # Daily Double: host panel, player wager screen
+│       │   └── shared/         # WagerInput, reused by both
 │       ├── store/
 │       │   └── gameStore.ts    # Zustand state (game log, etc.)
 │       └── utils/

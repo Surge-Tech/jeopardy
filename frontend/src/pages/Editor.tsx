@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Board, Category, Question } from '../types';
+import type { Board, Category, Question, FinalJeopardyBoard } from '../types';
+import FinalJeopardyEditor from '../components/final/FinalJeopardyEditor';
 
 const API = '/api';
 
@@ -18,6 +19,7 @@ export default function Editor() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<{ catIdx: number; qIdx: number } | null>(null);
+  const [editingFinal, setEditingFinal] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/boards/${boardId}`)
@@ -64,6 +66,18 @@ export default function Editor() {
     setBoard({ ...board!, categories: cats });
   }
 
+  function saveFinalJeopardy(fj: FinalJeopardyBoard) {
+    const b = { ...board!, finalJeopardy: fj };
+    setBoard(b);
+    save(b);
+  }
+
+  function removeFinalJeopardy() {
+    const b = { ...board!, finalJeopardy: undefined };
+    setBoard(b);
+    save(b);
+  }
+
   const activeQ = editingQuestion != null
     ? board.categories[editingQuestion.catIdx]?.questions[editingQuestion.qIdx]
     : null;
@@ -81,6 +95,12 @@ export default function Editor() {
         />
         <div className="ml-auto flex gap-3 items-center">
           {saved && <span className="text-green-400 text-sm">✓ Saved</span>}
+          <button
+            className={`btn-ghost text-sm ${board.finalJeopardy ? 'bg-jeopardy-gold text-jeopardy-dark' : ''}`}
+            onClick={() => setEditingFinal(true)}
+          >
+            ⚡ Final Jeopardy{board.finalJeopardy ? ' ✓' : ''}
+          </button>
           <button className="btn-primary" onClick={() => save(board)} disabled={saving}>
             {saving ? 'Saving...' : 'Save'}
           </button>
@@ -195,6 +215,15 @@ export default function Editor() {
           question={activeQ}
           onChange={updates => updateQuestion(editingQuestion.catIdx, editingQuestion.qIdx, updates)}
           onClose={() => { save(board); setEditingQuestion(null); }}
+        />
+      )}
+
+      {editingFinal && (
+        <FinalJeopardyEditor
+          finalJeopardy={board.finalJeopardy}
+          onSave={saveFinalJeopardy}
+          onRemove={removeFinalJeopardy}
+          onClose={() => setEditingFinal(false)}
         />
       )}
     </div>

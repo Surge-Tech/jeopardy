@@ -1,12 +1,13 @@
-# fly.toml — Fly.io deployment configuration
-# See https://fly.io/docs/reference/configuration/ for reference.
-# Before deploying: run `fly launch` to generate your own app name, or change
-# the `app` value below to your chosen app name and run `fly deploy`.
+# fly.toml app configuration file generated for jeopardy-cergkq on 2026-09-23T22:24:58Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = 'your-app-name'
-primary_region = 'iad'
+app = 'jeopardy-cergkq'
+primary_region = 'ewr'
 
 [build]
+
 [env]
   DATA_DIR = '/app/data'
   NODE_ENV = 'production'
@@ -17,7 +18,7 @@ primary_region = 'iad'
   destination = '/app/data'
 
 [http_service]
-  internal_port = 3001
+  internal_port = 8080
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true

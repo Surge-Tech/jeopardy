@@ -32,7 +32,7 @@ This runs two development servers — one for the backend, one for the frontend.
 
 ```bash
 # Clone the repo
-git clone https://github.com/natah0303/jeopardy.git
+git clone https://github.com/Surge-Tech/jeopardy.git
 cd jeopardy
 
 # Install dependencies for both frontend and backend

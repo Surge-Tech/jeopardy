@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '../types';
-import { playDailyDouble, playBuzzerReady, playBuzzIn } from '../utils/sounds';
+import { playDailyDouble, playBuzzerReady, playBuzzIn, playQuestionOpen, playCorrect, playWrong } from '../utils/sounds';
+import FinalBoardScreen from '../components/final/FinalBoardScreen';
 
 const API = '/api';
 
@@ -35,10 +36,14 @@ export default function BoardView() {
       playBuzzIn();
       setTimeout(() => setBuzzWinner(null), 1500);
     });
+    socket.on('score:result', ({ correct }: { correct: boolean }) => {
+      correct ? playCorrect() : playWrong();
+    });
     socket.emit('get:state', { roomCode });
     return () => {
       socket.off('game:state');
       socket.off('buzz:winner');
+      socket.off('score:result');
     };
   }, [roomCode]);
 
@@ -51,6 +56,7 @@ export default function BoardView() {
     const q = board.categories.flatMap(c => c.questions).find(q => q.id === gameState.activeQuestionId);
     setShowQuestion(q ?? null);
     if (q?.isDailyDouble) playDailyDouble();
+    else if (q) playQuestionOpen();
   }, [gameState?.activeQuestionId, board]);
 
   if (!gameState || !board) {
@@ -65,10 +71,15 @@ export default function BoardView() {
   }
 
   const answeredSet = new Set(gameState.answeredQuestions);
-  const isDDSplash = showQuestion?.isDailyDouble && !gameState.dailyDoubleRevealed;
+  const isDDSplash = showQuestion?.isDailyDouble && (
+    !gameState.dailyDoubleRevealed || (gameState.dailyDouble != null && gameState.dailyDouble.stage !== 'ready')
+  );
 
   return (
     <div className="min-h-screen bg-jeopardy-dark flex flex-col overflow-hidden" style={{ fontFamily: 'Arial Black, Impact, sans-serif' }}>
+
+      {/* Final Jeopardy takes over the whole screen once it starts */}
+      {gameState.finalJeopardy && <FinalBoardScreen gameState={gameState} />}
 
       {/* Buzz winner overlay */}
       {buzzWinner && (

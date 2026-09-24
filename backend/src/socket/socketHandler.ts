@@ -2,6 +2,7 @@ import type { Server, Socket } from 'socket.io';
 import * as gm from './gameManager.js';
 import * as boardStorage from '../storage/boardStorage.js';
 import { registerFinalHandlers, cleanup as cleanupFinal } from './finalJeopardy.js';
+import { onHost } from './hostAuth.js';
 
 // Track which socket owns which player in which room
 const socketPlayers = new Map<string, { roomCode: string; playerId: string; playerName: string }>();
@@ -59,7 +60,7 @@ export function registerSocketHandlers(io: Server) {
     // socket acts on this player's behalf from their own device," which is
     // never true for a host-added player (their entry would otherwise
     // falsely point at the host's own socket).
-    socket.on('host:add-player', ({ roomCode, name, color }: { roomCode: string; name: string; color: string }) => {
+    onHost(socket, 'host:add-player', ({ roomCode, name, color }: { roomCode: string; name: string; color: string }) => {
       const session = gm.getSession(roomCode);
       if (!session) return socket.emit('error', { message: 'Room not found' });
       const player = gm.addPlayer(roomCode, name, color);
@@ -102,34 +103,34 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: set buzzer lockout duration ──────────────────────────────────
-    socket.on('host:set-lockout', ({ roomCode, ms }: { roomCode: string; ms: number }) => {
+    onHost(socket, 'host:set-lockout', ({ roomCode, ms }: { roomCode: string; ms: number }) => {
       gm.setLockoutMs(roomCode, ms);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: open buzzer ────────────────────────────────────────────────
-    socket.on('host:enable-buzzer', ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:enable-buzzer', ({ roomCode }: { roomCode: string }) => {
       gm.enableBuzzer(roomCode);
       io.to(roomCode).emit('buzzer:open');
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: reset buzzer (allow re-buzz) ───────────────────────────────
-    socket.on('host:reset-buzzer', ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:reset-buzzer', ({ roomCode }: { roomCode: string }) => {
       gm.resetBuzzer(roomCode);
       io.to(roomCode).emit('buzzer:open');
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: lock buzzer ────────────────────────────────────────────────
-    socket.on('host:lock-buzzer', ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:lock-buzzer', ({ roomCode }: { roomCode: string }) => {
       gm.lockBuzzer(roomCode);
       io.to(roomCode).emit('buzzer:locked');
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: open a question ────────────────────────────────────────────
-    socket.on('host:open-question', ({ roomCode, questionId, isDailyDouble, boardHighValue }: { roomCode: string; questionId: string; isDailyDouble: boolean; boardHighValue?: number }) => {
+    onHost(socket, 'host:open-question', ({ roomCode, questionId, isDailyDouble, boardHighValue }: { roomCode: string; questionId: string; isDailyDouble: boolean; boardHighValue?: number }) => {
       gm.openQuestion(roomCode, questionId, isDailyDouble);
       if (isDailyDouble) {
         const session = gm.getSession(roomCode);
@@ -143,14 +144,14 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: fallback pick of the Daily Double contestant ────────────────
-    socket.on('host:dd-pick-player', ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+    onHost(socket, 'host:dd-pick-player', ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
       const hasDevice = [...socketPlayers.values()].some(v => v.roomCode === roomCode && v.playerId === playerId);
       gm.pickDDContestant(roomCode, playerId, hasDevice);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: correct/enter a Daily Double wager on behalf of a player ────
-    socket.on('host:dd-override-wager', ({ roomCode, amount }: { roomCode: string; amount: number }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+    onHost(socket, 'host:dd-override-wager', ({ roomCode, amount }: { roomCode: string; amount: number }, ack?: (res: { ok: boolean; error?: string }) => void) => {
       const res = gm.overrideDDWager(roomCode, amount);
       ack?.(res);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
@@ -166,13 +167,13 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: reveal DD clue (after DD splash screen) ────────────────────
-    socket.on('host:reveal-dd', ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:reveal-dd', ({ roomCode }: { roomCode: string }) => {
       gm.revealDailyDouble(roomCode);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: show response on board view ────────────────────────────────
-    socket.on('host:show-response', ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:show-response', ({ roomCode }: { roomCode: string }) => {
       gm.showResponse(roomCode);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
@@ -181,7 +182,7 @@ export function registerSocketHandlers(io: Server) {
     // After closing, auto-ends the game only when the just-completed round
     // was the last one AND the board has no Final Jeopardy configured — with
     // FJ, or on an earlier round, the host is prompted client-side instead.
-    socket.on('host:close-question', async ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:close-question', async ({ roomCode }: { roomCode: string }) => {
       gm.closeQuestion(roomCode);
       const session = gm.getSession(roomCode);
       if (session && session.phase !== 'finished') {
@@ -198,7 +199,7 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: end the game (shows the leaderboard) ────────────────────────
-    socket.on('host:end-game', ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:end-game', ({ roomCode }: { roomCode: string }) => {
       cleanupFinal(roomCode);
       gm.setFinalState(roomCode, null);
       gm.endGame(roomCode);
@@ -206,13 +207,13 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: resume a game that was ended by mistake ──────────────────────
-    socket.on('host:resume-game', ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:resume-game', ({ roomCode }: { roomCode: string }) => {
       gm.resumeGame(roomCode);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: award / deduct points ──────────────────────────────────────
-    socket.on('host:score', ({ roomCode, playerId, delta, outcome, isDailyDouble }: { roomCode: string; playerId: string; delta: number; outcome?: 'correct' | 'wrong'; isDailyDouble?: boolean }) => {
+    onHost(socket, 'host:score', ({ roomCode, playerId, delta, outcome, isDailyDouble }: { roomCode: string; playerId: string; delta: number; outcome?: 'correct' | 'wrong'; isDailyDouble?: boolean }) => {
       gm.updateScore(roomCode, playerId, delta);
       if (outcome) {
         gm.recordOutcome(roomCode, playerId, outcome);
@@ -222,25 +223,25 @@ export function registerSocketHandlers(io: Server) {
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
-    socket.on('host:set-score', ({ roomCode, playerId, score }: { roomCode: string; playerId: string; score: number }) => {
+    onHost(socket, 'host:set-score', ({ roomCode, playerId, score }: { roomCode: string; playerId: string; score: number }) => {
       gm.setScore(roomCode, playerId, score);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: remove a player ────────────────────────────────────────────
-    socket.on('host:remove-player', ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+    onHost(socket, 'host:remove-player', ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
       gm.removePlayer(roomCode, playerId);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: start game ─────────────────────────────────────────────────
-    socket.on('host:start', ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:start', ({ roomCode }: { roomCode: string }) => {
       gm.startGame(roomCode);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: advance to the next round ────────────────────────────────────
-    socket.on('host:next-round', async ({ roomCode }: { roomCode: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+    onHost(socket, 'host:next-round', async ({ roomCode }: { roomCode: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
       const session = gm.getSession(roomCode);
       if (!session) return ack?.({ ok: false, error: 'Room not found' });
       const board = await boardStorage.getBoard(session.boardId);
@@ -256,7 +257,7 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: end / delete session ───────────────────────────────────────
-    socket.on('host:end', ({ roomCode }: { roomCode: string }) => {
+    onHost(socket, 'host:end', ({ roomCode }: { roomCode: string }) => {
       io.to(roomCode).emit('game:ended');
       cleanupFinal(roomCode);
       gm.deleteSession(roomCode);

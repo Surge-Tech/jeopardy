@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FinalJeopardyBoard } from '../../types';
+import { hostFetch } from '../../lib/hostAuth';
 
 export default function FinalJeopardyEditor({
   finalJeopardy, onSave, onRemove, onClose,
@@ -21,11 +22,17 @@ export default function FinalJeopardyEditor({
     setUploading(true);
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch('/api/media/upload', { method: 'POST', body: form });
-    const data = await res.json();
-    setMediaType(data.mediaType);
-    setMediaUrl(data.url);
-    setUploading(false);
+    try {
+      const res = await hostFetch('/api/media/upload', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Upload failed');
+      setMediaType(data.mediaType);
+      setMediaUrl(data.url);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
   }
 
   function save() {

@@ -3,6 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import { randomUUID as uuidv4 } from 'crypto';
+import { EXT_BY_MIME } from '../mediaTypes.js';
+import { requireHostPasscode } from '../middleware/requireHostPasscode.js';
 
 const DATA_DIR = process.env.DATA_DIR ?? './data';
 const MEDIA_DIR = path.join(DATA_DIR, 'media');
@@ -13,15 +15,16 @@ const storage = multer.diskStorage({
     cb(null, MEDIA_DIR);
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const ext = EXT_BY_MIME[file.mimetype];
+    if (!ext) {
+      cb(new Error(`File type ${file.mimetype} not allowed`), '');
+      return;
+    }
     cb(null, `${uuidv4()}${ext}`);
   },
 });
 
-const ALLOWED_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'video/mp4', 'video/webm', 'video/ogg',
-]);
+const ALLOWED_TYPES = new Set(Object.keys(EXT_BY_MIME));
 
 const upload = multer({
   storage,
@@ -37,7 +40,7 @@ const upload = multer({
 
 const router = Router();
 
-router.post('/upload', upload.single('file'), (req, res) => {
+router.post('/upload', requireHostPasscode, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const isVideo = req.file.mimetype.startsWith('video/');
   res.json({
@@ -47,7 +50,7 @@ router.post('/upload', upload.single('file'), (req, res) => {
   });
 });
 
-router.delete('/:filename', async (req, res) => {
+router.delete('/:filename', requireHostPasscode, async (req, res) => {
   const filename = path.basename(req.params.filename); // prevent path traversal
   try {
     await fs.unlink(path.join(MEDIA_DIR, filename));

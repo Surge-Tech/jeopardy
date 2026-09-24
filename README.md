@@ -6,14 +6,16 @@ A self-hosted, fully customizable Jeopardy game platform. Build your own boards,
 
 ## Features
 
-- **Board Editor** — Create unlimited Jeopardy boards with up to 6 categories and 5 clues each. Supports text, images, and video clues.
-- **Real-time Buzzer System** — Players connect on any device via a browser. First buzz wins, ties are impossible.
+- **Board Editor** — Create unlimited Jeopardy boards with up to 6 categories and 5 clues each per round. Supports text, images, and video clues.
+- **Multi-Round Boards** — A board can hold several rounds (Jeopardy!, Double Jeopardy!, and beyond). Players, scores, and stats all carry over when the host advances to the next round — no need to start a new game.
+- **Real-time Buzzer System** — Players connect on any device via a browser. First buzz wins, ties are impossible. A configurable lockout (250/500/1000ms, or off) penalizes buzzing before the host opens it, so mashing the button no longer beats reacting to it.
 - **Daily Doubles with Wagering** — Mark any clue as a Daily Double. The host reveals it and the game automatically prompts the right player to wager on their phone (with a host override, and a manual picker for the rare case no player has answered correctly yet) — scoring then uses their wager instead of the clue's face value.
 - **Final Jeopardy** — A full wager-clue-reveal round with live wagers, a synced countdown timer, ambient music during the countdown, a dramatic per-contestant reveal, and a final scoreboard with a podium and stats.
+- **End-Game Lifecycle** — The game ends automatically once the last round is finished (if the board has no Final Jeopardy), or the host can end it manually at any point, including mid-Final-Jeopardy. A shared leaderboard — with tie handling — shows on every screen, and the host can resume or close the room from there.
 - **Projection View** — A fullscreen board view designed for a TV or shared screen.
-- **Host Control Panel** — Score tracking, manual score adjustments, game history log, per-player stats, and roll-back support.
+- **Host Control Panel** — Score tracking, manual score adjustments, game history log, per-player stats (including early buzzes), and roll-back support.
 - **Sound Effects** — Synthesized audio cues for buzz-ins, Daily Doubles, Final Jeopardy, and more, played on the board/TV so the room hears them. No audio files needed.
-- **Persistent Storage** — Boards are saved as JSON files on disk. No database required.
+- **Persistent Storage** — Boards are saved as JSON files on disk. No database required. Older single-round board files are migrated automatically.
 - **Works Everywhere** — Run it on your laptop for an in-person game night, or deploy it to the cloud for a remote game night. Players connect from anywhere with a link.
 
 ---
@@ -55,7 +57,7 @@ npm run dev
 - **Dashboard / Editor:** http://localhost:5173
 - **Share with players (LAN):** http://YOUR_LAN_IP:5173
 
-> For a full local + deployment guide, see [SETUP.md](SETUP.md).
+> For a full local + deployment guide, see [SETUP.md](SETUP.md). For the REST API and Socket.io event reference, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
@@ -98,11 +100,12 @@ jeopardy/
 │       ├── components/
 │       │   ├── final/          # Final Jeopardy: board screens, host panel, editor
 │       │   ├── dailydouble/    # Daily Double: host panel, player wager screen
-│       │   └── shared/         # WagerInput, reused by both
+│       │   └── shared/         # WagerInput, Leaderboard — reused across FJ and end-game
 │       ├── store/
 │       │   └── gameStore.ts    # Zustand state (game log, etc.)
 │       └── utils/
-│           └── sounds.ts       # Web Audio API sound effects
+│           ├── sounds.ts       # Web Audio API sound effects
+│           └── rounds.ts       # Round-aware board helpers (getRound, isRoundComplete)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── fly.toml
@@ -120,6 +123,15 @@ jeopardy/
 | Realtime | Socket.io (WebSockets) |
 | Storage | JSON files on disk (no database) |
 | Deployment | Docker, Fly.io |
+
+---
+
+## Documentation
+
+| Doc | For |
+|---|---|
+| [SETUP.md](SETUP.md) | Running a game night — local, LAN, Fly.io, or Docker. |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Contributors — data model, REST API, and the full Socket.io event protocol. |
 
 ---
 

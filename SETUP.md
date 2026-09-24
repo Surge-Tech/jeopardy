@@ -176,6 +176,22 @@ No credit card required for the free tier.
 
 Boards are saved as JSON files in `backend/data/boards/`. You can back them up or share them by copying those files.
 
+### Adding Rounds (Double Jeopardy, etc.)
+
+A board isn't limited to one grid — the round tab bar above the point-values row lets you build out a full game:
+
+| Control | What it does |
+|---|---|
+| **+ Add round** | Adds a blank round with the same category count as the last one and point values doubled (named "Double Jeopardy!" automatically for round 2). |
+| **Duplicate / Duplicate ×2** | Copies the current round's categories and clues into a new round, optionally doubling point values — handy for reusing a template or building Double Jeopardy from Jeopardy. |
+| **← / →** | Reorders rounds. |
+| **Remove round** | Deletes the current round (asks for confirmation; disabled when only one round remains). |
+| Round name field | Renames the currently-selected round (shown in the tab and to the host during the game). |
+
+Every round is independent — its own categories, clues, and point values. Players, scores, and stats carry over automatically when the host advances between rounds during a game.
+
+> Boards saved before multi-round support was added are migrated automatically the first time they're loaded (their single grid becomes round 1, "Jeopardy!") and rewritten in the new format on their next save.
+
 ---
 
 ## Running a Game
@@ -196,9 +212,22 @@ Boards are saved as JSON files in `backend/data/boards/`. You can back them up o
 | **✓ Correct / ✗ Wrong** | Awards or deducts points, closes the clue |
 | **Lock Buzzers** | Closes buzzers if open without selecting a winner |
 | **Adjust Score** | Manual ±point correction on any player |
+| **Lockout** dropdown | Sets how long an early buzz locks a player out (Off / 250 / 500 / 1000ms) — changeable mid-game |
+| **Next Round →** | Advances to the next round once the current one is done (or earlier, if you want to skip ahead); carries players, scores, and stats forward. Disabled while a clue is open. |
 | **⚡ Start Final Jeopardy** | Appears once the board's Final Jeopardy is configured; begins the closing round |
+| **End Game** | Ends the game and shows the leaderboard on every screen — available at any point, including mid-Final-Jeopardy. Asks for confirmation. |
+| **Resume** | Un-ends a game that was ended by mistake, returning to where it left off. |
+| **Close Room** | Tears down the session entirely for everyone (was "← Exit"). Asks for confirmation — this can't be undone. |
 | **Log tab** | Full history of the current game |
-| **Stats tab** | Per-player leaderboard and correct/wrong breakdown |
+| **Stats tab** | Per-player leaderboard and correct/wrong/early-buzz breakdown |
+
+### Buzzer Fairness
+
+Players can press the buzzer as soon as a clue is open, even before the host opens buzzing — but pressing early doesn't help them. An early press locks that player out for the configured duration (250ms by default), and mashing the button keeps re-arming the lockout rather than clearing it. This means reacting to the buzzer being opened beats mashing it early.
+
+### Ending a Game
+
+If the last round finishes and the board has Final Jeopardy configured, the host panel prompts you to either start Final Jeopardy or end the game there. If the board has no Final Jeopardy, the game ends automatically once the last clue of the last round is closed — the leaderboard appears immediately on the host panel, the board view, and every player's phone.
 
 ---
 

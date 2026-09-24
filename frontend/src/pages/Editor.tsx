@@ -168,18 +168,6 @@ export default function Editor() {
     save(b);
   }
 
-  function saveFinalJeopardy(fj: FinalJeopardyBoard) {
-    const b = { ...board!, finalJeopardy: fj };
-    setBoard(b);
-    save(b);
-  }
-
-  function removeFinalJeopardy() {
-    const b = { ...board!, finalJeopardy: undefined };
-    setBoard(b);
-    save(b);
-  }
-
   const activeQ = editingQuestion != null
     ? round.categories[editingQuestion.catIdx]?.questions[editingQuestion.qIdx]
     : null;

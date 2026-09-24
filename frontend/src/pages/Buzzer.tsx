@@ -13,10 +13,6 @@ function rejoinKey(roomCode: string | undefined) {
   return `jeopardy:player:${roomCode ?? ''}`;
 }
 
-function rejoinKey(roomCode: string | undefined) {
-  return `jeopardy:player:${roomCode ?? ''}`;
-}
-
 export default function Buzzer() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const { gameState, setGameState, setMyPlayer } = useGameStore();

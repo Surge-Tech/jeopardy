@@ -27,6 +27,8 @@ export function createSession(boardId: string): GameState {
     finalJeopardy: null,
     dailyDouble: null,
     lastCorrectPlayerId: null,
+    buzzLockouts: {},
+    settings: { lockoutMs: 250 },
   };
   sessions.set(roomCode, state);
   return state;
@@ -82,6 +84,7 @@ export function openQuestion(roomCode: string, questionId: string, isDailyDouble
   session.buzzTimestamp = null;
   session.dailyDoubleRevealed = !isDailyDouble; // DD starts unrevealed; regular questions start revealed
   session.responseVisible = false;
+  session.buzzLockouts = {};
   return true;
 }
 
@@ -113,6 +116,7 @@ export function closeQuestion(roomCode: string): boolean {
   session.dailyDoubleRevealed = false;
   session.responseVisible = false;
   session.dailyDouble = null;
+  session.buzzLockouts = {};
   return true;
 }
 
@@ -143,19 +147,42 @@ export function lockBuzzer(roomCode: string): boolean {
   return true;
 }
 
-export function recordBuzz(roomCode: string, playerId: string, playerName: string): boolean {
+export type BuzzOutcome = 'won' | 'early' | 'locked-out' | 'ignored';
+
+export function recordBuzz(roomCode: string, playerId: string, playerName: string): BuzzOutcome {
   const session = sessions.get(roomCode);
-  if (!session || session.buzzerState !== 'open') return false;
+  if (!session) return 'ignored';
+  if (!session.activeQuestionId || session.phase !== 'playing') return 'ignored';
+
+  const now = Date.now();
+  const player = session.players.find(p => p.id === playerId);
+
+  if (session.buzzerState === 'idle' || session.buzzerState === 'locked') {
+    if (session.settings.lockoutMs > 0) {
+      session.buzzLockouts[playerId] = now + session.settings.lockoutMs;
+      if (player) {
+        if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
+        player.stats.earlyBuzzes += 1;
+      }
+    }
+    return 'early';
+  }
+
+  // buzzerState === 'open'
+  const lockedUntil = session.buzzLockouts[playerId];
+  if (lockedUntil && now < lockedUntil) {
+    return 'locked-out';
+  }
+
   session.buzzerState = 'locked';
   session.buzzedPlayerId = playerId;
   session.buzzedPlayerName = playerName;
-  session.buzzTimestamp = Date.now();
-  const player = session.players.find(p => p.id === playerId);
+  session.buzzTimestamp = now;
   if (player) {
-    if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0 };
+    if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
     player.stats.buzzes += 1;
   }
-  return true;
+  return 'won';
 }
 
 // Records a correct/wrong outcome against a player's stats (score delta is applied separately via updateScore).
@@ -164,9 +191,19 @@ export function recordOutcome(roomCode: string, playerId: string, outcome: 'corr
   if (!session) return false;
   const player = session.players.find(p => p.id === playerId);
   if (!player) return false;
-  if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0 };
+  if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
   if (outcome === 'correct') player.stats.correct += 1;
   else player.stats.wrong += 1;
+  return true;
+}
+
+const VALID_LOCKOUTS = [0, 250, 500, 1000];
+
+export function setLockoutMs(roomCode: string, ms: number): boolean {
+  const session = sessions.get(roomCode);
+  if (!session) return false;
+  if (!VALID_LOCKOUTS.includes(ms)) return false;
+  session.settings.lockoutMs = ms;
   return true;
 }
 

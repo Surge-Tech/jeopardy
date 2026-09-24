@@ -6,7 +6,7 @@ import type { GameState } from '../types';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 
-type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'open' | 'winner' | 'too-late';
+type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'armed' | 'open' | 'winner' | 'too-late' | 'locked-out';
 
 function rejoinKey(roomCode: string | undefined) {
   return `jeopardy:player:${roomCode ?? ''}`;
@@ -36,9 +36,11 @@ export default function Buzzer() {
   useEffect(() => {
     socket.on('game:state', (state: GameState) => {
       setGameState(state);
-      if (!state.finalJeopardy && phase !== 'join' && phase !== 'lobby') {
+      const transient = phase === 'winner' || phase === 'too-late' || phase === 'locked-out';
+      if (!state.finalJeopardy && phase !== 'join' && phase !== 'lobby' && !transient) {
         if (state.buzzerState === 'open') setPhase('open');
-        if (state.buzzerState === 'idle') setPhase('waiting');
+        else if (state.activeQuestionId) setPhase('armed');
+        else setPhase('waiting');
       }
     });
     socket.on('player:joined', ({ player, state }: { player: { id: string; name: string }; state: GameState }) => {
@@ -58,13 +60,19 @@ export default function Buzzer() {
       }
       setTimeout(() => setPhase(prev => prev === 'winner' || prev === 'too-late' ? 'waiting' : prev), 5000);
     });
+    socket.on('buzz:locked-out', ({ until }: { until: number }) => {
+      setPhase('locked-out');
+      const delay = Math.max(0, until - Date.now());
+      setTimeout(() => setPhase(prev => prev === 'locked-out' ? 'armed' : prev), delay);
+    });
     socket.on('buzzer:open', () => setPhase('open'));
-    socket.on('buzzer:locked', () => setPhase('waiting'));
+    socket.on('buzzer:locked', () => setPhase(prev => prev === 'winner' || prev === 'too-late' || prev === 'locked-out' ? prev : 'waiting'));
     socket.on('error', ({ message }: { message: string }) => setError(message));
     return () => {
       socket.off('game:state');
       socket.off('player:joined');
       socket.off('buzz:winner');
+      socket.off('buzz:locked-out');
       socket.off('buzzer:open');
       socket.off('buzzer:locked');
       socket.off('error');
@@ -78,9 +86,9 @@ export default function Buzzer() {
   }
 
   function buzz() {
-    if (phase !== 'open') return;
+    if (phase !== 'open' && phase !== 'armed') return;
     socket.emit('buzz');
-    setPhase('waiting');
+    if (phase === 'open') setPhase('waiting');
   }
 
   const myScore = gameState?.players.find(p => p.id === myId)?.score ?? 0;
@@ -135,6 +143,34 @@ export default function Buzzer() {
           </p>
           <div className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto">
             <span className="text-gray-500 text-xl font-bold text-center px-4">Waiting...</span>
+          </div>
+        </div>
+      )}
+
+      {/* ARMED phase — question is active but buzzer isn't open yet; pressing still reaches the server */}
+      {!gameState?.finalJeopardy && !isDDWagering && phase === 'armed' && (
+        <div className="text-center">
+          <p className="text-3xl font-black text-white mb-2">{name}</p>
+          <p className="text-jeopardy-gold font-black text-2xl mb-8">
+            {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+          </p>
+          <button
+            className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto cursor-pointer"
+            style={{ fontSize: '1.25rem', fontWeight: 900, color: '#6b7280', touchAction: 'manipulation' }}
+            onClick={buzz}
+            onTouchStart={e => { e.preventDefault(); buzz(); }}
+          >
+            Wait...
+          </button>
+          <p className="text-gray-500 font-bold mt-6">Get ready</p>
+        </div>
+      )}
+
+      {/* LOCKED-OUT phase — pressed too early */}
+      {!gameState?.finalJeopardy && phase === 'locked-out' && (
+        <div className="text-center flip-in">
+          <div className="w-48 h-48 rounded-full bg-red-900 border-8 border-red-500 flex items-center justify-center mx-auto animate-pulse">
+            <span className="text-red-300 text-2xl font-black">Too early!</span>
           </div>
         </div>
       )}

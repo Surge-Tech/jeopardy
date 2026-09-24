@@ -162,16 +162,18 @@ export default function Host() {
   const boardUrl = `${window.location.origin}/board/${roomCode}`;
   const buzzUrl = `${window.location.origin}/buzz/${roomCode}`;
 
-  // Derive per-player stats from the log
-  const playerStats = gameState.players.map(p => {
-    const entries = gameLog.filter(e => e.player === p.name);
-    return {
-      ...p,
-      correct: entries.filter(e => e.type === 'correct').length,
-      wrong: entries.filter(e => e.type === 'wrong').length,
-      buzzes: entries.filter(e => e.type === 'buzz').length,
-    };
-  }).sort((a, b) => b.score - a.score);
+  // Per-player stats come from the server (survives refresh, includes early buzzes)
+  const playerStats = gameState.players.map(p => ({
+    ...p,
+    correct: p.stats?.correct ?? 0,
+    wrong: p.stats?.wrong ?? 0,
+    buzzes: p.stats?.buzzes ?? 0,
+    earlyBuzzes: p.stats?.earlyBuzzes ?? 0,
+  })).sort((a, b) => b.score - a.score);
+
+  function setLockout(ms: number) {
+    socket.emit('host:set-lockout', { roomCode, ms });
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col text-white">
@@ -184,6 +186,19 @@ export default function Host() {
             Room: <span className="text-jeopardy-gold font-black tracking-widest text-lg">{roomCode}</span>
           </div>
           <a href={boardUrl} target="_blank" rel="noopener" className="btn-ghost text-sm py-1 px-3">📺 Board View</a>
+          <div className="bg-gray-800 rounded px-3 py-1 text-sm flex items-center gap-2">
+            <span className="text-gray-400">Lockout:</span>
+            <select
+              className="bg-gray-800 text-white text-sm"
+              value={gameState.settings.lockoutMs}
+              onChange={e => setLockout(Number(e.target.value))}
+            >
+              <option value={0}>Off</option>
+              <option value={250}>250ms</option>
+              <option value={500}>500ms</option>
+              <option value={1000}>1000ms</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -433,7 +448,7 @@ export default function Host() {
                             <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
                             <span className="font-bold text-sm">{p.name}</span>
                           </div>
-                          <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                          <div className="grid grid-cols-4 gap-1 text-center text-xs">
                             <div className="bg-gray-700 rounded py-1">
                               <div className="text-green-400 font-black text-base">{p.correct}</div>
                               <div className="text-gray-400">Correct</div>
@@ -445,6 +460,10 @@ export default function Host() {
                             <div className="bg-gray-700 rounded py-1">
                               <div className="text-orange-300 font-black text-base">{p.buzzes}</div>
                               <div className="text-gray-400">Buzzes</div>
+                            </div>
+                            <div className="bg-gray-700 rounded py-1">
+                              <div className="text-red-300 font-black text-base">{p.earlyBuzzes}</div>
+                              <div className="text-gray-400">Early</div>
                             </div>
                           </div>
                         </div>

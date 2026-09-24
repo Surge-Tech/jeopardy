@@ -5,6 +5,19 @@ import { registerFinalHandlers, cleanup as cleanupFinal } from './finalJeopardy.
 // Track which socket owns which player in which room
 const socketPlayers = new Map<string, { roomCode: string; playerId: string; playerName: string }>();
 
+// Per-socket buzz rate limiting: drop anything beyond ~10 presses/sec.
+const BUZZ_RATE_LIMIT = 10;
+const BUZZ_RATE_WINDOW_MS = 1000;
+const buzzTimestamps = new Map<string, number[]>();
+
+function isRateLimited(socketId: string): boolean {
+  const now = Date.now();
+  const timestamps = (buzzTimestamps.get(socketId) ?? []).filter(t => now - t < BUZZ_RATE_WINDOW_MS);
+  timestamps.push(now);
+  buzzTimestamps.set(socketId, timestamps);
+  return timestamps.length > BUZZ_RATE_LIMIT;
+}
+
 export function registerSocketHandlers(io: Server) {
   io.on('connection', (socket: Socket) => {
     registerFinalHandlers(io, socket, socketPlayers);
@@ -68,17 +81,29 @@ export function registerSocketHandlers(io: Server) {
     socket.on('buzz', () => {
       const info = socketPlayers.get(socket.id);
       if (!info) return;
-      const won = gm.recordBuzz(info.roomCode, info.playerId, info.playerName);
-      if (won) {
+      if (isRateLimited(socket.id)) return;
+      const outcome = gm.recordBuzz(info.roomCode, info.playerId, info.playerName);
+      const session = gm.getSession(info.roomCode);
+      if (outcome === 'won') {
         io.to(info.roomCode).emit('buzz:winner', {
           playerId: info.playerId,
           playerName: info.playerName,
           timestamp: Date.now(),
         });
-        io.to(info.roomCode).emit('game:state', gm.getSession(info.roomCode));
+        io.to(info.roomCode).emit('game:state', session);
+      } else if (outcome === 'early' || outcome === 'locked-out') {
+        const until = session?.buzzLockouts[info.playerId] ?? Date.now();
+        socket.emit('buzz:locked-out', { until });
+        io.to(`hostpanel:${info.roomCode}`).emit('game:state', session);
       } else {
         socket.emit('buzz:too-late');
       }
+    });
+
+    // ── HOST: set buzzer lockout duration ──────────────────────────────────
+    socket.on('host:set-lockout', ({ roomCode, ms }: { roomCode: string; ms: number }) => {
+      gm.setLockoutMs(roomCode, ms);
+      io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: open buzzer ────────────────────────────────────────────────
@@ -201,6 +226,7 @@ export function registerSocketHandlers(io: Server) {
     // ── DISCONNECT ───────────────────────────────────────────────────────
     socket.on('disconnect', () => {
       const info = socketPlayers.get(socket.id);
+      buzzTimestamps.delete(socket.id);
       if (info) {
         socketPlayers.delete(socket.id);
         // Don't auto-remove player on disconnect so they can reconnect

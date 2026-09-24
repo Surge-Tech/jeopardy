@@ -37,6 +37,7 @@ export interface PlayerStats {
   correct: number;
   wrong: number;
   buzzes: number;
+  earlyBuzzes: number;
 }
 
 export interface Player {
@@ -109,6 +110,8 @@ export interface GameState {
   finalJeopardy: FinalPublicState | null;
   dailyDouble: DailyDoubleState | null;
   lastCorrectPlayerId: string | null;
+  buzzLockouts: Record<string, number>;
+  settings: { lockoutMs: number };
 }
 
 export interface BuzzerPlayer {

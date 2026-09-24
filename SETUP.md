@@ -230,7 +230,6 @@ Players can press the buzzer as soon as a clue is open, even before the host ope
 If the last round finishes and the board has Final Jeopardy configured, the host panel prompts you to either start Final Jeopardy or end the game there. If the board has no Final Jeopardy, the game ends automatically once the last clue of the last round is closed — the leaderboard appears immediately on the host panel, the board view, and every player's phone.
 
 ---
-
 ## Daily Double Wagering
 
 Picking a Daily Double tile no longer just shows the clue — the host panel walks through a wager step first, all sound effects and the "DAILY DOUBLE!" splash play on the board/TV, not the host's own device:

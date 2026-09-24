@@ -71,17 +71,6 @@ export default function BoardView() {
     else if (q) playQuestionOpen();
   }, [gameState?.activeQuestionId, board, gameState?.currentRoundIndex]);
 
-  if (roomClosed) {
-    return (
-      <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-4xl font-black text-jeopardy-gold mb-4">Room Closed</h1>
-          <p className="text-gray-400">The host ended this game session.</p>
-        </div>
-      </div>
-    );
-  }
-
   if (!gameState || !board) {
     return (
       <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center">
@@ -135,7 +124,6 @@ export default function BoardView() {
           <p className="text-gray-400 text-xl animate-pulse">Waiting for the host to start the next round…</p>
         </div>
       )}
-
       {/* Buzz winner overlay */}
       {buzzWinner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">

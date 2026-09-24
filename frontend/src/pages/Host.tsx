@@ -183,7 +183,6 @@ export default function Host() {
     socket.emit('host:end', { roomCode });
     navigate('/');
   }
-
   const boardUrl = `${window.location.origin}/board/${roomCode}`;
   const buzzUrl = `${window.location.origin}/buzz/${roomCode}`;
 

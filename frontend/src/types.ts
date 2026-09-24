@@ -29,7 +29,6 @@ export interface Round {
   categories: Category[];
   pointValues: number[];
 }
-
 export interface Board {
   id: string;
   name: string;

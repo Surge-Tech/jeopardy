@@ -153,7 +153,7 @@ export type BuzzOutcome = 'won' | 'early' | 'locked-out' | 'ignored';
 export function recordBuzz(roomCode: string, playerId: string, playerName: string): BuzzOutcome {
   const session = sessions.get(roomCode);
   if (!session) return 'ignored';
-  if (!session.activeQuestionId || session.phase !== 'playing') return 'ignored';
+  if (!session.activeQuestionId || session.phase === 'finished') return 'ignored';
 
   const now = Date.now();
   const player = session.players.find(p => p.id === playerId);

@@ -165,9 +165,17 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
         )}
 
         {fj.stage === 'final' && (
-          <button className="w-full btn-danger" onClick={() => socket.emit('host:fj-exit', { roomCode })}>
-            Return to Board
-          </button>
+          <div className="flex gap-2">
+            <button className="flex-1 btn-danger" onClick={() => socket.emit('host:fj-exit', { roomCode })}>
+              Return to Board
+            </button>
+            <button
+              className="flex-1 bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded"
+              onClick={() => { if (confirm('End the game and show the leaderboard?')) socket.emit('host:end-game', { roomCode }); }}
+            >
+              End Game
+            </button>
+          </div>
         )}
       </div>
     </div>

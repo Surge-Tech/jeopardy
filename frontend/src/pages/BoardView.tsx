@@ -5,6 +5,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '../types';
 import { playDailyDouble, playBuzzerReady, playBuzzIn, playQuestionOpen, playCorrect, playWrong } from '../utils/sounds';
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
+import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
 
 const API = '/api';
@@ -16,6 +17,7 @@ export default function BoardView() {
   const [showQuestion, setShowQuestion] = useState<Question | null>(null);
   const [buzzWinner, setBuzzWinner] = useState<{ playerName: string } | null>(null);
   const [roundSplash, setRoundSplash] = useState<{ index: number; name: string | null } | null>(null);
+  const [roomClosed, setRoomClosed] = useState(false);
   const prevBuzzerState = useRef<string>('idle');
   const prevActiveId = useRef<string | null>(null);
 
@@ -45,12 +47,14 @@ export default function BoardView() {
       setRoundSplash({ index, name });
       setTimeout(() => setRoundSplash(null), 3000);
     });
+    socket.on('game:ended', () => setRoomClosed(true));
     socket.emit('get:state', { roomCode });
     return () => {
       socket.off('game:state');
       socket.off('buzz:winner');
       socket.off('score:result');
       socket.off('round:changed');
+      socket.off('game:ended');
     };
   }, [roomCode]);
 
@@ -67,6 +71,17 @@ export default function BoardView() {
     else if (q) playQuestionOpen();
   }, [gameState?.activeQuestionId, board, gameState?.currentRoundIndex]);
 
+  if (roomClosed) {
+    return (
+      <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-black text-jeopardy-gold mb-4">Room Closed</h1>
+          <p className="text-gray-400">The host ended this game session.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!gameState || !board) {
     return (
       <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center">
@@ -74,6 +89,14 @@ export default function BoardView() {
           <h1 className="text-4xl font-black text-jeopardy-gold mb-4">Connecting...</h1>
           <p className="text-gray-400">Room: {roomCode}</p>
         </div>
+      </div>
+    );
+  }
+
+  if (gameState.phase === 'finished') {
+    return (
+      <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center py-12" style={{ fontFamily: 'Arial Black, Impact, sans-serif' }}>
+        <Leaderboard gameState={gameState} />
       </div>
     );
   }

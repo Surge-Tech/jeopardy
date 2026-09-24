@@ -5,6 +5,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '../types';
 import HostFinalPanel from '../components/final/HostFinalPanel';
 import DDHostPanel from '../components/dailydouble/DDHostPanel';
+import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
 
 const API = '/api';
@@ -168,6 +169,21 @@ export default function Host() {
     socket.emit('host:next-round', { roomCode });
   }
 
+  function endGame() {
+    if (!confirm('End the game and show the leaderboard?')) return;
+    socket.emit('host:end-game', { roomCode });
+  }
+
+  function resumeGame() {
+    socket.emit('host:resume-game', { roomCode });
+  }
+
+  function closeRoom() {
+    if (!confirm('Close this room? This ends the session for everyone and cannot be undone.')) return;
+    socket.emit('host:end', { roomCode });
+    navigate('/');
+  }
+
   const boardUrl = `${window.location.origin}/board/${roomCode}`;
   const buzzUrl = `${window.location.origin}/buzz/${roomCode}`;
 
@@ -188,7 +204,7 @@ export default function Host() {
     <div className="min-h-screen bg-gray-950 flex flex-col text-white">
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-700 px-4 py-3 flex items-center gap-4 flex-wrap">
-        <button onClick={() => { socket.emit('host:end', { roomCode }); navigate('/'); }} className="text-gray-400 hover:text-white text-sm">← Exit</button>
+        <button onClick={closeRoom} className="text-gray-400 hover:text-white text-sm">Close Room</button>
         <h1 className="text-xl font-black text-jeopardy-gold">{board.name}</h1>
         <div className="bg-gray-800 rounded px-3 py-1 text-sm">
           Round {gameState.currentRoundIndex + 1} of {board.rounds.length}
@@ -221,9 +237,39 @@ export default function Host() {
               <option value={1000}>1000ms</option>
             </select>
           </div>
+          {gameState.phase !== 'finished' && (
+            <button className="btn-danger text-sm py-1 px-3" onClick={endGame}>End Game</button>
+          )}
         </div>
       </div>
 
+      {/* Game-over banner */}
+      {gameState.phase === 'finished' && (
+        <div className="bg-jeopardy-gold text-jeopardy-dark px-4 py-2 flex items-center gap-4 flex-wrap font-bold">
+          <span>🏁 Game ended</span>
+          <div className="ml-auto flex gap-2">
+            <button className="bg-jeopardy-dark text-white text-sm py-1 px-3 rounded" onClick={resumeGame}>Resume</button>
+            <button className="bg-red-700 text-white text-sm py-1 px-3 rounded" onClick={closeRoom}>Close Room</button>
+          </div>
+        </div>
+      )}
+
+      {/* Prompt when the last round is complete and the board has Final Jeopardy */}
+      {gameState.phase !== 'finished' && isLastRound && roundComplete && !gameState.activeQuestionId && board.finalJeopardy && !gameState.finalJeopardy && (
+        <div className="bg-jeopardy-blue px-4 py-2 flex items-center gap-4 flex-wrap font-bold text-white">
+          <span>⚡ Last round complete — start Final Jeopardy or end the game.</span>
+          <div className="ml-auto flex gap-2">
+            <button className="bg-jeopardy-gold text-jeopardy-dark text-sm py-1 px-3 rounded" onClick={startFinalJeopardy}>Start Final Jeopardy</button>
+            <button className="bg-red-700 text-white text-sm py-1 px-3 rounded" onClick={endGame}>End Game</button>
+          </div>
+        </div>
+      )}
+
+      {gameState.phase === 'finished' ? (
+        <div className="flex-1 overflow-auto p-8">
+          <Leaderboard gameState={gameState} />
+        </div>
+      ) : (
       <div className="flex-1 flex gap-0 overflow-hidden">
         {/* Left: Board grid */}
         <div className="flex-1 overflow-auto p-3">
@@ -521,6 +567,7 @@ export default function Host() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

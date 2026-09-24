@@ -178,8 +178,36 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: close/dismiss a question ───────────────────────────────────
-    socket.on('host:close-question', ({ roomCode }: { roomCode: string }) => {
+    // After closing, auto-ends the game only when the just-completed round
+    // was the last one AND the board has no Final Jeopardy configured — with
+    // FJ, or on an earlier round, the host is prompted client-side instead.
+    socket.on('host:close-question', async ({ roomCode }: { roomCode: string }) => {
       gm.closeQuestion(roomCode);
+      const session = gm.getSession(roomCode);
+      if (session && session.phase !== 'finished') {
+        const board = await boardStorage.getBoard(session.boardId);
+        if (board) {
+          const isLastRound = session.currentRoundIndex >= board.rounds.length - 1;
+          const roundComplete = boardStorage.isRoundComplete(board, session.answeredQuestions, session.currentRoundIndex);
+          if (isLastRound && roundComplete && !board.finalJeopardy) {
+            gm.endGame(roomCode);
+          }
+        }
+      }
+      io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
+    // ── HOST: end the game (shows the leaderboard) ────────────────────────
+    socket.on('host:end-game', ({ roomCode }: { roomCode: string }) => {
+      cleanupFinal(roomCode);
+      gm.setFinalState(roomCode, null);
+      gm.endGame(roomCode);
+      io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
+    // ── HOST: resume a game that was ended by mistake ──────────────────────
+    socket.on('host:resume-game', ({ roomCode }: { roomCode: string }) => {
+      gm.resumeGame(roomCode);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 

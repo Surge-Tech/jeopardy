@@ -5,8 +5,9 @@ import { useGameStore } from '../store/gameStore';
 import type { GameState } from '../types';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
+import Leaderboard from '../components/shared/Leaderboard';
 
-type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'armed' | 'open' | 'winner' | 'too-late' | 'locked-out';
+type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'armed' | 'open' | 'winner' | 'too-late' | 'locked-out' | 'finished' | 'closed';
 
 function rejoinKey(roomCode: string | undefined) {
   return `jeopardy:player:${roomCode ?? ''}`;
@@ -36,8 +37,9 @@ export default function Buzzer() {
   useEffect(() => {
     socket.on('game:state', (state: GameState) => {
       setGameState(state);
+      if (state.phase === 'finished') { setPhase('finished'); return; }
       const transient = phase === 'winner' || phase === 'too-late' || phase === 'locked-out';
-      if (!state.finalJeopardy && phase !== 'join' && phase !== 'lobby' && !transient) {
+      if (!state.finalJeopardy && phase !== 'join' && phase !== 'lobby' && phase !== 'finished' && phase !== 'closed' && !transient) {
         if (state.buzzerState === 'open') setPhase('open');
         else if (state.activeQuestionId) setPhase('armed');
         else setPhase('waiting');
@@ -67,6 +69,7 @@ export default function Buzzer() {
     });
     socket.on('buzzer:open', () => setPhase('open'));
     socket.on('buzzer:locked', () => setPhase(prev => prev === 'winner' || prev === 'too-late' || prev === 'locked-out' ? prev : 'waiting'));
+    socket.on('game:ended', () => setPhase('closed'));
     socket.on('error', ({ message }: { message: string }) => setError(message));
     return () => {
       socket.off('game:state');
@@ -75,6 +78,7 @@ export default function Buzzer() {
       socket.off('buzz:locked-out');
       socket.off('buzzer:open');
       socket.off('buzzer:locked');
+      socket.off('game:ended');
       socket.off('error');
     };
   }, [myId, phase]);
@@ -124,8 +128,21 @@ export default function Buzzer() {
         </div>
       )}
 
+      {/* Room closed by the host */}
+      {phase === 'closed' && (
+        <div className="text-center">
+          <h2 className="text-3xl font-black text-jeopardy-gold mb-2">Room Closed</h2>
+          <p className="text-gray-400">The host ended this game session.</p>
+        </div>
+      )}
+
+      {/* Game finished — leaderboard */}
+      {phase === 'finished' && gameState && (
+        <Leaderboard gameState={gameState} compact myId={myId} />
+      )}
+
       {/* Final Jeopardy takes over once it starts */}
-      {phase !== 'join' && gameState?.finalJeopardy && myId && (
+      {phase !== 'join' && phase !== 'finished' && phase !== 'closed' && gameState?.finalJeopardy && myId && (
         <PlayerFinal gameState={gameState} myId={myId} />
       )}
 
@@ -215,7 +232,7 @@ export default function Buzzer() {
       )}
 
       {/* Players list (compact) */}
-      {!gameState?.finalJeopardy && gameState && gameState.players.length > 0 && phase !== 'join' && (
+      {!gameState?.finalJeopardy && gameState && gameState.players.length > 0 && phase !== 'join' && phase !== 'finished' && phase !== 'closed' && (
         <div className="mt-12 w-full max-w-sm">
           <h3 className="text-gray-500 text-xs uppercase tracking-widest mb-2 text-center">Scoreboard</h3>
           <div className="space-y-1">

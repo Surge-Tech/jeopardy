@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../../types';
 import { useCountdown } from './useCountdown';
-import FinalScoreboard from './FinalScoreboard';
+import Leaderboard from '../shared/Leaderboard';
 import { playFinalJeopardy, playTick, playTimesUp, playReveal, playThinkingPulse, stopThinkingPulse } from '../../utils/sounds';
 
 function getYouTubeEmbedUrl(url: string): string {
@@ -189,7 +189,7 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
         </div>
       )}
 
-      {fj.stage === 'final' && <FinalScoreboard gameState={gameState} />}
+      {fj.stage === 'final' && <Leaderboard gameState={gameState} />}
     </div>
   );
 }

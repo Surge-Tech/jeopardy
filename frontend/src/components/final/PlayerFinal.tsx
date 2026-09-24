@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { socket } from '../../socket';
 import type { GameState } from '../../types';
 import { useCountdown } from './useCountdown';
-import FinalScoreboard from './FinalScoreboard';
+import Leaderboard from '../shared/Leaderboard';
 import WagerInput from '../shared/WagerInput';
 
 type Ack = { ok: boolean; error?: string };
@@ -158,7 +158,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
   }
 
   if (fj.stage === 'final') {
-    return <FinalScoreboard gameState={gameState} compact />;
+    return <Leaderboard gameState={gameState} compact myId={myId} />;
   }
 
   return null;

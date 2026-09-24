@@ -12,6 +12,11 @@ A developer reference for how the pieces fit together: the data model, the REST 
 4. [REST API](#rest-api)
 5. [Real-Time Protocol (Socket.io)](#real-time-protocol-socketio)
 6. [State Machines](#state-machines)
+   - [Buzzer](#buzzer)
+   - [Daily Double](#daily-double)
+   - [Final Jeopardy](#final-jeopardy-finalstage)
+   - [Rounds](#rounds)
+   - [Phase / end-game](#phase--end-game)
 
 ---
 
@@ -37,7 +42,7 @@ Canonical types live in `backend/src/types.ts` (frontend has a mirrored copy in 
 | `Board` | A saved board: a list of `rounds`, optional Final Jeopardy config. Persisted to disk. |
 | `Round` | One grid: `{ id, name?, categories, pointValues }`. A board plays through `rounds` in order (Jeopardy!, Double Jeopardy!, ...). |
 | `Category` / `Question` | A round's grid content. A `Question` may be flagged `isDailyDouble`. Question ids are UUIDs, unique across the whole board (not just within a round) — this is what lets `answeredQuestions` stay a single flat list while still being able to tell whether a *specific round* is complete. |
-| `GameState` | The full state of one live session: players, buzzer state (incl. lockouts), active question, `currentRoundIndex`, Daily Double sub-state, Final Jeopardy public sub-state, `phase`. Broadcast wholesale to every client on every change via `game:state`. |
+| `GameState` | The full state of one live session: players, buzzer state (incl. `buzzLockouts` and the configurable `settings.lockoutMs`), active question, `currentRoundIndex`, Daily Double sub-state, Final Jeopardy public sub-state, `phase`. Broadcast wholesale to every client on every change via `game:state`. |
 | `Player` | `{ id, name, score, color, stats? }`. `stats` (`correct`/`wrong`/`buzzes`/`earlyBuzzes`) is populated lazily on first use. |
 | `DailyDoubleState` | Sub-state while a Daily Double wager is being collected (see [Daily Double](#daily-double)). |
 | `FinalPublicState` | The *public* Final Jeopardy state broadcast to all clients. Wagers and answers are hidden here until revealed — see [Final Jeopardy](#final-jeopardy). |
@@ -235,7 +240,9 @@ Within `reveal`, each contestant (lowest score first) steps through `revealStep`
 round 0 ──host:next-round──► round 1 ──host:next-round──► round 2 ──► ...
 ```
 
-`GameState.currentRoundIndex` tracks which of `board.rounds` is live. `gameManager.advanceRound` rejects the transition (via the `host:next-round` ack) if a question, Daily Double, or Final Jeopardy is currently active, or if the board is already on its last round — otherwise it increments the index and clears per-question/buzzer/lockout state, while leaving players, scores, stats, and `lastCorrectPlayerId` untouched. A round is "complete" (`boardStorage.isRoundComplete`) when every question id in `rounds[currentRoundIndex]` appears in `answeredQuestions` — this is what the host UI uses to highlight "Next Round" and what `host:close-question` uses for the auto-end check below.
+`GameState.currentRoundIndex` tracks which of `board.rounds` is live. `gameManager.advanceRound` rejects the transition (via the `host:next-round` ack) if a question, Daily Double, or Final Jeopardy is currently active, or if the board is already on its last round — otherwise it increments the index and clears per-question/buzzer/lockout state, while leaving players, scores, stats, and `lastCorrectPlayerId` untouched. A round is "complete" (`isRoundComplete`) when every question id in `rounds[currentRoundIndex]` appears in `answeredQuestions` — this is what the host UI uses to highlight "Next Round" and what `host:close-question` uses for the auto-end check below.
+
+> **Keep in sync:** `isRoundComplete`/`countRoundQuestions` are implemented twice — once server-side in `boardStorage.ts` (used for the auto-end check) and once client-side in `frontend/src/utils/rounds.ts` (used to render round-progress UI without waiting on a round trip). There's no shared package between the two workspaces, so a change to the completion rule has to be made in both places.
 
 ### Phase / end-game
 

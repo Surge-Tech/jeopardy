@@ -5,6 +5,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '../types';
 import HostFinalPanel from '../components/final/HostFinalPanel';
 import DDHostPanel from '../components/dailydouble/DDHostPanel';
+import { getRound, isRoundComplete } from '../utils/rounds';
 
 const API = '/api';
 const PLAYER_COLORS = ['#FFD700', '#4ade80', '#60a5fa', '#f87171', '#c084fc', '#fb923c', '#34d399', '#f472b6'];
@@ -64,23 +65,27 @@ export default function Host() {
   useEffect(() => {
     if (!gameState || !board) return;
     if (!gameState.activeQuestionId) { setActiveQ(null); return; }
-    const q = board.categories.flatMap(c => c.questions).find(q => q.id === gameState.activeQuestionId);
+    const round = getRound(board, gameState);
+    const q = round.categories.flatMap(c => c.questions).find(q => q.id === gameState.activeQuestionId);
     setActiveQ(q ?? null);
-  }, [gameState?.activeQuestionId, board]);
+  }, [gameState?.activeQuestionId, board, gameState?.currentRoundIndex]);
 
   if (!board || !gameState || !roomCode) {
     return <div className="flex items-center justify-center h-screen text-gray-400">Starting game session...</div>;
   }
 
   const answered = new Set(gameState.answeredQuestions);
+  const round = getRound(board, gameState);
+  const isLastRound = gameState.currentRoundIndex >= board.rounds.length - 1;
+  const roundComplete = isRoundComplete(board, gameState.answeredQuestions, gameState.currentRoundIndex);
 
   function getCatName(q: Question): string {
-    return board!.categories.find(c => c.questions.some(cq => cq.id === q.id))?.name ?? '';
+    return round.categories.find(c => c.questions.some(cq => cq.id === q.id))?.name ?? '';
   }
 
   function openQuestion(q: Question) {
     setBuzzWinner(null);
-    const boardHighValue = Math.max(...board!.pointValues);
+    const boardHighValue = Math.max(...round.pointValues);
     socket.emit('host:open-question', { roomCode, questionId: q.id, isDailyDouble: !!q.isDailyDouble, boardHighValue });
     if (q.isDailyDouble) {
       addLog({ type: 'dd', msg: `Daily Double opened — $${q.value} (${getCatName(q)})` });
@@ -153,10 +158,14 @@ export default function Host() {
   }
 
   function startFinalJeopardy() {
-    const totalQuestions = board!.categories.reduce((n, c) => n + c.questions.length, 0);
+    const totalQuestions = board!.rounds.reduce((n, r) => n + r.categories.reduce((n2, c) => n2 + c.questions.length, 0), 0);
     const remaining = totalQuestions - gameState!.answeredQuestions.length;
     if (remaining > 0 && !confirm(`${remaining} clue(s) haven't been played yet. Start Final Jeopardy anyway?`)) return;
     socket.emit('host:fj-start', { roomCode });
+  }
+
+  function nextRound() {
+    socket.emit('host:next-round', { roomCode });
   }
 
   const boardUrl = `${window.location.origin}/board/${roomCode}`;
@@ -181,7 +190,20 @@ export default function Host() {
       <div className="bg-gray-900 border-b border-gray-700 px-4 py-3 flex items-center gap-4 flex-wrap">
         <button onClick={() => { socket.emit('host:end', { roomCode }); navigate('/'); }} className="text-gray-400 hover:text-white text-sm">← Exit</button>
         <h1 className="text-xl font-black text-jeopardy-gold">{board.name}</h1>
+        <div className="bg-gray-800 rounded px-3 py-1 text-sm">
+          Round {gameState.currentRoundIndex + 1} of {board.rounds.length}
+          {round.name ? ` — ${round.name}` : ''}
+        </div>
         <div className="ml-auto flex gap-3 items-center flex-wrap">
+          {!isLastRound && (
+            <button
+              className={`text-sm py-1 px-3 rounded font-bold ${roundComplete ? 'bg-jeopardy-gold text-jeopardy-dark' : 'btn-ghost'}`}
+              disabled={!!gameState.activeQuestionId}
+              onClick={nextRound}
+            >
+              Next Round →
+            </button>
+          )}
           <div className="bg-gray-800 rounded px-3 py-1 text-sm">
             Room: <span className="text-jeopardy-gold font-black tracking-widest text-lg">{roomCode}</span>
           </div>
@@ -208,17 +230,17 @@ export default function Host() {
           <div className="overflow-x-auto">
             <div
               className="grid gap-1"
-              style={{ gridTemplateColumns: `repeat(${board.categories.length}, minmax(110px, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${round.categories.length}, minmax(110px, 1fr))` }}
             >
               {/* Category headers */}
-              {board.categories.map(cat => (
+              {round.categories.map(cat => (
                 <div key={cat.id} className="bg-jeopardy-blue border-2 border-black text-jeopardy-gold font-black text-center p-2 text-xs uppercase">
                   {cat.name || 'CATEGORY'}
                 </div>
               ))}
               {/* Question cells */}
-              {board.pointValues.map(pv =>
-                board.categories.map(cat => {
+              {round.pointValues.map(pv =>
+                round.categories.map(cat => {
                   const q = cat.questions.find(q => q.value === pv);
                   if (!q) return <div key={`${cat.id}-${pv}`} />;
                   const isAnswered = answered.has(q.id);

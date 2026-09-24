@@ -29,6 +29,7 @@ export function createSession(boardId: string): GameState {
     lastCorrectPlayerId: null,
     buzzLockouts: {},
     settings: { lockoutMs: 250 },
+    currentRoundIndex: 0,
   };
   sessions.set(roomCode, state);
   return state;
@@ -320,6 +321,50 @@ export function clearDailyDouble(roomCode: string): void {
 }
 
 export function startGame(roomCode: string): boolean {
+  const session = sessions.get(roomCode);
+  if (!session) return false;
+  session.phase = 'playing';
+  return true;
+}
+
+// Advances to the next round. Rejects if a question/DD/FJ is active or this
+// is already the last round. Players, scores, stats and lastCorrectPlayerId
+// all carry over — only the per-question/buzzer/lockout state resets.
+export function advanceRound(roomCode: string, roundCount: number): { ok: boolean; error?: string } {
+  const session = sessions.get(roomCode);
+  if (!session) return { ok: false, error: 'Room not found' };
+  if (session.activeQuestionId) return { ok: false, error: 'A question is still active' };
+  if (session.finalJeopardy) return { ok: false, error: 'Final Jeopardy is in progress' };
+  if (session.currentRoundIndex >= roundCount - 1) return { ok: false, error: 'Already on the last round' };
+
+  session.currentRoundIndex += 1;
+  session.activeQuestionId = null;
+  session.buzzerState = 'idle';
+  session.buzzedPlayerId = null;
+  session.buzzedPlayerName = null;
+  session.buzzTimestamp = null;
+  session.dailyDoubleRevealed = false;
+  session.responseVisible = false;
+  session.dailyDouble = null;
+  session.buzzLockouts = {};
+  return { ok: true };
+}
+
+export function endGame(roomCode: string): boolean {
+  const session = sessions.get(roomCode);
+  if (!session) return false;
+  session.phase = 'finished';
+  session.activeQuestionId = null;
+  session.buzzerState = 'idle';
+  session.buzzedPlayerId = null;
+  session.buzzedPlayerName = null;
+  session.buzzTimestamp = null;
+  session.dailyDouble = null;
+  session.buzzLockouts = {};
+  return true;
+}
+
+export function resumeGame(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
   session.phase = 'playing';

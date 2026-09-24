@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Board } from '../types';
-
 const API = '/api';
 
+type BoardSummary = { id: string; name: string; roundCount: number; hasFinal: boolean; createdAt: string; updatedAt: string };
+
 export default function Dashboard() {
-  const [boards, setBoards] = useState<Omit<Board, 'categories'>[]>([]);
+  const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
@@ -26,11 +26,7 @@ export default function Dashboard() {
     const res = await fetch(`${API}/boards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newName.trim(),
-        categories: [],
-        pointValues: [200, 400, 600, 800, 1000],
-      }),
+      body: JSON.stringify({ name: newName.trim() }),
     });
     const board = await res.json();
     setCreating(false);
@@ -141,7 +137,7 @@ export default function Dashboard() {
 function BoardCard({
   board, onEdit, onHost, onExport, onDelete
 }: {
-  board: Omit<Board, 'categories'>;
+  board: BoardSummary;
   onEdit: () => void;
   onHost: () => void;
   onExport: () => void;
@@ -153,7 +149,7 @@ function BoardCard({
       <div>
         <h3 className="text-xl font-bold text-white truncate">{board.name}</h3>
         <p className="text-gray-400 text-sm">Updated {updated}</p>
-        <p className="text-gray-500 text-xs mt-1">Points: {board.pointValues?.join(', ')}</p>
+        <p className="text-gray-500 text-xs mt-1">{board.roundCount} round{board.roundCount === 1 ? '' : 's'}{board.hasFinal ? ' · Final ✓' : ''}</p>
       </div>
       <div className="flex gap-2 flex-wrap">
         <button className="btn-primary text-sm py-1 px-3" onClick={onHost}>▶ Host</button>

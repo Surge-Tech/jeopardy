@@ -5,6 +5,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '../types';
 import { playDailyDouble, playBuzzerReady, playBuzzIn, playQuestionOpen, playCorrect, playWrong } from '../utils/sounds';
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
+import { getRound, isRoundComplete } from '../utils/rounds';
 
 const API = '/api';
 
@@ -14,6 +15,7 @@ export default function BoardView() {
   const [board, setBoard] = useState<Board | null>(null);
   const [showQuestion, setShowQuestion] = useState<Question | null>(null);
   const [buzzWinner, setBuzzWinner] = useState<{ playerName: string } | null>(null);
+  const [roundSplash, setRoundSplash] = useState<{ index: number; name: string | null } | null>(null);
   const prevBuzzerState = useRef<string>('idle');
   const prevActiveId = useRef<string | null>(null);
 
@@ -39,11 +41,16 @@ export default function BoardView() {
     socket.on('score:result', ({ correct }: { correct: boolean }) => {
       correct ? playCorrect() : playWrong();
     });
+    socket.on('round:changed', ({ index, name }: { index: number; name: string | null }) => {
+      setRoundSplash({ index, name });
+      setTimeout(() => setRoundSplash(null), 3000);
+    });
     socket.emit('get:state', { roomCode });
     return () => {
       socket.off('game:state');
       socket.off('buzz:winner');
       socket.off('score:result');
+      socket.off('round:changed');
     };
   }, [roomCode]);
 
@@ -53,11 +60,12 @@ export default function BoardView() {
     if (!gameState.activeQuestionId) { setShowQuestion(null); return; }
     if (gameState.activeQuestionId === prevActiveId.current) return;
     prevActiveId.current = gameState.activeQuestionId;
-    const q = board.categories.flatMap(c => c.questions).find(q => q.id === gameState.activeQuestionId);
+    const round = getRound(board, gameState);
+    const q = round.categories.flatMap(c => c.questions).find(q => q.id === gameState.activeQuestionId);
     setShowQuestion(q ?? null);
     if (q?.isDailyDouble) playDailyDouble();
     else if (q) playQuestionOpen();
-  }, [gameState?.activeQuestionId, board]);
+  }, [gameState?.activeQuestionId, board, gameState?.currentRoundIndex]);
 
   if (!gameState || !board) {
     return (
@@ -71,6 +79,9 @@ export default function BoardView() {
   }
 
   const answeredSet = new Set(gameState.answeredQuestions);
+  const round = getRound(board, gameState);
+  const roundComplete = isRoundComplete(board, gameState.answeredQuestions, gameState.currentRoundIndex);
+  const isLastRound = gameState.currentRoundIndex >= board.rounds.length - 1;
   const isDDSplash = showQuestion?.isDailyDouble && (
     !gameState.dailyDoubleRevealed || (gameState.dailyDouble != null && gameState.dailyDouble.stage !== 'ready')
   );
@@ -80,6 +91,27 @@ export default function BoardView() {
 
       {/* Final Jeopardy takes over the whole screen once it starts */}
       {gameState.finalJeopardy && <FinalBoardScreen gameState={gameState} />}
+
+      {/* Round splash — shown briefly when the host advances to a new round */}
+      {roundSplash && !gameState.finalJeopardy && (
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center"
+             style={{ background: 'linear-gradient(135deg, #060CE9 0%, #0A0A2E 100%)' }}>
+          <div className="text-jeopardy-gold font-black dd-reveal text-center"
+               style={{ fontSize: 'clamp(36px, 9vw, 110px)', textShadow: '4px 4px 0 #000, 0 0 40px rgba(255,215,0,0.5)', letterSpacing: '0.06em' }}>
+            {roundSplash.name ?? `Round ${roundSplash.index + 1}`}
+          </div>
+        </div>
+      )}
+
+      {/* End-of-round interstitial — shown when the round is done but it isn't the last one */}
+      {!gameState.finalJeopardy && !roundSplash && roundComplete && !isLastRound && !gameState.activeQuestionId && (
+        <div className="fixed inset-0 z-30 flex flex-col items-center justify-center bg-jeopardy-dark/95">
+          <div className="text-jeopardy-gold font-black text-4xl mb-4" style={{ textShadow: '2px 2px 0 #000' }}>
+            End of {round.name ?? 'Round'}
+          </div>
+          <p className="text-gray-400 text-xl animate-pulse">Waiting for the host to start the next round…</p>
+        </div>
+      )}
 
       {/* Buzz winner overlay */}
       {buzzWinner && (
@@ -171,12 +203,12 @@ export default function BoardView() {
 
       {/* Board grid */}
       <div className="flex-1 grid" style={{
-        gridTemplateColumns: `repeat(${board.categories.length}, 1fr)`,
+        gridTemplateColumns: `repeat(${round.categories.length}, 1fr)`,
         gap: '4px',
         padding: '4px',
       }}>
         {/* Category headers */}
-        {board.categories.map(cat => (
+        {round.categories.map(cat => (
           <div
             key={cat.id}
             className="bg-jeopardy-blue border-4 border-black text-jeopardy-gold font-black text-center flex items-center justify-center p-2"
@@ -187,8 +219,8 @@ export default function BoardView() {
         ))}
 
         {/* Question cells */}
-        {board.pointValues.map(pv => (
-          board.categories.map(cat => {
+        {round.pointValues.map(pv => (
+          round.categories.map(cat => {
             const q = cat.questions.find(q => q.value === pv);
             const isAnswered = q ? answeredSet.has(q.id) : false;
             return (

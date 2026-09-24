@@ -1,5 +1,6 @@
 import type { Server, Socket } from 'socket.io';
 import * as gm from './gameManager.js';
+import * as boardStorage from '../storage/boardStorage.js';
 import { registerFinalHandlers, cleanup as cleanupFinal } from './finalJeopardy.js';
 
 // Track which socket owns which player in which room
@@ -208,6 +209,22 @@ export function registerSocketHandlers(io: Server) {
     socket.on('host:start', ({ roomCode }: { roomCode: string }) => {
       gm.startGame(roomCode);
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
+    // ── HOST: advance to the next round ────────────────────────────────────
+    socket.on('host:next-round', async ({ roomCode }: { roomCode: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+      const session = gm.getSession(roomCode);
+      if (!session) return ack?.({ ok: false, error: 'Room not found' });
+      const board = await boardStorage.getBoard(session.boardId);
+      if (!board) return ack?.({ ok: false, error: 'Board not found' });
+      const res = gm.advanceRound(roomCode, board.rounds.length);
+      ack?.(res);
+      if (res.ok) {
+        const updated = gm.getSession(roomCode);
+        const round = board.rounds[updated!.currentRoundIndex];
+        io.to(roomCode).emit('round:changed', { index: updated!.currentRoundIndex, name: round?.name ?? null });
+        io.to(roomCode).emit('game:state', updated);
+      }
     });
 
     // ── HOST: end / delete session ───────────────────────────────────────

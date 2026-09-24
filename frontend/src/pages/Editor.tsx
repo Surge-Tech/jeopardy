@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Board, Category, Question, FinalJeopardyBoard } from '../types';
+import type { Board, Category, Question, FinalJeopardyBoard, Round } from '../types';
 import FinalJeopardyEditor from '../components/final/FinalJeopardyEditor';
 
 const API = '/api';
@@ -11,11 +11,33 @@ function newQuestion(value: number): Question {
 function newCategory(pointValues: number[]): Category {
   return { id: crypto.randomUUID(), name: '', questions: pointValues.map(newQuestion) };
 }
+function newRound(categoryCount: number, pointValues: number[], name?: string): Round {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    categories: Array.from({ length: categoryCount }, () => newCategory(pointValues)),
+    pointValues,
+  };
+}
+function duplicateRound(round: Round, doubleValues: boolean): Round {
+  const pointValues = doubleValues ? round.pointValues.map(v => v * 2) : [...round.pointValues];
+  return {
+    id: crypto.randomUUID(),
+    name: round.name,
+    pointValues,
+    categories: round.categories.map(cat => ({
+      id: crypto.randomUUID(),
+      name: cat.name,
+      questions: cat.questions.map((q, i) => ({ ...q, id: crypto.randomUUID(), value: pointValues[i] ?? q.value })),
+    })),
+  };
+}
 
 export default function Editor() {
   const { boardId } = useParams<{ boardId: string }>();
   const navigate = useNavigate();
   const [board, setBoard] = useState<Board | null>(null);
+  const [roundIdx, setRoundIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<{ catIdx: number; qIdx: number } | null>(null);
@@ -41,29 +63,97 @@ export default function Editor() {
 
   if (!board) return <div className="flex items-center justify-center h-screen text-gray-400">Loading...</div>;
 
+  const round = board.rounds[roundIdx] ?? board.rounds[0];
+
+  function updateRound(fn: (r: Round) => Round) {
+    const rounds = [...board!.rounds];
+    rounds[roundIdx] = fn(rounds[roundIdx]);
+    setBoard({ ...board!, rounds });
+  }
+
   function addCategory() {
-    const b = { ...board!, categories: [...board!.categories, newCategory(board!.pointValues)] };
-    setBoard(b);
+    updateRound(r => ({ ...r, categories: [...r.categories, newCategory(r.pointValues)] }));
   }
 
   function removeCategory(idx: number) {
     if (!confirm('Remove this category?')) return;
-    const b = { ...board!, categories: board!.categories.filter((_, i) => i !== idx) };
-    setBoard(b);
+    updateRound(r => ({ ...r, categories: r.categories.filter((_, i) => i !== idx) }));
   }
 
   function updateCategoryName(idx: number, name: string) {
-    const cats = [...board!.categories];
-    cats[idx] = { ...cats[idx], name };
-    setBoard({ ...board!, categories: cats });
+    updateRound(r => {
+      const cats = [...r.categories];
+      cats[idx] = { ...cats[idx], name };
+      return { ...r, categories: cats };
+    });
   }
 
   function updateQuestion(catIdx: number, qIdx: number, updates: Partial<Question>) {
-    const cats = [...board!.categories];
-    const qs = [...cats[catIdx].questions];
-    qs[qIdx] = { ...qs[qIdx], ...updates };
-    cats[catIdx] = { ...cats[catIdx], questions: qs };
-    setBoard({ ...board!, categories: cats });
+    updateRound(r => {
+      const cats = [...r.categories];
+      const qs = [...cats[catIdx].questions];
+      qs[qIdx] = { ...qs[qIdx], ...updates };
+      cats[catIdx] = { ...cats[catIdx], questions: qs };
+      return { ...r, categories: cats };
+    });
+  }
+
+  function updatePointValue(i: number, value: number) {
+    updateRound(r => {
+      const pv = [...r.pointValues];
+      pv[i] = value;
+      const cats = r.categories.map(cat => ({
+        ...cat,
+        questions: cat.questions.map((q, qi) => qi === i ? { ...q, value } : q),
+      }));
+      return { ...r, pointValues: pv, categories: cats };
+    });
+  }
+
+  function addRow() {
+    updateRound(r => {
+      const newVal = (r.pointValues[r.pointValues.length - 1] ?? 0) + 200;
+      const pv = [...r.pointValues, newVal];
+      const cats = r.categories.map(cat => ({ ...cat, questions: [...cat.questions, newQuestion(newVal)] }));
+      return { ...r, pointValues: pv, categories: cats };
+    });
+  }
+
+  function renameRound(name: string) {
+    updateRound(r => ({ ...r, name }));
+  }
+
+  function addRound() {
+    const prev = board!.rounds[board!.rounds.length - 1];
+    const pointValues = prev.pointValues.map(v => v * 2);
+    const name = board!.rounds.length === 1 ? 'Double Jeopardy!' : undefined;
+    const rounds = [...board!.rounds, newRound(prev.categories.length, pointValues, name)];
+    setBoard({ ...board!, rounds });
+    setRoundIdx(rounds.length - 1);
+  }
+
+  function duplicateCurrentRound(doubleValues: boolean) {
+    const rounds = [...board!.rounds];
+    rounds.splice(roundIdx + 1, 0, duplicateRound(round, doubleValues));
+    setBoard({ ...board!, rounds });
+    setRoundIdx(roundIdx + 1);
+  }
+
+  function moveRound(dir: -1 | 1) {
+    const target = roundIdx + dir;
+    if (target < 0 || target >= board!.rounds.length) return;
+    const rounds = [...board!.rounds];
+    [rounds[roundIdx], rounds[target]] = [rounds[target], rounds[roundIdx]];
+    setBoard({ ...board!, rounds });
+    setRoundIdx(target);
+  }
+
+  function removeRound() {
+    if (board!.rounds.length <= 1) return;
+    if (!confirm('Remove this round? This cannot be undone.')) return;
+    const rounds = board!.rounds.filter((_, i) => i !== roundIdx);
+    setBoard({ ...board!, rounds });
+    setRoundIdx(Math.max(0, roundIdx - 1));
   }
 
   function saveFinalJeopardy(fj: FinalJeopardyBoard) {
@@ -79,7 +169,7 @@ export default function Editor() {
   }
 
   const activeQ = editingQuestion != null
-    ? board.categories[editingQuestion.catIdx]?.questions[editingQuestion.qIdx]
+    ? round.categories[editingQuestion.catIdx]?.questions[editingQuestion.qIdx]
     : null;
 
   return (
@@ -108,48 +198,59 @@ export default function Editor() {
         </div>
       </div>
 
+      {/* Round tabs */}
+      <div className="px-4 py-2 bg-gray-900 border-b border-gray-800 flex gap-2 items-center flex-wrap">
+        {board.rounds.map((r, i) => (
+          <button
+            key={r.id}
+            onClick={() => setRoundIdx(i)}
+            className={`text-sm px-3 py-1 rounded font-bold transition-colors ${i === roundIdx ? 'bg-jeopardy-gold text-jeopardy-dark' : 'bg-gray-800 text-gray-400 hover:text-white'}`}
+          >
+            {r.name || `Round ${i + 1}`}
+          </button>
+        ))}
+        <button className="text-sm text-gray-400 hover:text-white px-2" onClick={addRound}>+ Add round</button>
+        <div className="ml-auto flex gap-2 items-center">
+          <input
+            className="w-40 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+            placeholder="Round name"
+            value={round.name ?? ''}
+            onChange={e => renameRound(e.target.value)}
+          />
+          <button className="text-xs text-gray-400 hover:text-white px-2 py-1" onClick={() => moveRound(-1)} disabled={roundIdx === 0}>←</button>
+          <button className="text-xs text-gray-400 hover:text-white px-2 py-1" onClick={() => moveRound(1)} disabled={roundIdx === board.rounds.length - 1}>→</button>
+          <button className="text-xs text-gray-400 hover:text-white px-2 py-1" onClick={() => duplicateCurrentRound(false)}>Duplicate</button>
+          <button className="text-xs text-gray-400 hover:text-white px-2 py-1" onClick={() => duplicateCurrentRound(true)}>Duplicate ×2</button>
+          <button
+            className="text-xs text-red-400 hover:text-red-200 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={removeRound}
+            disabled={board.rounds.length <= 1}
+          >Remove round</button>
+        </div>
+      </div>
+
       {/* Point values row */}
       <div className="px-4 py-2 bg-gray-900 border-b border-gray-800 flex gap-2 items-center">
         <span className="text-gray-400 text-sm mr-2">Point values:</span>
-        {board.pointValues.map((v, i) => (
+        {round.pointValues.map((v, i) => (
           <input
             key={i}
             type="number"
             className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-jeopardy-gold text-center text-sm"
             value={v}
-            onChange={e => {
-              const pv = [...board.pointValues];
-              pv[i] = Number(e.target.value);
-              // Also update question values
-              const cats = board.categories.map(cat => ({
-                ...cat,
-                questions: cat.questions.map((q, qi) => qi === i ? { ...q, value: Number(e.target.value) } : q),
-              }));
-              setBoard({ ...board, pointValues: pv, categories: cats });
-            }}
+            onChange={e => updatePointValue(i, Number(e.target.value))}
           />
         ))}
-        <button
-          className="text-sm text-gray-400 hover:text-white ml-2"
-          onClick={() => {
-            const newVal = (board.pointValues[board.pointValues.length - 1] ?? 0) + 200;
-            const pv = [...board.pointValues, newVal];
-            const cats = board.categories.map(cat => ({
-              ...cat,
-              questions: [...cat.questions, newQuestion(newVal)],
-            }));
-            setBoard({ ...board, pointValues: pv, categories: cats });
-          }}
-        >+ Add row</button>
+        <button className="text-sm text-gray-400 hover:text-white ml-2" onClick={addRow}>+ Add row</button>
       </div>
 
       {/* Board grid */}
       <div className="flex-1 overflow-auto p-4">
         <div className="overflow-x-auto">
-          <table className="border-collapse w-full" style={{ minWidth: `${Math.max(board.categories.length, 1) * 160}px` }}>
+          <table className="border-collapse w-full" style={{ minWidth: `${Math.max(round.categories.length, 1) * 160}px` }}>
             <thead>
               <tr>
-                {board.categories.map((cat, ci) => (
+                {round.categories.map((cat, ci) => (
                   <th key={cat.id} className="p-1">
                     <div className="relative">
                       <input
@@ -174,9 +275,9 @@ export default function Editor() {
               </tr>
             </thead>
             <tbody>
-              {board.pointValues.map((pv, qi) => (
+              {round.pointValues.map((pv, qi) => (
                 <tr key={qi}>
-                  {board.categories.map((cat, ci) => {
+                  {round.categories.map((cat, ci) => {
                     const q = cat.questions[qi];
                     if (!q) return <td key={ci} />;
                     const hasContent = q.clue || q.response || q.mediaUrl;

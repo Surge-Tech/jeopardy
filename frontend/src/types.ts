@@ -23,11 +23,17 @@ export interface FinalJeopardyBoard {
   timerSeconds?: number;
 }
 
+export interface Round {
+  id: string;
+  name?: string;
+  categories: Category[];
+  pointValues: number[];
+}
+
 export interface Board {
   id: string;
   name: string;
-  categories: Category[];
-  pointValues: number[];
+  rounds: Round[];
   createdAt: string;
   updatedAt: string;
   finalJeopardy?: FinalJeopardyBoard;
@@ -110,4 +116,5 @@ export interface GameState {
   lastCorrectPlayerId: string | null;
   buzzLockouts: Record<string, number>;
   settings: { lockoutMs: number };
+  currentRoundIndex: number;
 }

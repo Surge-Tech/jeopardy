@@ -30,6 +30,7 @@ export default function Host() {
   const [activeQ, setActiveQ] = useState<Question | null>(null);
   const [addPlayerName, setAddPlayerName] = useState('');
   const [buzzWinner, setBuzzWinner] = useState<string | null>(null);
+  const [buzzWinnerId, setBuzzWinnerId] = useState<string | null>(null);
   const [renamingPlayerId, setRenamingPlayerId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [renameError, setRenameError] = useState('');
@@ -43,8 +44,9 @@ export default function Host() {
       setGameState(state);
       setRoomCode(state.roomCode);
     });
-    socket.on('buzz:winner', ({ playerName }: { playerName: string }) => {
+    socket.on('buzz:winner', ({ playerName, playerId }: { playerName: string; playerId: string }) => {
       setBuzzWinner(playerName);
+      setBuzzWinnerId(playerId);
       addLog({ type: 'buzz', msg: `${playerName} buzzed in`, player: playerName });
     });
     socket.on('host:created', ({ roomCode: rc, state }: { roomCode: string; state: GameState }) => {
@@ -56,8 +58,9 @@ export default function Host() {
     socket.on('fj:host-log', ({ msg }: { msg: string }) => {
       addLog({ type: 'fj', msg });
     });
-    socket.on('buzz:next-in-queue', ({ playerName }: { playerName: string }) => {
+    socket.on('buzz:next-in-queue', ({ playerName, playerId }: { playerName: string; playerId: string }) => {
       setBuzzWinner(playerName);
+      setBuzzWinnerId(playerId);
       addLog({ type: 'buzz', msg: `Queue advance → ${playerName}`, player: playerName });
     });
 
@@ -105,6 +108,7 @@ export default function Host() {
 
   function openQuestion(q: Question) {
     setBuzzWinner(null);
+    setBuzzWinnerId(null);
     const boardHighValue = Math.max(...round.pointValues);
     socket.emit('host:open-question', { roomCode, questionId: q.id, isDailyDouble: !!q.isDailyDouble, boardHighValue });
     if (q.isDailyDouble) {
@@ -121,6 +125,7 @@ export default function Host() {
 
   function closeQuestion() {
     setBuzzWinner(null);
+    setBuzzWinnerId(null);
     const label = activeQ ? `$${activeQ.value} — ${getCatName(activeQ)}` : 'question';
     socket.emit('host:close-question', { roomCode });
     addLog({ type: 'close', msg: `Closed ${label} (no score)` });
@@ -128,6 +133,7 @@ export default function Host() {
 
   function enableBuzzer() {
     setBuzzWinner(null);
+    setBuzzWinnerId(null);
     socket.emit('host:enable-buzzer', { roomCode });
   }
 
@@ -137,6 +143,7 @@ export default function Host() {
 
   function resetBuzzer() {
     setBuzzWinner(null);
+    setBuzzWinnerId(null);
     socket.emit('host:reset-buzzer', { roomCode });
   }
 
@@ -157,6 +164,7 @@ export default function Host() {
     }
     // close without double-logging
     setBuzzWinner(null);
+    setBuzzWinnerId(null);
     socket.emit('host:close-question', { roomCode });
   }
 
@@ -166,6 +174,7 @@ export default function Host() {
     socket.emit('host:wrong-reopen', { roomCode, playerId, delta: -value });
     addLog({ type: 'wrong', msg: `${player?.name ?? 'Player'} answered wrong (-$${value})`, player: player?.name });
     setBuzzWinner(null);
+    setBuzzWinnerId(null);
   }
 
   function adjustScore(playerId: string, delta: number) {
@@ -460,15 +469,13 @@ export default function Host() {
                         <button
                           className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-1 rounded text-sm"
                           onClick={() => {
-                            const p = gameState.players.find(p => p.name === buzzWinner);
-                            if (p) awardPoints(p.id, true);
+                            if (buzzWinnerId) awardPoints(buzzWinnerId, true);
                           }}
                         >✓ Correct</button>
                         <button
                           className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1 rounded text-sm"
                           onClick={() => {
-                            const p = gameState.players.find(p => p.name === buzzWinner);
-                            if (p) markWrongAndReopen(p.id);
+                            if (buzzWinnerId) markWrongAndReopen(buzzWinnerId);
                           }}
                         >✗ Wrong</button>
                         <button className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm" onClick={resetBuzzer}>↺</button>

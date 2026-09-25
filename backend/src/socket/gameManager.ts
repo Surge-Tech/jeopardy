@@ -63,9 +63,17 @@ export function deleteSession(roomCode: string) {
   sessions.delete(roomCode);
 }
 
+// Case-insensitive, trimmed name-uniqueness check within a session. Excludes
+// `excludePlayerId` so a rename can keep a player's own current name.
+export function isNameTaken(session: GameState, name: string, excludePlayerId?: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return session.players.some(p => p.id !== excludePlayerId && p.name.trim().toLowerCase() === normalized);
+}
+
 export function addPlayer(roomCode: string, name: string, color: string): Player | null {
   const session = sessions.get(roomCode);
   if (!session) return null;
+  if (isNameTaken(session, name)) return null;
   const player: Player = { id: uuidv4(), name, score: 0, color };
   session.players.push(player);
   return player;
@@ -82,6 +90,7 @@ export function renamePlayer(roomCode: string, playerId: string, newName: string
   if (!session) return false;
   const player = session.players.find(p => p.id === playerId);
   if (!player) return false;
+  if (isNameTaken(session, newName, playerId)) return false;
   player.name = newName.trim().slice(0, 32);
   return true;
 }
@@ -404,6 +413,9 @@ export function listSessions(): { roomCode: string; boardId: string; playerCount
 export function markWrongAndReopen(roomCode: string, playerId: string, delta: number): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
+  // Reject stale/duplicate/mismatched emits: only the currently-buzzed-in
+  // player can be marked wrong. Does not mutate state on mismatch.
+  if (playerId !== session.buzzedPlayerId) return false;
   const player = session.players.find(p => p.id === playerId);
   if (!player) return false;
   player.score += delta;

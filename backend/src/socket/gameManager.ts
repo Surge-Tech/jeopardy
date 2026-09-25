@@ -410,6 +410,19 @@ export function listSessions(): { roomCode: string; boardId: string; playerCount
   }));
 }
 
+// Reject stale/duplicate/mismatched "Correct"/"Wrong" judging clicks: the
+// awarded playerId must match whoever is actually eligible right now — the
+// currently-buzzed-in player for a regular question, or the Daily Double
+// contestant when isDailyDouble is true. Does not mutate state. Manual score
+// adjustments (no outcome) bypass this check entirely — callers should only
+// invoke it when an `outcome` is present.
+export function validateScoreEligibility(roomCode: string, playerId: string, isDailyDouble: boolean): boolean {
+  const session = sessions.get(roomCode);
+  if (!session) return false;
+  if (isDailyDouble) return playerId === session.dailyDouble?.playerId;
+  return playerId === session.buzzedPlayerId;
+}
+
 export function markWrongAndReopen(roomCode: string, playerId: string, delta: number): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;

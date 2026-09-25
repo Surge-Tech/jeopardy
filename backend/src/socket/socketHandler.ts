@@ -366,6 +366,7 @@ export function registerSocketHandlers(io: Server) {
           playerId: next.playerId,
           playerName: next.playerName,
         });
+        startAutoLockTimer(io, roomCode);
       } else {
         gm.resetBuzzer(roomCode);
         buzzOpenedAt.set(roomCode, Date.now());

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
 import { playDailyDouble, playBuzzerReady, playBuzzIn, playQuestionOpen, playCorrect, playWrong } from '../utils/sounds';
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';
@@ -27,15 +28,15 @@ export default function BoardView() {
   // browser sleep, backend restart) so this board keeps receiving host-only state.
   useEffect(() => {
     if (!roomCode) return;
-    function rejoin() { socket.emit('host:join', { roomCode }); }
+    function rejoin() { socket.emit(SOCKET_EVENTS.HOST_JOIN, { roomCode }); }
     socket.on('connect', rejoin);
     return () => { socket.off('connect', rejoin); };
   }, [roomCode]);
 
   useEffect(() => {
     if (!roomCode) return;
-    socket.emit('host:join', { roomCode });
-    socket.on('game:state', (state: GameState) => {
+    socket.emit(SOCKET_EVENTS.HOST_JOIN, { roomCode });
+    socket.on(SOCKET_EVENTS.GAME_STATE, (state: GameState) => {
       setGameState(state);
       if (!board && state.boardId) {
         fetch(`${API}/boards/${state.boardId}`).then(r => r.json()).then(setBoard);
@@ -46,20 +47,20 @@ export default function BoardView() {
       }
       prevBuzzerState.current = state.buzzerState;
     });
-    socket.on('buzz:winner', ({ playerName }: { playerName: string }) => {
+    socket.on(SOCKET_EVENTS.BUZZ_WINNER, ({ playerName }: { playerName: string }) => {
       setBuzzWinner({ playerName });
       playBuzzIn();
       setTimeout(() => setBuzzWinner(null), 1500);
     });
-    socket.on('score:result', ({ correct }: { correct: boolean }) => {
+    socket.on(SOCKET_EVENTS.SCORE_RESULT, ({ correct }: { correct: boolean }) => {
       correct ? playCorrect() : playWrong();
     });
-    socket.on('round:changed', ({ index, name }: { index: number; name: string | null }) => {
+    socket.on(SOCKET_EVENTS.ROUND_CHANGED, ({ index, name }: { index: number; name: string | null }) => {
       setRoundSplash({ index, name });
       setTimeout(() => setRoundSplash(null), 3000);
     });
-    socket.on('game:ended', () => setRoomClosed(true));
-    socket.emit('get:state', { roomCode });
+    socket.on(SOCKET_EVENTS.GAME_ENDED, () => setRoomClosed(true));
+    socket.emit(SOCKET_EVENTS.GET_STATE, { roomCode });
     return () => {
       socket.off('game:state');
       socket.off('buzz:winner');

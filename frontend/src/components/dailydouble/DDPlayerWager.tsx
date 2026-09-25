@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { socket } from '../../socket';
 import type { DailyDoubleState } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
 import WagerInput from '../shared/WagerInput';
 
 type Ack = { ok: boolean; error?: string };
@@ -9,7 +10,7 @@ export default function DDPlayerWager({ dailyDouble }: { dailyDouble: DailyDoubl
   const [error, setError] = useState('');
 
   function lockWager(amount: number) {
-    socket.emit('dd:wager', { amount }, (res: Ack) => {
+    socket.emit(SOCKET_EVENTS.DD_WAGER, { amount }, (res: Ack) => {
       if (!res.ok) setError(res.error ?? 'Could not lock wager');
     });
   }

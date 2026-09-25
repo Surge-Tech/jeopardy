@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { GameState } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
@@ -32,7 +33,7 @@ export default function Buzzer() {
     if (!roomCode) return;
     function tryRejoin() {
       const savedId = localStorage.getItem(rejoinKey(roomCode));
-      if (savedId) socket.emit('player:rejoin', { roomCode, playerId: savedId });
+      if (savedId) socket.emit(SOCKET_EVENTS.PLAYER_REJOIN, { roomCode, playerId: savedId });
     }
     tryRejoin();
     socket.on('connect', tryRejoin);
@@ -40,7 +41,7 @@ export default function Buzzer() {
   }, [roomCode]);
 
   useEffect(() => {
-    socket.on('game:state', (state: GameState) => {
+    socket.on(SOCKET_EVENTS.GAME_STATE, (state: GameState) => {
       setGameState(state);
       if (state.phase === 'finished') { setPhase('finished'); return; }
       const transient = phase === 'winner' || phase === 'too-late' || phase === 'locked-out';
@@ -50,14 +51,14 @@ export default function Buzzer() {
         else setPhase('waiting');
       }
     });
-    socket.on('player:joined', ({ player, state }: { player: { id: string; name: string }; state: GameState }) => {
+    socket.on(SOCKET_EVENTS.PLAYER_JOINED, ({ player, state }: { player: { id: string; name: string }; state: GameState }) => {
       setMyId(player.id);
       setMyPlayer(player as any);
       setGameState(state);
       setPhase('waiting');
       if (roomCode) localStorage.setItem(rejoinKey(roomCode), player.id);
     });
-    socket.on('buzz:winner', ({ playerId, playerName }: { playerId: string; playerName: string }) => {
+    socket.on(SOCKET_EVENTS.BUZZ_WINNER, ({ playerId, playerName }: { playerId: string; playerName: string }) => {
       if (playerId === myId) {
         setWinnerName(playerName);
         setPhase('winner');
@@ -67,14 +68,14 @@ export default function Buzzer() {
       }
       setTimeout(() => setPhase(prev => prev === 'winner' || prev === 'too-late' ? 'waiting' : prev), 5000);
     });
-    socket.on('buzz:locked-out', ({ until }: { until: number }) => {
+    socket.on(SOCKET_EVENTS.BUZZ_LOCKED_OUT, ({ until }: { until: number }) => {
       setPhase('locked-out');
       const delay = Math.max(0, until - Date.now());
       setTimeout(() => setPhase(prev => prev === 'locked-out' ? 'armed' : prev), delay);
     });
-    socket.on('buzzer:open', () => setPhase('open'));
-    socket.on('buzzer:locked', () => setPhase(prev => prev === 'winner' || prev === 'too-late' || prev === 'locked-out' ? prev : 'waiting'));
-    socket.on('game:ended', () => setPhase('closed'));
+    socket.on(SOCKET_EVENTS.BUZZER_OPEN, () => setPhase('open'));
+    socket.on(SOCKET_EVENTS.BUZZER_LOCKED, () => setPhase(prev => prev === 'winner' || prev === 'too-late' || prev === 'locked-out' ? prev : 'waiting'));
+    socket.on(SOCKET_EVENTS.GAME_ENDED, () => setPhase('closed'));
     socket.on('error', ({ message }: { message: string }) => setError(message));
     return () => {
       socket.off('game:state');
@@ -91,12 +92,12 @@ export default function Buzzer() {
   function joinGame() {
     if (!name.trim()) { setError('Enter your name'); return; }
     setError('');
-    socket.emit('player:join', { roomCode, name: name.trim(), color: randomPlayerColor() });
+    socket.emit(SOCKET_EVENTS.PLAYER_JOIN, { roomCode, name: name.trim(), color: randomPlayerColor() });
   }
 
   function buzz() {
     if (phase !== 'open' && phase !== 'armed') return;
-    socket.emit('buzz');
+    socket.emit(SOCKET_EVENTS.BUZZ);
     if (phase === 'open') setPhase('waiting');
   }
 
@@ -114,7 +115,7 @@ export default function Buzzer() {
   function saveEditName() {
     const trimmed = editNameValue.trim();
     if (!trimmed) { setEditNameError('Name cannot be empty'); return; }
-    socket.emit('player:rename', { newName: trimmed }, (res: { ok: boolean; error?: string }) => {
+    socket.emit(SOCKET_EVENTS.PLAYER_RENAME, { newName: trimmed }, (res: { ok: boolean; error?: string }) => {
       if (res.ok) {
         setName(trimmed);
         setEditingName(false);

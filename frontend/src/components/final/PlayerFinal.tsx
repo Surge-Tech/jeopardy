@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { socket } from '../../socket';
 import type { GameState } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import WagerInput from '../shared/WagerInput';
@@ -33,7 +34,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
   }, [fj.stage]);
 
   function lockWager(amount: number) {
-    socket.emit('fj:wager', { amount }, (res: Ack) => {
+    socket.emit(SOCKET_EVENTS.FJ_WAGER, { amount }, (res: Ack) => {
       if (res.ok) { setWagerLocked(true); setLockedWagerAmount(amount); setWagerError(''); }
       else setWagerError(res.error ?? 'Could not lock wager');
     });
@@ -43,12 +44,12 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
     setAnswerText(text);
     if (draftTimer.current) window.clearTimeout(draftTimer.current);
     draftTimer.current = window.setTimeout(() => {
-      socket.emit('fj:draft', { text });
+      socket.emit(SOCKET_EVENTS.FJ_DRAFT, { text });
     }, 400);
   }
 
   function submitAnswer() {
-    socket.emit('fj:answer', { text: answerText }, (res: Ack) => {
+    socket.emit(SOCKET_EVENTS.FJ_ANSWER, { text: answerText }, (res: Ack) => {
       if (res.ok) setAnswerLocked(true);
     });
   }

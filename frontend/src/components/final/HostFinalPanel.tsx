@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { socket } from '../../socket';
 import type { Board, GameState } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
 import { useCountdown } from './useCountdown';
 
 interface HostState {
@@ -18,7 +19,7 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
   const remainingMs = useCountdown(fj.deadline, fj.serverNow);
 
   useEffect(() => {
-    socket.on('fj:host-state', (s: HostState) => setHostState(s));
+    socket.on(SOCKET_EVENTS.FJ_HOST_STATE, (s: HostState) => setHostState(s));
     return () => { socket.off('fj:host-state'); };
   }, []);
 
@@ -29,7 +30,7 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
   function applyOverride(playerId: string) {
     const wager = overrideWager.trim() !== '' ? Number(overrideWager) : undefined;
     const answer = overrideAnswer.trim() !== '' ? overrideAnswer : undefined;
-    socket.emit('host:fj-set-for-player', { roomCode, playerId, wager, answer });
+    socket.emit(SOCKET_EVENTS.HOST_FJ_SET_FOR_PLAYER, { roomCode, playerId, wager, answer });
     setOverridePlayerId(null);
     setOverrideWager('');
     setOverrideAnswer('');
@@ -89,7 +90,7 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
       {/* Stage-specific controls */}
       <div className="space-y-2 pt-2 border-t border-gray-700">
         {fj.stage === 'intro' && (
-          <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit('host:fj-reveal-category', { roomCode })}>
+          <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_REVEAL_CATEGORY, { roomCode })}>
             Reveal Category
           </button>
         )}
@@ -99,7 +100,7 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
           return (
             <button
               className={`w-full font-bold py-2 rounded ${missing.length ? 'bg-orange-600 hover:bg-orange-500 text-white' : 'bg-jeopardy-gold text-jeopardy-dark'}`}
-              onClick={() => socket.emit('host:fj-reveal-clue', { roomCode, force: missing.length > 0 })}
+              onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_REVEAL_CLUE, { roomCode, force: missing.length > 0 })}
             >
               {missing.length ? `Force reveal — ${missing.length} missing wager(s) = $0` : 'Reveal Clue'}
             </button>
@@ -107,13 +108,13 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
         })()}
 
         {fj.stage === 'clue' && (
-          <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded" onClick={() => socket.emit('host:fj-start-timer', { roomCode })}>
+          <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_START_TIMER, { roomCode })}>
             ⏱ Start Timer
           </button>
         )}
 
         {fj.stage === 'locked' && (
-          <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit('host:fj-begin-reveal', { roomCode })}>
+          <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_BEGIN_REVEAL, { roomCode })}>
             Begin Reveal
           </button>
         )}
@@ -122,34 +123,34 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
           <div className="space-y-2">
             <div className="text-center text-sm text-gray-400">Revealing: <span className="text-white font-bold">{currentContestant.playerName}</span></div>
             {fj.revealStep === 'name' && (
-              <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded" onClick={() => socket.emit('host:fj-reveal-step', { roomCode })}>
+              <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_REVEAL_STEP, { roomCode })}>
                 Show Wager
               </button>
             )}
             {fj.revealStep === 'wager' && (
-              <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded" onClick={() => socket.emit('host:fj-reveal-step', { roomCode })}>
+              <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_REVEAL_STEP, { roomCode })}>
                 Show Answer
               </button>
             )}
             {fj.revealStep === 'answer' && (
               <div className="flex gap-2">
-                <button className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded" onClick={() => socket.emit('host:fj-judge', { roomCode, playerId: currentContestant.playerId, correct: true })}>
+                <button className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_JUDGE, { roomCode, playerId: currentContestant.playerId, correct: true })}>
                   ✓ Correct
                 </button>
-                <button className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded" onClick={() => socket.emit('host:fj-judge', { roomCode, playerId: currentContestant.playerId, correct: false })}>
+                <button className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_JUDGE, { roomCode, playerId: currentContestant.playerId, correct: false })}>
                   ✗ Wrong
                 </button>
               </div>
             )}
             {fj.revealStep === 'judged' && (
               <div className="space-y-2">
-                <button className="text-xs text-gray-500 hover:text-red-400 w-full" onClick={() => socket.emit('host:fj-undo', { roomCode })}>↺ Undo</button>
+                <button className="text-xs text-gray-500 hover:text-red-400 w-full" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_UNDO, { roomCode })}>↺ Undo</button>
                 {!isLast ? (
-                  <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit('host:fj-next', { roomCode })}>
+                  <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_NEXT, { roomCode })}>
                     Next Contestant
                   </button>
                 ) : (
-                  <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit('host:fj-show-response', { roomCode })}>
+                  <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_SHOW_RESPONSE, { roomCode })}>
                     Show Correct Response
                   </button>
                 )}
@@ -159,19 +160,19 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
         )}
 
         {fj.stage === 'response' && (
-          <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit('host:fj-scoreboard', { roomCode })}>
+          <button className="w-full bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_SCOREBOARD, { roomCode })}>
             Final Scoreboard
           </button>
         )}
 
         {fj.stage === 'final' && (
           <div className="flex gap-2">
-            <button className="flex-1 btn-danger" onClick={() => socket.emit('host:fj-exit', { roomCode })}>
+            <button className="flex-1 btn-danger" onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_EXIT, { roomCode })}>
               Return to Board
             </button>
             <button
               className="flex-1 bg-jeopardy-gold text-jeopardy-dark font-bold py-2 rounded"
-              onClick={() => { if (confirm('End the game and show the leaderboard?')) socket.emit('host:end-game', { roomCode }); }}
+              onClick={() => { if (confirm('End the game and show the leaderboard?')) socket.emit(SOCKET_EVENTS.HOST_END_GAME, { roomCode }); }}
             >
               End Game
             </button>

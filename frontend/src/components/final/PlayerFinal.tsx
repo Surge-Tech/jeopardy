@@ -4,6 +4,7 @@ import type { GameState } from '../../types';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import WagerInput from '../shared/WagerInput';
+import { formatMoney } from '../../utils/format';
 
 type Ack = { ok: boolean; error?: string };
 
@@ -151,7 +152,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
         </div>
         <p className="text-gray-300">Wager: ${revealed.wager}</p>
         <p className="text-jeopardy-gold font-black text-xl mt-2">
-          {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+          {formatMoney(myScore)}
         </p>
       </div>
     );

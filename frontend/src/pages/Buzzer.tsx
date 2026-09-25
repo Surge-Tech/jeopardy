@@ -6,6 +6,8 @@ import type { GameState } from '../types';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
+import { randomPlayerColor } from '../utils/colors';
+import { formatMoney } from '../utils/format';
 
 type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'armed' | 'open' | 'winner' | 'too-late' | 'locked-out' | 'finished' | 'closed';
 
@@ -89,7 +91,7 @@ export default function Buzzer() {
   function joinGame() {
     if (!name.trim()) { setError('Enter your name'); return; }
     setError('');
-    socket.emit('player:join', { roomCode, name: name.trim(), color: randomColor() });
+    socket.emit('player:join', { roomCode, name: name.trim(), color: randomPlayerColor() });
   }
 
   function buzz() {
@@ -214,7 +216,7 @@ export default function Buzzer() {
         <div className="text-center">
           <p className="text-3xl font-black text-white mb-2">{name}</p>
           <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+            {formatMoney(myScore)}
           </p>
           <div className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto">
             <span className="text-gray-500 text-xl font-bold text-center px-4">Waiting...</span>
@@ -227,7 +229,7 @@ export default function Buzzer() {
         <div className="text-center">
           <p className="text-3xl font-black text-white mb-2">{name}</p>
           <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+            {formatMoney(myScore)}
           </p>
           <button
             className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto cursor-pointer"
@@ -255,7 +257,7 @@ export default function Buzzer() {
         <div className="text-center">
           <p className="text-3xl font-black text-white mb-2">{name}</p>
           <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+            {formatMoney(myScore)}
           </p>
           <button
             className="w-56 h-56 rounded-full border-8 border-jeopardy-gold bg-jeopardy-blue flex items-center justify-center mx-auto buzzer-active cursor-pointer"
@@ -301,7 +303,7 @@ export default function Buzzer() {
                   <span className={`text-sm ${p.id === myId ? 'text-white font-bold' : 'text-gray-400'}`}>{p.name}</span>
                 </div>
                 <span className="font-bold text-sm" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
-                  {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                  {formatMoney(p.score)}
                 </span>
               </div>
             ))}
@@ -310,9 +312,4 @@ export default function Buzzer() {
       )}
     </div>
   );
-}
-
-function randomColor() {
-  const colors = ['#FFD700', '#4ade80', '#60a5fa', '#f87171', '#c084fc', '#fb923c', '#34d399', '#f472b6'];
-  return colors[Math.floor(Math.random() * colors.length)];
 }

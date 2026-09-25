@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import type { GameState } from '../../types';
 import { playWinnerFanfare } from '../../utils/sounds';
+import { formatMoneyChange } from '../../utils/format';
 
 interface Row {
   playerId: string;
@@ -201,7 +202,7 @@ export default function Leaderboard({ gameState, compact, myId }: { gameState: G
                 {hasFj && <td className="p-2 text-center">{r.result === 'correct' ? '✅' : r.result === 'wrong' ? '❌' : '—'}</td>}
                 {hasFj && (
                   <td className={`p-2 text-right ${r.change > 0 ? 'text-green-400' : r.change < 0 ? 'text-red-400' : 'text-gray-500'}`}>
-                    {r.change > 0 ? `+$${r.change}` : r.change < 0 ? `-$${Math.abs(r.change)}` : '$0'}
+                    {formatMoneyChange(r.change)}
                   </td>
                 )}
                 <td className="p-2 text-right font-black text-jeopardy-gold">${r.finalScore}</td>

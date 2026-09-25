@@ -3,11 +3,7 @@ import type { GameState } from '../../types';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import { playFinalJeopardy, playTick, playTimesUp, playReveal, playThinkingPulse, stopThinkingPulse } from '../../utils/sounds';
-
-function getYouTubeEmbedUrl(url: string): string {
-  const match = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-  return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1` : url;
-}
+import { getYouTubeEmbedUrl } from '../../utils/media';
 
 function CountdownRing({ remainingMs, totalMs }: { remainingMs: number; totalMs: number }) {
   const pct = totalMs > 0 ? Math.max(0, Math.min(1, remainingMs / totalMs)) : 0;

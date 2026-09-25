@@ -7,6 +7,8 @@ import { playDailyDouble, playBuzzerReady, playBuzzIn, playQuestionOpen, playCor
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
+import { getYouTubeEmbedUrl } from '../utils/media';
+import { formatMoney } from '../utils/format';
 
 const API = '/api';
 
@@ -302,7 +304,7 @@ export default function BoardView() {
               className="font-black text-xl"
               style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}
             >
-              {player.score < 0 ? `-$${Math.abs(player.score)}` : `$${player.score}`}
+              {formatMoney(player.score)}
             </div>
           </div>
         ))}
@@ -312,9 +314,4 @@ export default function BoardView() {
       </div>
     </div>
   );
-}
-
-function getYouTubeEmbedUrl(url: string): string {
-  const match = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-  return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1` : url;
 }

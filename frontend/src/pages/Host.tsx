@@ -8,9 +8,10 @@ import HostFinalPanel from '../components/final/HostFinalPanel';
 import DDHostPanel from '../components/dailydouble/DDHostPanel';
 import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
+import { PLAYER_COLORS } from '../utils/colors';
+import { formatMoney } from '../utils/format';
 
 const API = '/api';
-const PLAYER_COLORS = ['#FFD700', '#4ade80', '#60a5fa', '#f87171', '#c084fc', '#fb923c', '#34d399', '#f472b6'];
 
 const LOG_ICONS: Record<string, string> = {
   open: '📋', dd: '⭐', buzz: '⚡', correct: '✅', wrong: '❌', close: '✖', score: '💰',
@@ -603,7 +604,7 @@ export default function Host() {
                           </div>
                         )}
                         <div className="font-black" style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}>
-                          {player.score < 0 ? `-$${Math.abs(player.score)}` : `$${player.score}`}
+                          {formatMoney(player.score)}
                         </div>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
@@ -650,7 +651,7 @@ export default function Host() {
                         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
                         <span className="flex-1 text-sm font-bold truncate">{p.name}</span>
                         <span className="font-black text-sm" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
-                          {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                          {formatMoney(p.score)}
                         </span>
                       </div>
                     ))}

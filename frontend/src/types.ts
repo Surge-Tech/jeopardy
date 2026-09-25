@@ -97,6 +97,15 @@ export interface DailyDoubleState {
   submittedByPlayer: boolean;
 }
 
+export interface BuzzEntry {
+  playerId: string;
+  playerName: string;
+  reactionMs: number;
+  attemptedAnswer: boolean;
+}
+
+export const PERMANENT_LOCKOUT = Number.MAX_SAFE_INTEGER;
+
 export interface GameState {
   boardId: string;
   roomCode: string;
@@ -114,6 +123,11 @@ export interface GameState {
   dailyDouble: DailyDoubleState | null;
   lastCorrectPlayerId: string | null;
   buzzLockouts: Record<string, number>;
-  settings: { lockoutMs: number };
+  buzzQueue: BuzzEntry[];
+  settings: {
+    lockoutMs: number;
+    autoLockEnabled: boolean;
+    autoLockTimeoutS: number;
+  };
   currentRoundIndex: number;
 }

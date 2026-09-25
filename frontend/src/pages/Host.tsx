@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '../types';
+import { PERMANENT_LOCKOUT } from '../types';
 import HostFinalPanel from '../components/final/HostFinalPanel';
 import DDHostPanel from '../components/dailydouble/DDHostPanel';
 import Leaderboard from '../components/shared/Leaderboard';
@@ -52,6 +53,10 @@ export default function Host() {
     socket.on('fj:host-log', ({ msg }: { msg: string }) => {
       addLog({ type: 'fj', msg });
     });
+    socket.on('buzz:next-in-queue', ({ playerName }: { playerName: string }) => {
+      setBuzzWinner(playerName);
+      addLog({ type: 'buzz', msg: `Queue advance → ${playerName}`, player: playerName });
+    });
 
     socket.emit('host:create', { boardId });
 
@@ -60,6 +65,7 @@ export default function Host() {
       socket.off('buzz:winner');
       socket.off('host:created');
       socket.off('fj:host-log');
+      socket.off('buzz:next-in-queue');
     };
   }, [boardId]);
 
@@ -149,6 +155,14 @@ export default function Host() {
     // close without double-logging
     setBuzzWinner(null);
     socket.emit('host:close-question', { roomCode });
+  }
+
+  function markWrongAndReopen(playerId: string) {
+    const value = activeQ?.value ?? 0;
+    const player = gameState!.players.find(p => p.id === playerId);
+    socket.emit('host:wrong-reopen', { roomCode, playerId, delta: -value });
+    addLog({ type: 'wrong', msg: `${player?.name ?? 'Player'} answered wrong (-$${value})`, player: player?.name });
+    setBuzzWinner(null);
   }
 
   function adjustScore(playerId: string, delta: number) {
@@ -245,6 +259,33 @@ export default function Host() {
               <option value={500}>500ms</option>
               <option value={1000}>1000ms</option>
             </select>
+          </div>
+          <div className="flex items-center gap-2 bg-gray-800 rounded px-3 py-1 text-sm">
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={gameState.settings.autoLockEnabled}
+                onChange={e => socket.emit('host:set-auto-lock', { roomCode, enabled: e.target.checked })}
+                className="accent-yellow-400"
+              />
+              <span className="text-gray-400 text-xs">Auto-lock</span>
+            </label>
+            {gameState.settings.autoLockEnabled && (
+              <>
+                <input
+                  type="number"
+                  min={5}
+                  max={10}
+                  value={gameState.settings.autoLockTimeoutS}
+                  onChange={e => {
+                    const s = Number(e.target.value);
+                    if (s >= 5 && s <= 10) socket.emit('host:set-auto-lock-timeout', { roomCode, seconds: s });
+                  }}
+                  className="bg-gray-700 text-white text-xs w-10 rounded px-1 py-0.5 text-center"
+                />
+                <span className="text-gray-400 text-xs">s</span>
+              </>
+            )}
           </div>
           {gameState.phase !== 'finished' && (
             <button className="btn-danger text-sm py-1 px-3" onClick={endGame}>End Game</button>
@@ -400,7 +441,7 @@ export default function Host() {
                           className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1 rounded text-sm"
                           onClick={() => {
                             const p = gameState.players.find(p => p.name === buzzWinner);
-                            if (p) awardPoints(p.id, false);
+                            if (p) markWrongAndReopen(p.id);
                           }}
                         >✗ Wrong</button>
                         <button className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm" onClick={resetBuzzer}>↺</button>
@@ -413,6 +454,49 @@ export default function Host() {
                     </button>
                   )}
                 </div>
+
+                {(() => {
+                  const lockedOut = gameState.players.filter(
+                    p => gameState.buzzLockouts[p.id] === PERMANENT_LOCKOUT
+                  );
+                  if (lockedOut.length === 0) return null;
+                  return (
+                    <div className="mt-2">
+                      <div className="text-[10px] text-gray-500 uppercase mb-1">Ineligible this question</div>
+                      <div className="flex flex-wrap gap-1">
+                        {lockedOut.map(p => (
+                          <span key={p.id} className="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full">
+                            {p.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {gameState.buzzQueue && gameState.buzzQueue.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-[10px] text-gray-500 uppercase mb-1">Buzz Queue</div>
+                    <div className="space-y-1">
+                      {gameState.buzzQueue.map((entry, i) => (
+                        <div
+                          key={entry.playerId}
+                          className={`flex items-center gap-2 text-xs px-2 py-1 rounded ${
+                            entry.attemptedAnswer
+                              ? 'bg-gray-800 text-gray-500 line-through'
+                              : gameState.buzzedPlayerId === entry.playerId
+                              ? 'bg-blue-900 text-white font-bold'
+                              : 'bg-gray-800 text-gray-300'
+                          }`}
+                        >
+                          <span className="text-gray-500 w-4">{i + 1}.</span>
+                          <span className="flex-1">{entry.playerName}</span>
+                          <span className="text-gray-500 tabular-nums">{entry.reactionMs}ms</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <button className="btn-danger text-sm w-full" onClick={closeQuestion}>Close Question</button>
               </div>

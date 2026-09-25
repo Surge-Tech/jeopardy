@@ -16,7 +16,7 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
   const [overridePlayerId, setOverridePlayerId] = useState<string | null>(null);
   const [overrideWager, setOverrideWager] = useState('');
   const [overrideAnswer, setOverrideAnswer] = useState('');
-  const remainingMs = useCountdown(fj.deadline, fj.serverNow);
+  const remainingMs = useCountdown(fj.deadline, fj.serverNow, 'second');
 
   useEffect(() => {
     socket.on(SOCKET_EVENTS.FJ_HOST_STATE, (s: HostState) => setHostState(s));

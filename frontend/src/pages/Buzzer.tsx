@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
@@ -29,6 +29,16 @@ export default function Buzzer() {
   const [editNameValue, setEditNameValue] = useState('');
   const [editNameError, setEditNameError] = useState('');
 
+  // Kept in sync with `phase`/`myId` state below so the socket-handler effect
+  // can read the current values without needing them in its dependency
+  // array — the handlers only use them inside closures, they don't need to
+  // be redefined (and the socket listeners re-registered) every time phase
+  // or myId changes.
+  const phaseRef = useRef(phase);
+  const myIdRef = useRef(myId);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+  useEffect(() => { myIdRef.current = myId; }, [myId]);
+
   // Try to rejoin (e.g. after a phone screen sleeps and drops the socket).
   useEffect(() => {
     if (!roomCode) return;
@@ -45,8 +55,9 @@ export default function Buzzer() {
     socket.on(SOCKET_EVENTS.GAME_STATE, (state: GameState) => {
       setGameState(state);
       if (state.phase === 'finished') { setPhase('finished'); return; }
-      const transient = phase === 'winner' || phase === 'too-late' || phase === 'locked-out';
-      if (!state.finalJeopardy && phase !== 'join' && phase !== 'lobby' && phase !== 'finished' && phase !== 'closed' && !transient) {
+      const currentPhase = phaseRef.current;
+      const transient = currentPhase === 'winner' || currentPhase === 'too-late' || currentPhase === 'locked-out';
+      if (!state.finalJeopardy && currentPhase !== 'join' && currentPhase !== 'lobby' && currentPhase !== 'finished' && currentPhase !== 'closed' && !transient) {
         if (state.buzzerState === 'open') setPhase('open');
         else if (state.activeQuestionId) setPhase('armed');
         else setPhase('waiting');
@@ -60,7 +71,7 @@ export default function Buzzer() {
       if (roomCode) localStorage.setItem(rejoinKey(roomCode), player.id);
     });
     socket.on(SOCKET_EVENTS.BUZZ_WINNER, ({ playerId, playerName }: { playerId: string; playerName: string }) => {
-      if (playerId === myId) {
+      if (playerId === myIdRef.current) {
         setWinnerName(playerName);
         setPhase('winner');
       } else {
@@ -79,16 +90,16 @@ export default function Buzzer() {
     socket.on(SOCKET_EVENTS.GAME_ENDED, () => setPhase('closed'));
     socket.on('error', ({ message }: { message: string }) => setError(message));
     return () => {
-      socket.off('game:state');
-      socket.off('player:joined');
-      socket.off('buzz:winner');
-      socket.off('buzz:locked-out');
-      socket.off('buzzer:open');
-      socket.off('buzzer:locked');
-      socket.off('game:ended');
+      socket.off(SOCKET_EVENTS.GAME_STATE);
+      socket.off(SOCKET_EVENTS.PLAYER_JOINED);
+      socket.off(SOCKET_EVENTS.BUZZ_WINNER);
+      socket.off(SOCKET_EVENTS.BUZZ_LOCKED_OUT);
+      socket.off(SOCKET_EVENTS.BUZZER_OPEN);
+      socket.off(SOCKET_EVENTS.BUZZER_LOCKED);
+      socket.off(SOCKET_EVENTS.GAME_ENDED);
       socket.off('error');
     };
-  }, [myId, phase]);
+  }, [roomCode]);
 
   function joinGame() {
     if (!name.trim()) { setError('Enter your name'); return; }

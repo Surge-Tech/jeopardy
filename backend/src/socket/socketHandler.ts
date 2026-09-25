@@ -45,7 +45,44 @@ function startAutoLockTimer(io: Server, roomCode: string) {
   autoLockTimers.set(roomCode, t);
 }
 
+// Full teardown for a room: cancels its auto-lock timer, drops its
+// buzzOpenedAt entry, cleans up any Final Jeopardy secret state, deletes the
+// session itself, and notifies any client still connected. Used by both the
+// explicit "host:end" handler and the idle-session reaper below so the two
+// paths can never drift out of sync.
+function endRoom(io: Server, roomCode: string) {
+  cancelAutoLockTimer(roomCode);
+  buzzOpenedAt.delete(roomCode);
+  io.to(roomCode).emit(SOCKET_EVENTS.GAME_ENDED);
+  cleanupFinal(roomCode);
+  gm.deleteSession(roomCode);
+}
+
+// Idle-session reaper: a host who simply closes their browser tab without
+// clicking "End Game" would otherwise leak that room's session (plus its
+// autoLockTimers entry and finalJeopardy secrets) for the lifetime of the
+// server process. Sweeping every 15 minutes against a 6-hour idle threshold
+// bounds that growth to "rooms idle for over 6 hours" while being generous
+// enough to never interrupt a real game, even one paused for a long break —
+// 15 minutes keeps the worst-case lag between a room going idle and being
+// reaped small relative to the 6-hour threshold, without running the sweep
+// often enough to matter for CPU/log noise.
+const IDLE_SWEEP_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const IDLE_SESSION_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+function startIdleSessionReaper(io: Server) {
+  const timer = setInterval(() => {
+    const idleRooms = gm.getIdleSessions(IDLE_SESSION_MAX_AGE_MS);
+    for (const roomCode of idleRooms) {
+      endRoom(io, roomCode);
+    }
+  }, IDLE_SWEEP_INTERVAL_MS);
+  timer.unref?.();
+}
+
 export function registerSocketHandlers(io: Server) {
+  startIdleSessionReaper(io);
+
   io.on('connection', (socket: Socket) => {
     registerFinalHandlers(io, socket, socketPlayers);
 
@@ -337,11 +374,7 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: end / delete session ───────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_END, ({ roomCode }: { roomCode: string }) => {
-      cancelAutoLockTimer(roomCode);
-      buzzOpenedAt.delete(roomCode);
-      io.to(roomCode).emit(SOCKET_EVENTS.GAME_ENDED);
-      cleanupFinal(roomCode);
-      gm.deleteSession(roomCode);
+      endRoom(io, roomCode);
     });
 
     // ── HOST: wrong answer — reopen or advance to next in queue ──────────

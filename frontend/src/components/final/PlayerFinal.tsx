@@ -13,7 +13,7 @@ type Ack = { ok: boolean; error?: string };
 export default function PlayerFinal({ gameState, myId }: { gameState: GameState; myId: string }) {
   const fj = gameState.finalJeopardy!;
   const contestant = fj.contestants.find(c => c.playerId === myId);
-  const remainingMs = useCountdown(fj.deadline, fj.serverNow);
+  const remainingMs = useCountdown(fj.deadline, fj.serverNow, 'second');
 
   const [wagerLocked, setWagerLocked] = useState(false);
   const [lockedWagerAmount, setLockedWagerAmount] = useState(0);

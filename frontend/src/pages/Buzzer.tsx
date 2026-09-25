@@ -4,6 +4,7 @@ import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { GameState } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
+import { LIMITS } from '@shared/limits';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
@@ -193,7 +194,7 @@ export default function Buzzer() {
                 value={editNameValue}
                 onChange={e => setEditNameValue(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') saveEditName(); if (e.key === 'Escape') cancelEditName(); }}
-                maxLength={40}
+                maxLength={LIMITS.PLAYER_NAME_MAX}
               />
               {editNameError && <p className="text-red-400 text-xs text-center">{editNameError}</p>}
               <div className="flex gap-2 justify-center">

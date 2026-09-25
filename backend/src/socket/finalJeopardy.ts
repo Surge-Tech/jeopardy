@@ -4,6 +4,7 @@ import * as boardStorage from '../storage/boardStorage.js';
 import type { FinalPublicState, FinalJeopardyBoard, FinalContestant } from '../types.js';
 import { onHost } from './hostAuth.js';
 import { SOCKET_EVENTS } from '../shared/socketEvents.js';
+import { LIMITS } from '../shared/limits.js';
 
 // ── Secret, per-room Final Jeopardy state ──────────────────────────────────
 // Kept OUTSIDE GameState because a NodeJS.Timeout can't be serialized over
@@ -162,7 +163,7 @@ export function setForPlayer(io: Server, roomCode: string, playerId: string, wag
     hostLog(io, roomCode, `Host set ${contestant.playerName}'s wager to $${wager}`);
   }
   if (answer !== undefined) {
-    const trimmed = answer.trim().slice(0, 200);
+    const trimmed = answer.trim().slice(0, LIMITS.ANSWER_MAX);
     secret.answers.set(playerId, trimmed);
     contestant.hasAnswered = true;
     hostLog(io, roomCode, `Host set ${contestant.playerName}'s answer`);
@@ -222,7 +223,7 @@ export function saveDraft(io: Server, roomCode: string, playerId: string, text: 
   if (!fj || !secret) return { ok: false, error: 'No Final Jeopardy in progress' };
   if (fj.stage !== 'answering') return { ok: false, error: 'Not accepting answers right now' };
   if (secret.answers.has(playerId)) return { ok: false, error: 'Answer already submitted' };
-  secret.drafts.set(playerId, text.slice(0, 200));
+  secret.drafts.set(playerId, text.slice(0, LIMITS.ANSWER_MAX));
   broadcastHostState(io, roomCode);
   return { ok: true };
 }
@@ -234,7 +235,7 @@ export function submitAnswer(io: Server, roomCode: string, playerId: string, tex
   if (fj.stage !== 'answering') return { ok: false, error: 'Not accepting answers right now' };
   if (!fj.deadline || Date.now() > fj.deadline + 750) return { ok: false, error: 'Time is up' };
   if (secret.answers.has(playerId)) return { ok: false, error: 'Answer already submitted' };
-  const trimmed = text.trim().slice(0, 200);
+  const trimmed = text.trim().slice(0, LIMITS.ANSWER_MAX);
   secret.answers.set(playerId, trimmed);
   secret.drafts.delete(playerId);
   const contestant = fj.contestants.find(c => c.playerId === playerId);
@@ -257,7 +258,7 @@ export function lockAnswers(io: Server, roomCode: string) {
   // Whatever was drafted becomes final for anyone who didn't explicitly submit.
   for (const c of fj.contestants) {
     if (!secret.answers.has(c.playerId)) {
-      const draft = (secret.drafts.get(c.playerId) ?? '').trim().slice(0, 200);
+      const draft = (secret.drafts.get(c.playerId) ?? '').trim().slice(0, LIMITS.ANSWER_MAX);
       secret.answers.set(c.playerId, draft);
       c.hasAnswered = draft.length > 0;
     }

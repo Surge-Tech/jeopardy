@@ -4,6 +4,7 @@ import * as boardStorage from '../storage/boardStorage.js';
 import { registerFinalHandlers, cleanup as cleanupFinal } from './finalJeopardy.js';
 import { onHost } from './hostAuth.js';
 import { SOCKET_EVENTS } from '../shared/socketEvents.js';
+import { LIMITS } from '../shared/limits.js';
 
 // Track which socket owns which player in which room
 const socketPlayers = new Map<string, { roomCode: string; playerId: string; playerName: string }>();
@@ -281,7 +282,7 @@ export function registerSocketHandlers(io: Server) {
       if (gm.isNameTaken(session, trimmed, info.playerId)) return ack?.({ ok: false, error: 'That name is already taken' });
       const renamed = gm.renamePlayer(info.roomCode, info.playerId, trimmed);
       if (!renamed) return ack?.({ ok: false, error: 'Could not rename player' });
-      socketPlayers.set(socket.id, { ...info, playerName: trimmed.slice(0, 32) });
+      socketPlayers.set(socket.id, { ...info, playerName: trimmed.slice(0, LIMITS.PLAYER_NAME_MAX) });
       ack?.({ ok: true });
       io.to(info.roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(info.roomCode));
     });
@@ -298,7 +299,7 @@ export function registerSocketHandlers(io: Server) {
       // Update socketPlayers entry for this player if they have a live socket
       for (const [sid, info] of socketPlayers) {
         if (info.roomCode === roomCode && info.playerId === playerId) {
-          socketPlayers.set(sid, { ...info, playerName: trimmed.slice(0, 32) });
+          socketPlayers.set(sid, { ...info, playerName: trimmed.slice(0, LIMITS.PLAYER_NAME_MAX) });
           break;
         }
       }

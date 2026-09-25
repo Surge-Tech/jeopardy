@@ -1,6 +1,7 @@
 import { randomUUID as uuidv4 } from 'crypto';
 import type { GameState, Player, FinalPublicState, DailyDoubleState, BuzzEntry } from '../types.js';
 import { PERMANENT_LOCKOUT } from '../types.js';
+import { LIMITS } from '../shared/limits.js';
 
 export { PERMANENT_LOCKOUT };
 
@@ -92,7 +93,7 @@ export function renamePlayer(roomCode: string, playerId: string, newName: string
   const player = session.players.find(p => p.id === playerId);
   if (!player) return false;
   if (isNameTaken(session, newName, playerId)) return false;
-  player.name = newName.trim().slice(0, 32);
+  player.name = newName.trim().slice(0, LIMITS.PLAYER_NAME_MAX);
   return true;
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { socket } from '../../socket';
 import type { GameState } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
+import { LIMITS } from '@shared/limits';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import WagerInput from '../shared/WagerInput';
@@ -116,7 +117,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
           placeholder="What is…"
           value={answerText}
           onChange={e => handleDraft(e.target.value)}
-          maxLength={200}
+          maxLength={LIMITS.ANSWER_MAX}
         />
         <button className="btn-primary w-full py-3" onClick={submitAnswer}>Submit</button>
       </div>

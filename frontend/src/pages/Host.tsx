@@ -5,6 +5,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '@shared/types';
 import { PERMANENT_LOCKOUT } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
+import { LIMITS } from '@shared/limits';
 import HostFinalPanel from '../components/final/HostFinalPanel';
 import DDHostPanel from '../components/dailydouble/DDHostPanel';
 import Leaderboard from '../components/shared/Leaderboard';
@@ -587,7 +588,7 @@ export default function Host() {
                                 value={renameValue}
                                 onChange={e => setRenameValue(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') saveRenamePlayer(player.id); if (e.key === 'Escape') cancelRenamePlayer(); }}
-                                maxLength={40}
+                                maxLength={LIMITS.PLAYER_NAME_MAX}
                               />
                               <button className="text-xs bg-jeopardy-gold text-jeopardy-dark font-bold px-2 py-1 rounded" onClick={() => saveRenamePlayer(player.id)}>Save</button>
                               <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={cancelRenamePlayer}>✕</button>

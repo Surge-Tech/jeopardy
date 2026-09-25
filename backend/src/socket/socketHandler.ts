@@ -110,6 +110,7 @@ export function registerSocketHandlers(io: Server) {
       const outcome = gm.recordBuzz(info.roomCode, info.playerId, info.playerName, buzzOpenedAt.get(info.roomCode) ?? null);
       const session = gm.getSession(info.roomCode);
       if (outcome === 'won') {
+        cancelAutoLockTimer(info.roomCode);
         io.to(info.roomCode).emit('buzz:winner', {
           playerId: info.playerId,
           playerName: info.playerName,

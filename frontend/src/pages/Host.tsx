@@ -3,27 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '@shared/types';
-import { PERMANENT_LOCKOUT } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
-import { LIMITS } from '@shared/limits';
 import HostFinalPanel from '../components/final/HostFinalPanel';
 import DDHostPanel from '../components/dailydouble/DDHostPanel';
 import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
 import { PLAYER_COLORS } from '../utils/colors';
-import { formatMoney } from '../utils/format';
+import ShareLink from '../components/host/ShareLink';
+import BoardGrid from '../components/host/BoardGrid';
+import ActiveQuestionPanel from '../components/host/ActiveQuestionPanel';
+import PlayersTab from '../components/host/PlayersTab';
+import LogTab from '../components/host/LogTab';
+import StatsTab from '../components/host/StatsTab';
 
 const API = '/api';
-
-const LOG_ICONS: Record<string, string> = {
-  open: '📋', dd: '⭐', buzz: '⚡', correct: '✅', wrong: '❌', close: '✖', score: '💰',
-  fj: '⚡', wager: '🎲', answer: '📝',
-};
-const LOG_COLORS: Record<string, string> = {
-  open: 'text-blue-300', dd: 'text-yellow-300', buzz: 'text-orange-300',
-  correct: 'text-green-400', wrong: 'text-red-400', close: 'text-gray-400', score: 'text-purple-300',
-  fj: 'text-jeopardy-gold', wager: 'text-yellow-300', answer: 'text-blue-300',
-};
 
 export default function Host() {
   const { boardId } = useParams<{ boardId: string }>();
@@ -361,44 +354,12 @@ export default function Host() {
       <div className="flex-1 flex gap-0 overflow-hidden">
         {/* Left: Board grid */}
         <div className="flex-1 overflow-auto p-3">
-          <div className="overflow-x-auto">
-            <div
-              className="grid gap-1"
-              style={{ gridTemplateColumns: `repeat(${round.categories.length}, minmax(110px, 1fr))` }}
-            >
-              {/* Category headers */}
-              {round.categories.map(cat => (
-                <div key={cat.id} className="bg-jeopardy-blue border-2 border-black text-jeopardy-gold font-black text-center p-2 text-xs uppercase">
-                  {cat.name || 'CATEGORY'}
-                </div>
-              ))}
-              {/* Question cells */}
-              {round.pointValues.map(pv =>
-                round.categories.map(cat => {
-                  const q = cat.questions.find(q => q.value === pv);
-                  if (!q) return <div key={`${cat.id}-${pv}`} />;
-                  const isAnswered = answered.has(q.id);
-                  const isActive = gameState.activeQuestionId === q.id;
-                  return (
-                    <button
-                      key={q.id}
-                      disabled={isAnswered}
-                      onClick={() => !isAnswered && openQuestion(q)}
-                      className={`relative border-2 border-black text-center font-black py-3 text-sm transition-all
-                        ${isActive ? 'bg-yellow-500 text-black border-yellow-300' :
-                          isAnswered ? 'bg-gray-900 text-gray-700 cursor-not-allowed' :
-                          'bg-jeopardy-blue text-jeopardy-gold hover:brightness-125'}`}
-                    >
-                      {isAnswered ? '—' : `$${pv}`}
-                      {q.isDailyDouble && !isAnswered && (
-                        <span className="absolute top-1 right-1 bg-yellow-400 text-black text-[9px] font-black px-1 rounded leading-tight">DD</span>
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
+          <BoardGrid
+            round={round}
+            answered={answered}
+            activeQuestionId={gameState.activeQuestionId}
+            onOpenQuestion={openQuestion}
+          />
 
           {/* Final Jeopardy launcher */}
           {board.finalJeopardy && !gameState.finalJeopardy && (
@@ -435,107 +396,24 @@ export default function Host() {
                 onClose={closeQuestion}
               />
             ) : activeQ ? (
-              <div className="space-y-3">
-                <div className="text-jeopardy-gold font-black text-xl">${activeQ.value}</div>
-
-                <div className="bg-gray-800 rounded p-3 text-sm text-white leading-relaxed">{activeQ.clue}</div>
-
-                {/* Answer always visible to host */}
-                <div className="bg-green-950 border border-green-700 rounded p-3 text-sm text-green-300">
-                  <div className="text-[10px] text-gray-500 uppercase mb-1">Answer</div>
-                  {activeQ.response}
-                </div>
-
-                {/* Show on board button — only relevant until revealed */}
-                {!gameState.responseVisible && (
-                  <button className="btn-ghost text-sm w-full" onClick={showAnswer}>Show Answer on Board</button>
-                )}
-
-                {/* Buzzer controls */}
-                <div className="space-y-2">
-                  {gameState.buzzerState === 'idle' && (
-                    <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors" onClick={enableBuzzer}>
-                      🔔 Open Buzzers
-                    </button>
-                  )}
-                  {gameState.buzzerState === 'open' && (
-                    <button className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 rounded transition-colors" onClick={lockBuzzer}>
-                      🔒 Lock Buzzers
-                    </button>
-                  )}
-                  {gameState.buzzerState === 'locked' && buzzWinner && (
-                    <div className="bg-jeopardy-blue border-2 border-jeopardy-gold rounded p-3 text-center">
-                      <div className="text-gray-300 text-sm">Buzzed In:</div>
-                      <div className="text-jeopardy-gold font-black text-lg">{buzzWinner}</div>
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-1 rounded text-sm"
-                          onClick={() => {
-                            if (buzzWinnerId) awardPoints(buzzWinnerId, true);
-                          }}
-                        >✓ Correct</button>
-                        <button
-                          className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1 rounded text-sm"
-                          onClick={() => {
-                            if (buzzWinnerId) markWrongAndReopen(buzzWinnerId);
-                          }}
-                        >✗ Wrong</button>
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm" onClick={resetBuzzer}>↺</button>
-                      </div>
-                    </div>
-                  )}
-                  {gameState.buzzerState === 'locked' && !buzzWinner && (
-                    <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors" onClick={resetBuzzer}>
-                      🔔 Re-open Buzzers
-                    </button>
-                  )}
-                </div>
-
-                {(() => {
-                  const lockedOut = gameState.players.filter(
-                    p => gameState.buzzLockouts[p.id] === PERMANENT_LOCKOUT
-                  );
-                  if (lockedOut.length === 0) return null;
-                  return (
-                    <div className="mt-2">
-                      <div className="text-[10px] text-gray-500 uppercase mb-1">Ineligible this question</div>
-                      <div className="flex flex-wrap gap-1">
-                        {lockedOut.map(p => (
-                          <span key={p.id} className="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full">
-                            {p.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {gameState.buzzQueue && gameState.buzzQueue.length > 0 && (
-                  <div className="mt-2">
-                    <div className="text-[10px] text-gray-500 uppercase mb-1">Buzz Queue</div>
-                    <div className="space-y-1">
-                      {gameState.buzzQueue.map((entry, i) => (
-                        <div
-                          key={entry.playerId}
-                          className={`flex items-center gap-2 text-xs px-2 py-1 rounded ${
-                            entry.attemptedAnswer
-                              ? 'bg-gray-800 text-gray-500 line-through'
-                              : gameState.buzzedPlayerId === entry.playerId
-                              ? 'bg-blue-900 text-white font-bold'
-                              : 'bg-gray-800 text-gray-300'
-                          }`}
-                        >
-                          <span className="text-gray-500 w-4">{i + 1}.</span>
-                          <span className="flex-1">{entry.playerName}</span>
-                          <span className="text-gray-500 tabular-nums">{entry.reactionMs}ms</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <button className="btn-danger text-sm w-full" onClick={closeQuestion}>Close Question</button>
-              </div>
+              <ActiveQuestionPanel
+                activeQ={activeQ}
+                responseVisible={gameState.responseVisible}
+                buzzerState={gameState.buzzerState}
+                buzzWinner={buzzWinner}
+                buzzWinnerId={buzzWinnerId}
+                players={gameState.players}
+                buzzLockouts={gameState.buzzLockouts}
+                buzzQueue={gameState.buzzQueue}
+                buzzedPlayerId={gameState.buzzedPlayerId}
+                onShowAnswer={showAnswer}
+                onEnableBuzzer={enableBuzzer}
+                onLockBuzzer={lockBuzzer}
+                onResetBuzzer={resetBuzzer}
+                onAward={awardPoints}
+                onMarkWrong={markWrongAndReopen}
+                onClose={closeQuestion}
+              />
             ) : (
               <p className="text-gray-500 text-sm">Click a question on the board to open it.</p>
             )}
@@ -560,189 +438,40 @@ export default function Host() {
 
             {/* Players tab */}
             {tab === 'players' && (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <input
-                    className="input-field text-sm flex-1"
-                    placeholder="Player name..."
-                    value={addPlayerName}
-                    onChange={e => setAddPlayerName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && addPlayer()}
-                  />
-                  <button className="btn-primary text-sm py-1 px-3" onClick={addPlayer}>+</button>
-                </div>
-                {gameState.players.length === 0 && (
-                  <p className="text-gray-600 text-sm">No players. Add some above or share the buzzer URL.</p>
-                )}
-                {gameState.players.map(player => (
-                  <div key={player.id} className="bg-gray-800 rounded-lg p-3 flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: player.color }} />
-                      <div className="flex-1 min-w-0">
-                        {renamingPlayerId === player.id ? (
-                          <div className="flex flex-col gap-1">
-                            <div className="flex gap-1">
-                              <input
-                                autoFocus
-                                className="input-field text-xs flex-1 py-1"
-                                value={renameValue}
-                                onChange={e => setRenameValue(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') saveRenamePlayer(player.id); if (e.key === 'Escape') cancelRenamePlayer(); }}
-                                maxLength={LIMITS.PLAYER_NAME_MAX}
-                              />
-                              <button className="text-xs bg-jeopardy-gold text-jeopardy-dark font-bold px-2 py-1 rounded" onClick={() => saveRenamePlayer(player.id)}>Save</button>
-                              <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={cancelRenamePlayer}>✕</button>
-                            </div>
-                            {renameError && <p className="text-red-400 text-xs">{renameError}</p>}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <span className="font-bold text-sm truncate">{player.name}</span>
-                            <button
-                              className="text-gray-500 hover:text-gray-300 text-xs flex-shrink-0"
-                              title="Rename player"
-                              onClick={() => startRenamePlayer(player)}
-                            >✎</button>
-                          </div>
-                        )}
-                        <div className="font-black" style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}>
-                          {formatMoney(player.score)}
-                        </div>
-                      </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => adjustScore(player.id, 100)}>+100</button>
-                        <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => adjustScore(player.id, -100)}>-100</button>
-                        <button className="text-xs text-red-400 hover:text-red-200 px-1" onClick={() => removePlayer(player.id)}>✕</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <PlayersTab
+                players={gameState.players}
+                addPlayerName={addPlayerName}
+                onAddPlayerNameChange={setAddPlayerName}
+                onAddPlayer={addPlayer}
+                renamingPlayerId={renamingPlayerId}
+                renameValue={renameValue}
+                onRenameValueChange={setRenameValue}
+                renameError={renameError}
+                onStartRename={startRenamePlayer}
+                onCancelRename={cancelRenamePlayer}
+                onSaveRename={saveRenamePlayer}
+                onAdjustScore={adjustScore}
+                onRemovePlayer={removePlayer}
+              />
             )}
 
             {/* Log tab */}
             {tab === 'log' && (
-              <div className="space-y-1">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs text-gray-500">{gameLog.length} events</span>
-                  <button className="text-xs text-gray-500 hover:text-red-400" onClick={clearLog}>Clear</button>
-                </div>
-                {gameLog.length === 0 && <p className="text-gray-600 text-sm">No events yet.</p>}
-                {gameLog.map(entry => (
-                  <div key={entry.id} className="flex gap-2 text-xs py-1 border-b border-gray-800">
-                    <span className="text-gray-600 flex-shrink-0 tabular-nums">{entry.ts}</span>
-                    <span className="flex-shrink-0">{LOG_ICONS[entry.type]}</span>
-                    <span className={LOG_COLORS[entry.type]}>{entry.msg}</span>
-                  </div>
-                ))}
-              </div>
+              <LogTab gameLog={gameLog} onClearLog={clearLog} />
             )}
 
             {/* Stats tab */}
             {tab === 'stats' && (
-              <div className="space-y-4">
-                {gameState.players.length === 0 && <p className="text-gray-600 text-sm">No players yet.</p>}
-
-                {/* Leaderboard */}
-                {playerStats.length > 0 && (
-                  <div>
-                    <div className="text-xs font-bold text-gray-400 uppercase mb-2">Leaderboard</div>
-                    {playerStats.map((p, i) => (
-                      <div key={p.id} className="flex items-center gap-2 py-2 border-b border-gray-800">
-                        <span className="text-gray-500 text-xs w-4 text-right">{i + 1}</span>
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
-                        <span className="flex-1 text-sm font-bold truncate">{p.name}</span>
-                        <span className="font-black text-sm" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
-                          {formatMoney(p.score)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Per-player breakdown */}
-                {playerStats.length > 0 && (
-                  <div>
-                    <div className="text-xs font-bold text-gray-400 uppercase mb-2">Answer Breakdown</div>
-                    <div className="space-y-2">
-                      {playerStats.map(p => (
-                        <div key={p.id} className="bg-gray-800 rounded p-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-                            <span className="font-bold text-sm">{p.name}</span>
-                          </div>
-                          <div className="grid grid-cols-4 gap-1 text-center text-xs">
-                            <div className="bg-gray-700 rounded py-1">
-                              <div className="text-green-400 font-black text-base">{p.correct}</div>
-                              <div className="text-gray-400">Correct</div>
-                            </div>
-                            <div className="bg-gray-700 rounded py-1">
-                              <div className="text-red-400 font-black text-base">{p.wrong}</div>
-                              <div className="text-gray-400">Wrong</div>
-                            </div>
-                            <div className="bg-gray-700 rounded py-1">
-                              <div className="text-orange-300 font-black text-base">{p.buzzes}</div>
-                              <div className="text-gray-400">Buzzes</div>
-                            </div>
-                            <div className="bg-gray-700 rounded py-1">
-                              <div className="text-red-300 font-black text-base">{p.earlyBuzzes}</div>
-                              <div className="text-gray-400">Early</div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Game summary */}
-                <div>
-                  <div className="text-xs font-bold text-gray-400 uppercase mb-2">Game Summary</div>
-                  <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                    <div className="bg-gray-800 rounded p-2">
-                      <div className="text-white font-black text-base">{gameState.answeredQuestions.length}</div>
-                      <div className="text-gray-400">Questions Closed</div>
-                    </div>
-                    <div className="bg-gray-800 rounded p-2">
-                      <div className="text-white font-black text-base">{gameLog.filter(e => e.type === 'correct').length}</div>
-                      <div className="text-gray-400">Correct Answers</div>
-                    </div>
-                    <div className="bg-gray-800 rounded p-2">
-                      <div className="text-white font-black text-base">{gameLog.filter(e => e.type === 'wrong').length}</div>
-                      <div className="text-gray-400">Wrong Answers</div>
-                    </div>
-                    <div className="bg-gray-800 rounded p-2">
-                      <div className="text-white font-black text-base">{gameLog.filter(e => e.type === 'dd').length}</div>
-                      <div className="text-gray-400">Daily Doubles</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <StatsTab
+                playerStats={playerStats}
+                answeredQuestionsCount={gameState.answeredQuestions.length}
+                gameLog={gameLog}
+              />
             )}
           </div>
         </div>
       </div>
       )}
-    </div>
-  );
-}
-
-function ShareLink({ label, url }: { label: string; url: string }) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-  return (
-    <div className="bg-gray-800 rounded p-2 flex items-center gap-2">
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-gray-400">{label}</div>
-        <div className="text-xs text-gray-300 truncate font-mono">{url}</div>
-      </div>
-      <button className="text-xs btn-ghost py-1 px-2 flex-shrink-0" onClick={copy}>
-        {copied ? '✓' : 'Copy'}
-      </button>
     </div>
   );
 }

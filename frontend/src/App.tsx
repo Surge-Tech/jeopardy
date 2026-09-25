@@ -7,7 +7,8 @@ import Editor from './pages/Editor';
 import Host from './pages/Host';
 import BoardView from './pages/BoardView';
 import Buzzer from './pages/Buzzer';
-import type { GameState, Player } from './types';
+import type { GameState, Player } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
 
 export default function App() {
   const { setGameState, setConnected } = useGameStore();
@@ -15,8 +16,8 @@ export default function App() {
   useEffect(() => {
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
-    socket.on('game:state', (state: GameState) => setGameState(state));
-    socket.on('player:joined', ({ player, state }: { player: Player; state: GameState }) => {
+    socket.on(SOCKET_EVENTS.GAME_STATE, (state: GameState) => setGameState(state));
+    socket.on(SOCKET_EVENTS.PLAYER_JOINED, ({ player, state }: { player: Player; state: GameState }) => {
       useGameStore.getState().setMyPlayer(player);
       setGameState(state);
     });

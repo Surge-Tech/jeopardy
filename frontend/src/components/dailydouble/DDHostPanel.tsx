@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { socket } from '../../socket';
-import type { GameState, Question } from '../../types';
+import type { GameState, Question } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
 
 export default function DDHostPanel({
   roomCode,
@@ -21,13 +22,13 @@ export default function DDHostPanel({
   const [overrideAmount, setOverrideAmount] = useState('');
 
   function pick(playerId: string) {
-    socket.emit('host:dd-pick-player', { roomCode, playerId });
+    socket.emit(SOCKET_EVENTS.HOST_DD_PICK_PLAYER, { roomCode, playerId });
   }
 
   function applyOverride() {
     const amount = Number(overrideAmount);
     if (!Number.isFinite(amount)) return;
-    socket.emit('host:dd-override-wager', { roomCode, amount: Math.round(amount) }, (res: { ok: boolean; error?: string }) => {
+    socket.emit(SOCKET_EVENTS.HOST_DD_OVERRIDE_WAGER, { roomCode, amount: Math.round(amount) }, (res: { ok: boolean; error?: string }) => {
       if (res.ok) setOverrideAmount('');
     });
   }

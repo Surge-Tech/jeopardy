@@ -2,10 +2,14 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
-import type { GameState } from '../types';
+import type { GameState } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
+import { LIMITS } from '@shared/limits';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
+import { randomPlayerColor } from '../utils/colors';
+import { formatMoney } from '../utils/format';
 
 type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'armed' | 'open' | 'winner' | 'too-late' | 'locked-out' | 'finished' | 'closed';
 
@@ -30,7 +34,7 @@ export default function Buzzer() {
     if (!roomCode) return;
     function tryRejoin() {
       const savedId = localStorage.getItem(rejoinKey(roomCode));
-      if (savedId) socket.emit('player:rejoin', { roomCode, playerId: savedId });
+      if (savedId) socket.emit(SOCKET_EVENTS.PLAYER_REJOIN, { roomCode, playerId: savedId });
     }
     tryRejoin();
     socket.on('connect', tryRejoin);
@@ -38,7 +42,7 @@ export default function Buzzer() {
   }, [roomCode]);
 
   useEffect(() => {
-    socket.on('game:state', (state: GameState) => {
+    socket.on(SOCKET_EVENTS.GAME_STATE, (state: GameState) => {
       setGameState(state);
       if (state.phase === 'finished') { setPhase('finished'); return; }
       const transient = phase === 'winner' || phase === 'too-late' || phase === 'locked-out';
@@ -48,14 +52,14 @@ export default function Buzzer() {
         else setPhase('waiting');
       }
     });
-    socket.on('player:joined', ({ player, state }: { player: { id: string; name: string }; state: GameState }) => {
+    socket.on(SOCKET_EVENTS.PLAYER_JOINED, ({ player, state }: { player: { id: string; name: string }; state: GameState }) => {
       setMyId(player.id);
       setMyPlayer(player as any);
       setGameState(state);
       setPhase('waiting');
       if (roomCode) localStorage.setItem(rejoinKey(roomCode), player.id);
     });
-    socket.on('buzz:winner', ({ playerId, playerName }: { playerId: string; playerName: string }) => {
+    socket.on(SOCKET_EVENTS.BUZZ_WINNER, ({ playerId, playerName }: { playerId: string; playerName: string }) => {
       if (playerId === myId) {
         setWinnerName(playerName);
         setPhase('winner');
@@ -65,14 +69,14 @@ export default function Buzzer() {
       }
       setTimeout(() => setPhase(prev => prev === 'winner' || prev === 'too-late' ? 'waiting' : prev), 5000);
     });
-    socket.on('buzz:locked-out', ({ until }: { until: number }) => {
+    socket.on(SOCKET_EVENTS.BUZZ_LOCKED_OUT, ({ until }: { until: number }) => {
       setPhase('locked-out');
       const delay = Math.max(0, until - Date.now());
       setTimeout(() => setPhase(prev => prev === 'locked-out' ? 'armed' : prev), delay);
     });
-    socket.on('buzzer:open', () => setPhase('open'));
-    socket.on('buzzer:locked', () => setPhase(prev => prev === 'winner' || prev === 'too-late' || prev === 'locked-out' ? prev : 'waiting'));
-    socket.on('game:ended', () => setPhase('closed'));
+    socket.on(SOCKET_EVENTS.BUZZER_OPEN, () => setPhase('open'));
+    socket.on(SOCKET_EVENTS.BUZZER_LOCKED, () => setPhase(prev => prev === 'winner' || prev === 'too-late' || prev === 'locked-out' ? prev : 'waiting'));
+    socket.on(SOCKET_EVENTS.GAME_ENDED, () => setPhase('closed'));
     socket.on('error', ({ message }: { message: string }) => setError(message));
     return () => {
       socket.off('game:state');
@@ -89,12 +93,12 @@ export default function Buzzer() {
   function joinGame() {
     if (!name.trim()) { setError('Enter your name'); return; }
     setError('');
-    socket.emit('player:join', { roomCode, name: name.trim(), color: randomColor() });
+    socket.emit(SOCKET_EVENTS.PLAYER_JOIN, { roomCode, name: name.trim(), color: randomPlayerColor() });
   }
 
   function buzz() {
     if (phase !== 'open' && phase !== 'armed') return;
-    socket.emit('buzz');
+    socket.emit(SOCKET_EVENTS.BUZZ);
     if (phase === 'open') setPhase('waiting');
   }
 
@@ -112,7 +116,7 @@ export default function Buzzer() {
   function saveEditName() {
     const trimmed = editNameValue.trim();
     if (!trimmed) { setEditNameError('Name cannot be empty'); return; }
-    socket.emit('player:rename', { newName: trimmed }, (res: { ok: boolean; error?: string }) => {
+    socket.emit(SOCKET_EVENTS.PLAYER_RENAME, { newName: trimmed }, (res: { ok: boolean; error?: string }) => {
       if (res.ok) {
         setName(trimmed);
         setEditingName(false);
@@ -190,7 +194,7 @@ export default function Buzzer() {
                 value={editNameValue}
                 onChange={e => setEditNameValue(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') saveEditName(); if (e.key === 'Escape') cancelEditName(); }}
-                maxLength={40}
+                maxLength={LIMITS.PLAYER_NAME_MAX}
               />
               {editNameError && <p className="text-red-400 text-xs text-center">{editNameError}</p>}
               <div className="flex gap-2 justify-center">
@@ -214,7 +218,7 @@ export default function Buzzer() {
         <div className="text-center">
           <p className="text-3xl font-black text-white mb-2">{name}</p>
           <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+            {formatMoney(myScore)}
           </p>
           <div className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto">
             <span className="text-gray-500 text-xl font-bold text-center px-4">Waiting...</span>
@@ -227,7 +231,7 @@ export default function Buzzer() {
         <div className="text-center">
           <p className="text-3xl font-black text-white mb-2">{name}</p>
           <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+            {formatMoney(myScore)}
           </p>
           <button
             className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto cursor-pointer"
@@ -255,7 +259,7 @@ export default function Buzzer() {
         <div className="text-center">
           <p className="text-3xl font-black text-white mb-2">{name}</p>
           <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+            {formatMoney(myScore)}
           </p>
           <button
             className="w-56 h-56 rounded-full border-8 border-jeopardy-gold bg-jeopardy-blue flex items-center justify-center mx-auto buzzer-active cursor-pointer"
@@ -301,7 +305,7 @@ export default function Buzzer() {
                   <span className={`text-sm ${p.id === myId ? 'text-white font-bold' : 'text-gray-400'}`}>{p.name}</span>
                 </div>
                 <span className="font-bold text-sm" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
-                  {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                  {formatMoney(p.score)}
                 </span>
               </div>
             ))}
@@ -310,9 +314,4 @@ export default function Buzzer() {
       )}
     </div>
   );
-}
-
-function randomColor() {
-  const colors = ['#FFD700', '#4ade80', '#60a5fa', '#f87171', '#c084fc', '#fb923c', '#34d399', '#f472b6'];
-  return colors[Math.floor(Math.random() * colors.length)];
 }

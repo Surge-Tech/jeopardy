@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
-import type { Board, GameState, Question } from '../types';
-import { PERMANENT_LOCKOUT } from '../types';
+import type { Board, GameState, Question } from '@shared/types';
+import { PERMANENT_LOCKOUT } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
+import { LIMITS } from '@shared/limits';
 import HostFinalPanel from '../components/final/HostFinalPanel';
 import DDHostPanel from '../components/dailydouble/DDHostPanel';
 import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
+import { PLAYER_COLORS } from '../utils/colors';
+import { formatMoney } from '../utils/format';
 
 const API = '/api';
-const PLAYER_COLORS = ['#FFD700', '#4ade80', '#60a5fa', '#f87171', '#c084fc', '#fb923c', '#34d399', '#f472b6'];
 
 const LOG_ICONS: Record<string, string> = {
   open: '📋', dd: '⭐', buzz: '⚡', correct: '✅', wrong: '❌', close: '✖', score: '💰',
@@ -39,31 +42,31 @@ export default function Host() {
   useEffect(() => {
     fetch(`${API}/boards/${boardId}`).then(r => r.json()).then(setBoard);
 
-    socket.on('game:state', (state: GameState) => {
+    socket.on(SOCKET_EVENTS.GAME_STATE, (state: GameState) => {
       setGameState(state);
       setRoomCode(state.roomCode);
     });
-    socket.on('buzz:winner', ({ playerName, playerId }: { playerName: string; playerId: string }) => {
+    socket.on(SOCKET_EVENTS.BUZZ_WINNER, ({ playerName, playerId }: { playerName: string; playerId: string }) => {
       setBuzzWinner(playerName);
       setBuzzWinnerId(playerId);
       addLog({ type: 'buzz', msg: `${playerName} buzzed in`, player: playerName });
     });
-    socket.on('host:created', ({ roomCode: rc, state }: { roomCode: string; state: GameState }) => {
+    socket.on(SOCKET_EVENTS.HOST_CREATED, ({ roomCode: rc, state }: { roomCode: string; state: GameState }) => {
       setRoomCode(rc);
       setGameState(state);
       clearLog();
       addLog({ type: 'open', msg: 'Game session started' });
     });
-    socket.on('fj:host-log', ({ msg }: { msg: string }) => {
+    socket.on(SOCKET_EVENTS.FJ_HOST_LOG, ({ msg }: { msg: string }) => {
       addLog({ type: 'fj', msg });
     });
-    socket.on('buzz:next-in-queue', ({ playerName, playerId }: { playerName: string; playerId: string }) => {
+    socket.on(SOCKET_EVENTS.BUZZ_NEXT_IN_QUEUE, ({ playerName, playerId }: { playerName: string; playerId: string }) => {
       setBuzzWinner(playerName);
       setBuzzWinnerId(playerId);
       addLog({ type: 'buzz', msg: `Queue advance → ${playerName}`, player: playerName });
     });
 
-    socket.emit('host:create', { boardId });
+    socket.emit(SOCKET_EVENTS.HOST_CREATE, { boardId });
 
     return () => {
       socket.off('game:state');
@@ -78,7 +81,7 @@ export default function Host() {
   // laptop sleep, backend restart) so host-only socket events keep working.
   useEffect(() => {
     function rejoinAsHost() {
-      if (roomCode) socket.emit('host:join', { roomCode });
+      if (roomCode) socket.emit(SOCKET_EVENTS.HOST_JOIN, { roomCode });
     }
     socket.on('connect', rejoinAsHost);
     return () => { socket.off('connect', rejoinAsHost); };
@@ -109,7 +112,7 @@ export default function Host() {
     setBuzzWinner(null);
     setBuzzWinnerId(null);
     const boardHighValue = Math.max(...round.pointValues);
-    socket.emit('host:open-question', { roomCode, questionId: q.id, isDailyDouble: !!q.isDailyDouble, boardHighValue });
+    socket.emit(SOCKET_EVENTS.HOST_OPEN_QUESTION, { roomCode, questionId: q.id, isDailyDouble: !!q.isDailyDouble, boardHighValue });
     if (q.isDailyDouble) {
       addLog({ type: 'dd', msg: `Daily Double opened — $${q.value} (${getCatName(q)})` });
     } else {
@@ -118,7 +121,7 @@ export default function Host() {
   }
 
   function revealDD() {
-    socket.emit('host:reveal-dd', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_REVEAL_DD, { roomCode });
     addLog({ type: 'dd', msg: 'Daily Double clue revealed' });
   }
 
@@ -126,28 +129,28 @@ export default function Host() {
     setBuzzWinner(null);
     setBuzzWinnerId(null);
     const label = activeQ ? `$${activeQ.value} — ${getCatName(activeQ)}` : 'question';
-    socket.emit('host:close-question', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_CLOSE_QUESTION, { roomCode });
     addLog({ type: 'close', msg: `Closed ${label} (no score)` });
   }
 
   function enableBuzzer() {
     setBuzzWinner(null);
     setBuzzWinnerId(null);
-    socket.emit('host:enable-buzzer', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_ENABLE_BUZZER, { roomCode });
   }
 
   function lockBuzzer() {
-    socket.emit('host:lock-buzzer', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_LOCK_BUZZER, { roomCode });
   }
 
   function resetBuzzer() {
     setBuzzWinner(null);
     setBuzzWinnerId(null);
-    socket.emit('host:reset-buzzer', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_RESET_BUZZER, { roomCode });
   }
 
   function showAnswer() {
-    socket.emit('host:show-response', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_SHOW_RESPONSE, { roomCode });
   }
 
   function awardPoints(playerId: string, correct: boolean) {
@@ -155,7 +158,7 @@ export default function Host() {
     const value = isDD ? (gameState!.dailyDouble!.wager ?? 0) : (activeQ?.value ?? 0);
     const delta = correct ? value : -value;
     const player = gameState!.players.find(p => p.id === playerId);
-    socket.emit('host:score', { roomCode, playerId, delta, outcome: correct ? 'correct' : 'wrong', isDailyDouble: isDD });
+    socket.emit(SOCKET_EVENTS.HOST_SCORE, { roomCode, playerId, delta, outcome: correct ? 'correct' : 'wrong', isDailyDouble: isDD });
     if (correct) {
       addLog({ type: 'correct', msg: `${player?.name} answered correctly (+$${value})`, player: player?.name });
     } else {
@@ -164,13 +167,13 @@ export default function Host() {
     // close without double-logging
     setBuzzWinner(null);
     setBuzzWinnerId(null);
-    socket.emit('host:close-question', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_CLOSE_QUESTION, { roomCode });
   }
 
   function markWrongAndReopen(playerId: string) {
     const value = activeQ?.value ?? 0;
     const player = gameState!.players.find(p => p.id === playerId);
-    socket.emit('host:wrong-reopen', { roomCode, playerId, delta: -value });
+    socket.emit(SOCKET_EVENTS.HOST_WRONG_REOPEN, { roomCode, playerId, delta: -value });
     addLog({ type: 'wrong', msg: `${player?.name ?? 'Player'} answered wrong (-$${value})`, player: player?.name });
     setBuzzWinner(null);
     setBuzzWinnerId(null);
@@ -178,19 +181,19 @@ export default function Host() {
 
   function adjustScore(playerId: string, delta: number) {
     const player = gameState!.players.find(p => p.id === playerId);
-    socket.emit('host:score', { roomCode, playerId, delta });
+    socket.emit(SOCKET_EVENTS.HOST_SCORE, { roomCode, playerId, delta });
     addLog({ type: 'score', msg: `${player?.name} score adjusted ${delta > 0 ? '+' : ''}${delta}`, player: player?.name });
   }
 
   function addPlayer() {
     if (!addPlayerName.trim()) return;
     const color = PLAYER_COLORS[(gameState?.players.length ?? 0) % PLAYER_COLORS.length];
-    socket.emit('host:add-player', { roomCode, name: addPlayerName.trim(), color });
+    socket.emit(SOCKET_EVENTS.HOST_ADD_PLAYER, { roomCode, name: addPlayerName.trim(), color });
     setAddPlayerName('');
   }
 
   function removePlayer(playerId: string) {
-    socket.emit('host:remove-player', { roomCode, playerId });
+    socket.emit(SOCKET_EVENTS.HOST_REMOVE_PLAYER, { roomCode, playerId });
   }
 
   function startRenamePlayer(player: { id: string; name: string }) {
@@ -207,7 +210,7 @@ export default function Host() {
   function saveRenamePlayer(playerId: string) {
     const trimmed = renameValue.trim();
     if (!trimmed) { setRenameError('Name cannot be empty'); return; }
-    socket.emit('host:rename-player', { roomCode, playerId, newName: trimmed }, (res: { ok: boolean; error?: string }) => {
+    socket.emit(SOCKET_EVENTS.HOST_RENAME_PLAYER, { roomCode, playerId, newName: trimmed }, (res: { ok: boolean; error?: string }) => {
       if (res.ok) {
         setRenamingPlayerId(null);
         setRenameError('');
@@ -221,25 +224,25 @@ export default function Host() {
     const totalQuestions = board!.rounds.reduce((n, r) => n + r.categories.reduce((n2, c) => n2 + c.questions.length, 0), 0);
     const remaining = totalQuestions - gameState!.answeredQuestions.length;
     if (remaining > 0 && !confirm(`${remaining} clue(s) haven't been played yet. Start Final Jeopardy anyway?`)) return;
-    socket.emit('host:fj-start', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_FJ_START, { roomCode });
   }
 
   function nextRound() {
-    socket.emit('host:next-round', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_NEXT_ROUND, { roomCode });
   }
 
   function endGame() {
     if (!confirm('End the game and show the leaderboard?')) return;
-    socket.emit('host:end-game', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_END_GAME, { roomCode });
   }
 
   function resumeGame() {
-    socket.emit('host:resume-game', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_RESUME_GAME, { roomCode });
   }
 
   function closeRoom() {
     if (!confirm('Close this room? This ends the session for everyone and cannot be undone.')) return;
-    socket.emit('host:end', { roomCode });
+    socket.emit(SOCKET_EVENTS.HOST_END, { roomCode });
     navigate('/');
   }
   const boardUrl = `${window.location.origin}/board/${roomCode}`;
@@ -255,7 +258,7 @@ export default function Host() {
   })).sort((a, b) => b.score - a.score);
 
   function setLockout(ms: number) {
-    socket.emit('host:set-lockout', { roomCode, ms });
+    socket.emit(SOCKET_EVENTS.HOST_SET_LOCKOUT, { roomCode, ms });
   }
 
   return (
@@ -300,7 +303,7 @@ export default function Host() {
               <input
                 type="checkbox"
                 checked={gameState.settings.autoLockEnabled}
-                onChange={e => socket.emit('host:set-auto-lock', { roomCode, enabled: e.target.checked })}
+                onChange={e => socket.emit(SOCKET_EVENTS.HOST_SET_AUTO_LOCK, { roomCode, enabled: e.target.checked })}
                 className="accent-yellow-400"
               />
               <span className="text-gray-400 text-xs">Auto-lock</span>
@@ -314,7 +317,7 @@ export default function Host() {
                   value={gameState.settings.autoLockTimeoutS}
                   onChange={e => {
                     const s = Number(e.target.value);
-                    if (s >= 5 && s <= 10) socket.emit('host:set-auto-lock-timeout', { roomCode, seconds: s });
+                    if (s >= 5 && s <= 10) socket.emit(SOCKET_EVENTS.HOST_SET_AUTO_LOCK_TIMEOUT, { roomCode, seconds: s });
                   }}
                   className="bg-gray-700 text-white text-xs w-10 rounded px-1 py-0.5 text-center"
                 />
@@ -585,7 +588,7 @@ export default function Host() {
                                 value={renameValue}
                                 onChange={e => setRenameValue(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') saveRenamePlayer(player.id); if (e.key === 'Escape') cancelRenamePlayer(); }}
-                                maxLength={40}
+                                maxLength={LIMITS.PLAYER_NAME_MAX}
                               />
                               <button className="text-xs bg-jeopardy-gold text-jeopardy-dark font-bold px-2 py-1 rounded" onClick={() => saveRenamePlayer(player.id)}>Save</button>
                               <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={cancelRenamePlayer}>✕</button>
@@ -603,7 +606,7 @@ export default function Host() {
                           </div>
                         )}
                         <div className="font-black" style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}>
-                          {player.score < 0 ? `-$${Math.abs(player.score)}` : `$${player.score}`}
+                          {formatMoney(player.score)}
                         </div>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
@@ -650,7 +653,7 @@ export default function Host() {
                         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
                         <span className="flex-1 text-sm font-bold truncate">{p.name}</span>
                         <span className="font-black text-sm" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
-                          {p.score < 0 ? `-$${Math.abs(p.score)}` : `$${p.score}`}
+                          {formatMoney(p.score)}
                         </span>
                       </div>
                     ))}

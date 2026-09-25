@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { socket } from '../../socket';
-import type { GameState } from '../../types';
+import type { GameState } from '@shared/types';
+import { SOCKET_EVENTS } from '@shared/socketEvents';
+import { LIMITS } from '@shared/limits';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import WagerInput from '../shared/WagerInput';
+import { formatMoney } from '../../utils/format';
 
 type Ack = { ok: boolean; error?: string };
 
@@ -32,7 +35,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
   }, [fj.stage]);
 
   function lockWager(amount: number) {
-    socket.emit('fj:wager', { amount }, (res: Ack) => {
+    socket.emit(SOCKET_EVENTS.FJ_WAGER, { amount }, (res: Ack) => {
       if (res.ok) { setWagerLocked(true); setLockedWagerAmount(amount); setWagerError(''); }
       else setWagerError(res.error ?? 'Could not lock wager');
     });
@@ -42,12 +45,12 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
     setAnswerText(text);
     if (draftTimer.current) window.clearTimeout(draftTimer.current);
     draftTimer.current = window.setTimeout(() => {
-      socket.emit('fj:draft', { text });
+      socket.emit(SOCKET_EVENTS.FJ_DRAFT, { text });
     }, 400);
   }
 
   function submitAnswer() {
-    socket.emit('fj:answer', { text: answerText }, (res: Ack) => {
+    socket.emit(SOCKET_EVENTS.FJ_ANSWER, { text: answerText }, (res: Ack) => {
       if (res.ok) setAnswerLocked(true);
     });
   }
@@ -114,7 +117,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
           placeholder="What is…"
           value={answerText}
           onChange={e => handleDraft(e.target.value)}
-          maxLength={200}
+          maxLength={LIMITS.ANSWER_MAX}
         />
         <button className="btn-primary w-full py-3" onClick={submitAnswer}>Submit</button>
       </div>
@@ -151,7 +154,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
         </div>
         <p className="text-gray-300">Wager: ${revealed.wager}</p>
         <p className="text-jeopardy-gold font-black text-xl mt-2">
-          {myScore < 0 ? `-$${Math.abs(myScore)}` : `$${myScore}`}
+          {formatMoney(myScore)}
         </p>
       </div>
     );

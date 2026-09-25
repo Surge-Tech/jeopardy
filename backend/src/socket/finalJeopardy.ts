@@ -3,6 +3,8 @@ import * as gm from './gameManager.js';
 import * as boardStorage from '../storage/boardStorage.js';
 import type { FinalPublicState, FinalJeopardyBoard, FinalContestant } from '../types.js';
 import { onHost } from './hostAuth.js';
+import { SOCKET_EVENTS } from '../shared/socketEvents.js';
+import { LIMITS } from '../shared/limits.js';
 
 // ── Secret, per-room Final Jeopardy state ──────────────────────────────────
 // Kept OUTSIDE GameState because a NodeJS.Timeout can't be serialized over
@@ -25,17 +27,17 @@ function hostRoom(roomCode: string) {
 
 function broadcastState(io: Server, roomCode: string) {
   const session = gm.getSession(roomCode);
-  if (session) io.to(roomCode).emit('game:state', session);
+  if (session) io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, session);
 }
 
 function hostLog(io: Server, roomCode: string, msg: string) {
-  io.to(hostRoom(roomCode)).emit('fj:host-log', { msg, ts: Date.now() });
+  io.to(hostRoom(roomCode)).emit(SOCKET_EVENTS.FJ_HOST_LOG, { msg, ts: Date.now() });
 }
 
 function broadcastHostState(io: Server, roomCode: string) {
   const secret = secrets.get(roomCode);
   if (!secret) return;
-  io.to(hostRoom(roomCode)).emit('fj:host-state', {
+  io.to(hostRoom(roomCode)).emit(SOCKET_EVENTS.FJ_HOST_STATE, {
     wagers: Object.fromEntries(secret.wagers),
     answers: Object.fromEntries(secret.answers),
     drafts: Object.fromEntries(secret.drafts),
@@ -161,7 +163,7 @@ export function setForPlayer(io: Server, roomCode: string, playerId: string, wag
     hostLog(io, roomCode, `Host set ${contestant.playerName}'s wager to $${wager}`);
   }
   if (answer !== undefined) {
-    const trimmed = answer.trim().slice(0, 200);
+    const trimmed = answer.trim().slice(0, LIMITS.ANSWER_MAX);
     secret.answers.set(playerId, trimmed);
     contestant.hasAnswered = true;
     hostLog(io, roomCode, `Host set ${contestant.playerName}'s answer`);
@@ -221,7 +223,7 @@ export function saveDraft(io: Server, roomCode: string, playerId: string, text: 
   if (!fj || !secret) return { ok: false, error: 'No Final Jeopardy in progress' };
   if (fj.stage !== 'answering') return { ok: false, error: 'Not accepting answers right now' };
   if (secret.answers.has(playerId)) return { ok: false, error: 'Answer already submitted' };
-  secret.drafts.set(playerId, text.slice(0, 200));
+  secret.drafts.set(playerId, text.slice(0, LIMITS.ANSWER_MAX));
   broadcastHostState(io, roomCode);
   return { ok: true };
 }
@@ -233,7 +235,7 @@ export function submitAnswer(io: Server, roomCode: string, playerId: string, tex
   if (fj.stage !== 'answering') return { ok: false, error: 'Not accepting answers right now' };
   if (!fj.deadline || Date.now() > fj.deadline + 750) return { ok: false, error: 'Time is up' };
   if (secret.answers.has(playerId)) return { ok: false, error: 'Answer already submitted' };
-  const trimmed = text.trim().slice(0, 200);
+  const trimmed = text.trim().slice(0, LIMITS.ANSWER_MAX);
   secret.answers.set(playerId, trimmed);
   secret.drafts.delete(playerId);
   const contestant = fj.contestants.find(c => c.playerId === playerId);
@@ -256,7 +258,7 @@ export function lockAnswers(io: Server, roomCode: string) {
   // Whatever was drafted becomes final for anyone who didn't explicitly submit.
   for (const c of fj.contestants) {
     if (!secret.answers.has(c.playerId)) {
-      const draft = (secret.drafts.get(c.playerId) ?? '').trim().slice(0, 200);
+      const draft = (secret.drafts.get(c.playerId) ?? '').trim().slice(0, LIMITS.ANSWER_MAX);
       secret.answers.set(c.playerId, draft);
       c.hasAnswered = draft.length > 0;
     }
@@ -420,76 +422,76 @@ export function registerFinalHandlers(
   socket: Socket,
   socketPlayers: Map<string, { roomCode: string; playerId: string; playerName: string }>,
 ) {
-  onHost(socket, 'host:fj-start', async ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_START, async ({ roomCode }: { roomCode: string }) => {
     const res = await startFinal(io, roomCode);
     if (!res.ok) socket.emit('error', { message: res.error });
   });
 
-  onHost(socket, 'host:fj-reveal-category', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_REVEAL_CATEGORY, ({ roomCode }: { roomCode: string }) => {
     revealCategory(io, roomCode);
   });
 
-  onHost(socket, 'host:fj-reveal-clue', ({ roomCode, force }: { roomCode: string; force?: boolean }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_REVEAL_CLUE, ({ roomCode, force }: { roomCode: string; force?: boolean }) => {
     const res = revealClue(io, roomCode, !!force);
     if (!res.ok) socket.emit('error', { message: res.error });
   });
 
-  onHost(socket, 'host:fj-start-timer', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_START_TIMER, ({ roomCode }: { roomCode: string }) => {
     startTimer(io, roomCode);
   });
 
-  onHost(socket, 'host:fj-begin-reveal', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_BEGIN_REVEAL, ({ roomCode }: { roomCode: string }) => {
     beginReveal(io, roomCode);
   });
 
-  onHost(socket, 'host:fj-reveal-step', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_REVEAL_STEP, ({ roomCode }: { roomCode: string }) => {
     revealStep(io, roomCode);
   });
 
-  onHost(socket, 'host:fj-judge', ({ roomCode, playerId, correct }: { roomCode: string; playerId: string; correct: boolean }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_JUDGE, ({ roomCode, playerId, correct }: { roomCode: string; playerId: string; correct: boolean }) => {
     judge(io, roomCode, playerId, correct);
   });
 
-  onHost(socket, 'host:fj-undo', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_UNDO, ({ roomCode }: { roomCode: string }) => {
     undo(io, roomCode);
   });
 
-  onHost(socket, 'host:fj-next', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_NEXT, ({ roomCode }: { roomCode: string }) => {
     next(io, roomCode);
   });
 
-  onHost(socket, 'host:fj-show-response', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_SHOW_RESPONSE, ({ roomCode }: { roomCode: string }) => {
     showResponse(io, roomCode);
   });
 
-  onHost(socket, 'host:fj-scoreboard', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_SCOREBOARD, ({ roomCode }: { roomCode: string }) => {
     showScoreboard(io, roomCode);
   });
 
-  onHost(socket, 'host:fj-exit', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_EXIT, ({ roomCode }: { roomCode: string }) => {
     exitFinal(io, roomCode);
   });
 
-  onHost(socket, 'host:fj-set-for-player', ({ roomCode, playerId, wager, answer }: { roomCode: string; playerId: string; wager?: number; answer?: string }) => {
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_SET_FOR_PLAYER, ({ roomCode, playerId, wager, answer }: { roomCode: string; playerId: string; wager?: number; answer?: string }) => {
     setForPlayer(io, roomCode, playerId, wager, answer);
   });
 
   // ── Player events ──────────────────────────────────────────────────────
-  socket.on('fj:wager', ({ amount }: { amount: number }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+  socket.on(SOCKET_EVENTS.FJ_WAGER, ({ amount }: { amount: number }, ack?: (res: { ok: boolean; error?: string }) => void) => {
     const info = socketPlayers.get(socket.id);
     if (!info) return ack?.({ ok: false, error: 'Not joined' });
     const res = submitWager(io, info.roomCode, info.playerId, amount);
     ack?.(res);
   });
 
-  socket.on('fj:draft', ({ text }: { text: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+  socket.on(SOCKET_EVENTS.FJ_DRAFT, ({ text }: { text: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
     const info = socketPlayers.get(socket.id);
     if (!info) return ack?.({ ok: false, error: 'Not joined' });
     const res = saveDraft(io, info.roomCode, info.playerId, text ?? '');
     ack?.(res);
   });
 
-  socket.on('fj:answer', ({ text }: { text: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+  socket.on(SOCKET_EVENTS.FJ_ANSWER, ({ text }: { text: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
     const info = socketPlayers.get(socket.id);
     if (!info) return ack?.({ ok: false, error: 'Not joined' });
     const res = submitAnswer(io, info.roomCode, info.playerId, text ?? '');

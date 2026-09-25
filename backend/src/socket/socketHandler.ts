@@ -228,6 +228,38 @@ export function registerSocketHandlers(io: Server) {
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
+    // ── PLAYER: rename themselves (lobby only) ───────────────────────────
+    socket.on('player:rename', ({ newName }: { newName: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+      const info = socketPlayers.get(socket.id);
+      if (!info) return ack?.({ ok: false, error: 'Not joined' });
+      const session = gm.getSession(info.roomCode);
+      if (!session) return ack?.({ ok: false, error: 'Room not found' });
+      if (session.phase !== 'lobby') return ack?.({ ok: false, error: 'Name changes only allowed in lobby' });
+      const trimmed = newName.trim();
+      if (!trimmed) return ack?.({ ok: false, error: 'Name cannot be empty' });
+      gm.renamePlayer(info.roomCode, info.playerId, trimmed);
+      socketPlayers.set(socket.id, { ...info, playerName: trimmed.slice(0, 32) });
+      ack?.({ ok: true });
+      io.to(info.roomCode).emit('game:state', gm.getSession(info.roomCode));
+    });
+
+    // ── HOST: rename any player ───────────────────────────────────────────
+    onHost(socket, 'host:rename-player', ({ roomCode, playerId, newName }: { roomCode: string; playerId: string; newName: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
+      const trimmed = newName.trim();
+      if (!trimmed) return ack?.({ ok: false, error: 'Name cannot be empty' });
+      const renamed = gm.renamePlayer(roomCode, playerId, trimmed);
+      if (!renamed) return ack?.({ ok: false, error: 'Player not found' });
+      // Update socketPlayers entry for this player if they have a live socket
+      for (const [sid, info] of socketPlayers) {
+        if (info.roomCode === roomCode && info.playerId === playerId) {
+          socketPlayers.set(sid, { ...info, playerName: trimmed.slice(0, 32) });
+          break;
+        }
+      }
+      ack?.({ ok: true });
+      io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
     // ── HOST: remove a player ────────────────────────────────────────────
     onHost(socket, 'host:remove-player', ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
       gm.removePlayer(roomCode, playerId);

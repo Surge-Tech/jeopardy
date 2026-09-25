@@ -29,6 +29,9 @@ export default function Host() {
   const [activeQ, setActiveQ] = useState<Question | null>(null);
   const [addPlayerName, setAddPlayerName] = useState('');
   const [buzzWinner, setBuzzWinner] = useState<string | null>(null);
+  const [renamingPlayerId, setRenamingPlayerId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameError, setRenameError] = useState('');
   const [tab, setTab] = useState<'players' | 'log' | 'stats'>('players');
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -166,6 +169,30 @@ export default function Host() {
 
   function removePlayer(playerId: string) {
     socket.emit('host:remove-player', { roomCode, playerId });
+  }
+
+  function startRenamePlayer(player: { id: string; name: string }) {
+    setRenamingPlayerId(player.id);
+    setRenameValue(player.name);
+    setRenameError('');
+  }
+
+  function cancelRenamePlayer() {
+    setRenamingPlayerId(null);
+    setRenameError('');
+  }
+
+  function saveRenamePlayer(playerId: string) {
+    const trimmed = renameValue.trim();
+    if (!trimmed) { setRenameError('Name cannot be empty'); return; }
+    socket.emit('host:rename-player', { roomCode, playerId, newName: trimmed }, (res: { ok: boolean; error?: string }) => {
+      if (res.ok) {
+        setRenamingPlayerId(null);
+        setRenameError('');
+      } else {
+        setRenameError(res.error ?? 'Could not rename');
+      }
+    });
   }
 
   function startFinalJeopardy() {
@@ -455,18 +482,45 @@ export default function Host() {
                   <p className="text-gray-600 text-sm">No players. Add some above or share the buzzer URL.</p>
                 )}
                 {gameState.players.map(player => (
-                  <div key={player.id} className="bg-gray-800 rounded-lg p-3 flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: player.color }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-sm truncate">{player.name}</div>
-                      <div className="font-black" style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}>
-                        {player.score < 0 ? `-$${Math.abs(player.score)}` : `$${player.score}`}
+                  <div key={player.id} className="bg-gray-800 rounded-lg p-3 flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: player.color }} />
+                      <div className="flex-1 min-w-0">
+                        {renamingPlayerId === player.id ? (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex gap-1">
+                              <input
+                                autoFocus
+                                className="input-field text-xs flex-1 py-1"
+                                value={renameValue}
+                                onChange={e => setRenameValue(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') saveRenamePlayer(player.id); if (e.key === 'Escape') cancelRenamePlayer(); }}
+                                maxLength={40}
+                              />
+                              <button className="text-xs bg-jeopardy-gold text-jeopardy-dark font-bold px-2 py-1 rounded" onClick={() => saveRenamePlayer(player.id)}>Save</button>
+                              <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={cancelRenamePlayer}>✕</button>
+                            </div>
+                            {renameError && <p className="text-red-400 text-xs">{renameError}</p>}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-sm truncate">{player.name}</span>
+                            <button
+                              className="text-gray-500 hover:text-gray-300 text-xs flex-shrink-0"
+                              title="Rename player"
+                              onClick={() => startRenamePlayer(player)}
+                            >✎</button>
+                          </div>
+                        )}
+                        <div className="font-black" style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}>
+                          {player.score < 0 ? `-$${Math.abs(player.score)}` : `$${player.score}`}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => adjustScore(player.id, 100)}>+100</button>
-                      <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => adjustScore(player.id, -100)}>-100</button>
-                      <button className="text-xs text-red-400 hover:text-red-200 px-1" onClick={() => removePlayer(player.id)}>✕</button>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => adjustScore(player.id, 100)}>+100</button>
+                        <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => adjustScore(player.id, -100)}>-100</button>
+                        <button className="text-xs text-red-400 hover:text-red-200 px-1" onClick={() => removePlayer(player.id)}>✕</button>
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -87,14 +87,14 @@ export function removePlayer(roomCode: string, playerId: string) {
   session.players = session.players.filter(p => p.id !== playerId);
 }
 
-export function renamePlayer(roomCode: string, playerId: string, newName: string): boolean {
+export function renamePlayer(roomCode: string, playerId: string, newName: string): { ok: boolean; error?: string } {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session) return { ok: false, error: 'Room not found' };
   const player = session.players.find(p => p.id === playerId);
-  if (!player) return false;
-  if (isNameTaken(session, newName, playerId)) return false;
+  if (!player) return { ok: false, error: 'Player not found' };
+  if (isNameTaken(session, newName, playerId)) return { ok: false, error: 'That name is already taken' };
   player.name = newName.trim().slice(0, LIMITS.PLAYER_NAME_MAX);
-  return true;
+  return { ok: true };
 }
 
 export function startGame(roomCode: string): boolean {

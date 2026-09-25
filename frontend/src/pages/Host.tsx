@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '@shared/types';
-import { PERMANENT_LOCKOUT } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
 import { LIMITS } from '@shared/limits';
 import HostFinalPanel from '../components/final/HostFinalPanel';
@@ -14,6 +13,7 @@ import { PLAYER_COLORS } from '../utils/colors';
 import { formatMoney } from '../utils/format';
 import ShareLink from '../components/host/ShareLink';
 import BoardGrid from '../components/host/BoardGrid';
+import ActiveQuestionPanel from '../components/host/ActiveQuestionPanel';
 
 const API = '/api';
 
@@ -405,107 +405,24 @@ export default function Host() {
                 onClose={closeQuestion}
               />
             ) : activeQ ? (
-              <div className="space-y-3">
-                <div className="text-jeopardy-gold font-black text-xl">${activeQ.value}</div>
-
-                <div className="bg-gray-800 rounded p-3 text-sm text-white leading-relaxed">{activeQ.clue}</div>
-
-                {/* Answer always visible to host */}
-                <div className="bg-green-950 border border-green-700 rounded p-3 text-sm text-green-300">
-                  <div className="text-[10px] text-gray-500 uppercase mb-1">Answer</div>
-                  {activeQ.response}
-                </div>
-
-                {/* Show on board button — only relevant until revealed */}
-                {!gameState.responseVisible && (
-                  <button className="btn-ghost text-sm w-full" onClick={showAnswer}>Show Answer on Board</button>
-                )}
-
-                {/* Buzzer controls */}
-                <div className="space-y-2">
-                  {gameState.buzzerState === 'idle' && (
-                    <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors" onClick={enableBuzzer}>
-                      🔔 Open Buzzers
-                    </button>
-                  )}
-                  {gameState.buzzerState === 'open' && (
-                    <button className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 rounded transition-colors" onClick={lockBuzzer}>
-                      🔒 Lock Buzzers
-                    </button>
-                  )}
-                  {gameState.buzzerState === 'locked' && buzzWinner && (
-                    <div className="bg-jeopardy-blue border-2 border-jeopardy-gold rounded p-3 text-center">
-                      <div className="text-gray-300 text-sm">Buzzed In:</div>
-                      <div className="text-jeopardy-gold font-black text-lg">{buzzWinner}</div>
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-1 rounded text-sm"
-                          onClick={() => {
-                            if (buzzWinnerId) awardPoints(buzzWinnerId, true);
-                          }}
-                        >✓ Correct</button>
-                        <button
-                          className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1 rounded text-sm"
-                          onClick={() => {
-                            if (buzzWinnerId) markWrongAndReopen(buzzWinnerId);
-                          }}
-                        >✗ Wrong</button>
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm" onClick={resetBuzzer}>↺</button>
-                      </div>
-                    </div>
-                  )}
-                  {gameState.buzzerState === 'locked' && !buzzWinner && (
-                    <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors" onClick={resetBuzzer}>
-                      🔔 Re-open Buzzers
-                    </button>
-                  )}
-                </div>
-
-                {(() => {
-                  const lockedOut = gameState.players.filter(
-                    p => gameState.buzzLockouts[p.id] === PERMANENT_LOCKOUT
-                  );
-                  if (lockedOut.length === 0) return null;
-                  return (
-                    <div className="mt-2">
-                      <div className="text-[10px] text-gray-500 uppercase mb-1">Ineligible this question</div>
-                      <div className="flex flex-wrap gap-1">
-                        {lockedOut.map(p => (
-                          <span key={p.id} className="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full">
-                            {p.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {gameState.buzzQueue && gameState.buzzQueue.length > 0 && (
-                  <div className="mt-2">
-                    <div className="text-[10px] text-gray-500 uppercase mb-1">Buzz Queue</div>
-                    <div className="space-y-1">
-                      {gameState.buzzQueue.map((entry, i) => (
-                        <div
-                          key={entry.playerId}
-                          className={`flex items-center gap-2 text-xs px-2 py-1 rounded ${
-                            entry.attemptedAnswer
-                              ? 'bg-gray-800 text-gray-500 line-through'
-                              : gameState.buzzedPlayerId === entry.playerId
-                              ? 'bg-blue-900 text-white font-bold'
-                              : 'bg-gray-800 text-gray-300'
-                          }`}
-                        >
-                          <span className="text-gray-500 w-4">{i + 1}.</span>
-                          <span className="flex-1">{entry.playerName}</span>
-                          <span className="text-gray-500 tabular-nums">{entry.reactionMs}ms</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <button className="btn-danger text-sm w-full" onClick={closeQuestion}>Close Question</button>
-              </div>
+              <ActiveQuestionPanel
+                activeQ={activeQ}
+                responseVisible={gameState.responseVisible}
+                buzzerState={gameState.buzzerState}
+                buzzWinner={buzzWinner}
+                buzzWinnerId={buzzWinnerId}
+                players={gameState.players}
+                buzzLockouts={gameState.buzzLockouts}
+                buzzQueue={gameState.buzzQueue}
+                buzzedPlayerId={gameState.buzzedPlayerId}
+                onShowAnswer={showAnswer}
+                onEnableBuzzer={enableBuzzer}
+                onLockBuzzer={lockBuzzer}
+                onResetBuzzer={resetBuzzer}
+                onAward={awardPoints}
+                onMarkWrong={markWrongAndReopen}
+                onClose={closeQuestion}
+              />
             ) : (
               <p className="text-gray-500 text-sm">Click a question on the board to open it.</p>
             )}

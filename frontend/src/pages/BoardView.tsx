@@ -176,7 +176,7 @@ export default function BoardView() {
 
       {/* Question overlay — shown after DD reveal or immediately for regular questions */}
       {showQuestion && !isDDSplash && (
-        <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col items-center justify-center p-8 flip-in">
+        <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col items-center justify-center p-8 flip-in relative">
           <div className="text-jeopardy-gold font-black text-2xl mb-4 tracking-widest">
             ${showQuestion.value}
             {showQuestion.isDailyDouble && (
@@ -229,6 +229,27 @@ export default function BoardView() {
               </div>
             )}
           </div>
+
+          {/* Buzz order panel */}
+          {gameState?.buzzQueue && gameState.buzzQueue.length > 0 && (
+            <div className="absolute bottom-4 right-4 bg-gray-900 bg-opacity-90 border border-gray-600 rounded-lg p-3 text-sm min-w-[160px]">
+              <div className="text-[10px] text-gray-500 uppercase mb-2">Buzz Order</div>
+              {gameState.buzzQueue.map((entry, i) => (
+                <div
+                  key={entry.playerId}
+                  className={`flex items-center gap-2 py-0.5 ${
+                    entry.attemptedAnswer ? 'text-gray-600 line-through' :
+                    entry.playerId === gameState.buzzedPlayerId ? 'text-yellow-400 font-bold' :
+                    'text-gray-300'
+                  }`}
+                >
+                  <span className="text-gray-500 w-4 text-xs">{i + 1}.</span>
+                  <span className="flex-1 text-xs">{entry.playerName}</span>
+                  <span className="text-gray-500 text-xs tabular-nums">{entry.reactionMs}ms</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

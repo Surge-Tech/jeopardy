@@ -12,12 +12,35 @@ const BUZZ_RATE_LIMIT = 10;
 const BUZZ_RATE_WINDOW_MS = 1000;
 const buzzTimestamps = new Map<string, number[]>();
 
+const buzzOpenedAt = new Map<string, number>(); // roomCode -> timestamp
+const autoLockTimers = new Map<string, NodeJS.Timeout>(); // roomCode -> timer
+
 function isRateLimited(socketId: string): boolean {
   const now = Date.now();
   const timestamps = (buzzTimestamps.get(socketId) ?? []).filter(t => now - t < BUZZ_RATE_WINDOW_MS);
   timestamps.push(now);
   buzzTimestamps.set(socketId, timestamps);
   return timestamps.length > BUZZ_RATE_LIMIT;
+}
+
+function cancelAutoLockTimer(roomCode: string) {
+  const t = autoLockTimers.get(roomCode);
+  if (t) { clearTimeout(t); autoLockTimers.delete(roomCode); }
+}
+
+function startAutoLockTimer(io: Server, roomCode: string) {
+  cancelAutoLockTimer(roomCode);
+  const session = gm.getSession(roomCode);
+  if (!session?.settings.autoLockEnabled) return;
+  const ms = (session.settings.autoLockTimeoutS ?? 7) * 1000;
+  const t = setTimeout(() => {
+    autoLockTimers.delete(roomCode);
+    gm.lockBuzzer(roomCode);
+    const s = gm.getSession(roomCode);
+    io.to(roomCode).emit('game:state', s);
+    io.to(`hostpanel:${roomCode}`).emit('buzz:queue-locked', { auto: true });
+  }, ms);
+  autoLockTimers.set(roomCode, t);
 }
 
 export function registerSocketHandlers(io: Server) {
@@ -84,7 +107,7 @@ export function registerSocketHandlers(io: Server) {
       const info = socketPlayers.get(socket.id);
       if (!info) return;
       if (isRateLimited(socket.id)) return;
-      const outcome = gm.recordBuzz(info.roomCode, info.playerId, info.playerName);
+      const outcome = gm.recordBuzz(info.roomCode, info.playerId, info.playerName, buzzOpenedAt.get(info.roomCode) ?? null);
       const session = gm.getSession(info.roomCode);
       if (outcome === 'won') {
         io.to(info.roomCode).emit('buzz:winner', {
@@ -97,6 +120,9 @@ export function registerSocketHandlers(io: Server) {
         const until = session?.buzzLockouts[info.playerId] ?? Date.now();
         socket.emit('buzz:locked-out', { until });
         io.to(`hostpanel:${info.roomCode}`).emit('game:state', session);
+      } else if (outcome === 'queued') {
+        socket.emit('buzz:queued');
+        io.to(`hostpanel:${info.roomCode}`).emit('game:state', gm.getSession(info.roomCode));
       } else {
         socket.emit('buzz:too-late');
       }
@@ -111,6 +137,8 @@ export function registerSocketHandlers(io: Server) {
     // ── HOST: open buzzer ────────────────────────────────────────────────
     onHost(socket, 'host:enable-buzzer', ({ roomCode }: { roomCode: string }) => {
       gm.enableBuzzer(roomCode);
+      buzzOpenedAt.set(roomCode, Date.now());
+      startAutoLockTimer(io, roomCode);
       io.to(roomCode).emit('buzzer:open');
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
@@ -118,12 +146,15 @@ export function registerSocketHandlers(io: Server) {
     // ── HOST: reset buzzer (allow re-buzz) ───────────────────────────────
     onHost(socket, 'host:reset-buzzer', ({ roomCode }: { roomCode: string }) => {
       gm.resetBuzzer(roomCode);
+      buzzOpenedAt.set(roomCode, Date.now());
+      startAutoLockTimer(io, roomCode);
       io.to(roomCode).emit('buzzer:open');
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── HOST: lock buzzer ────────────────────────────────────────────────
     onHost(socket, 'host:lock-buzzer', ({ roomCode }: { roomCode: string }) => {
+      cancelAutoLockTimer(roomCode);
       gm.lockBuzzer(roomCode);
       io.to(roomCode).emit('buzzer:locked');
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
@@ -183,6 +214,8 @@ export function registerSocketHandlers(io: Server) {
     // was the last one AND the board has no Final Jeopardy configured — with
     // FJ, or on an earlier round, the host is prompted client-side instead.
     onHost(socket, 'host:close-question', async ({ roomCode }: { roomCode: string }) => {
+      cancelAutoLockTimer(roomCode);
+      buzzOpenedAt.delete(roomCode);
       gm.closeQuestion(roomCode);
       const session = gm.getSession(roomCode);
       if (session && session.phase !== 'finished') {
@@ -290,9 +323,60 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: end / delete session ───────────────────────────────────────
     onHost(socket, 'host:end', ({ roomCode }: { roomCode: string }) => {
+      cancelAutoLockTimer(roomCode);
+      buzzOpenedAt.delete(roomCode);
       io.to(roomCode).emit('game:ended');
       cleanupFinal(roomCode);
       gm.deleteSession(roomCode);
+    });
+
+    // ── HOST: wrong answer — reopen or advance to next in queue ──────────
+    onHost(socket, 'host:wrong-reopen', ({ roomCode, playerId, delta }: { roomCode: string; playerId: string; delta: number }) => {
+      gm.markWrongAndReopen(roomCode, playerId, delta);
+      io.to(roomCode).emit('score:result', { playerId, correct: false });
+
+      gm.markBuzzAttempted(roomCode, playerId);
+
+      const session = gm.getSession(roomCode);
+      if (!session) return;
+      const ineligibleIds = new Set(
+        Object.keys(session.buzzLockouts).filter(id => session.buzzLockouts[id] === gm.PERMANENT_LOCKOUT)
+      );
+
+      const next = gm.getNextInQueue(roomCode, ineligibleIds);
+      if (next) {
+        gm.advanceToBuzzEntry(roomCode, next);
+        const updated = gm.getSession(roomCode);
+        io.to(roomCode).emit('buzz:winner', {
+          playerId: next.playerId,
+          playerName: next.playerName,
+          timestamp: Date.now(),
+        });
+        io.to(roomCode).emit('game:state', updated);
+        io.to(`hostpanel:${roomCode}`).emit('buzz:next-in-queue', {
+          playerId: next.playerId,
+          playerName: next.playerName,
+        });
+      } else {
+        gm.resetBuzzer(roomCode);
+        buzzOpenedAt.set(roomCode, Date.now());
+        io.to(roomCode).emit('buzzer:open');
+        io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+        startAutoLockTimer(io, roomCode);
+      }
+    });
+
+    // ── HOST: toggle auto-lock ────────────────────────────────────────────
+    onHost(socket, 'host:set-auto-lock', ({ roomCode, enabled }: { roomCode: string; enabled: boolean }) => {
+      gm.setAutoLock(roomCode, enabled);
+      if (!enabled) cancelAutoLockTimer(roomCode);
+      io.to(roomCode).emit('game:state', gm.getSession(roomCode));
+    });
+
+    // ── HOST: set auto-lock timeout ────────────────────────────────────────
+    onHost(socket, 'host:set-auto-lock-timeout', ({ roomCode, seconds }: { roomCode: string; seconds: number }) => {
+      const ok = gm.setAutoLockTimeout(roomCode, seconds);
+      if (ok) io.to(roomCode).emit('game:state', gm.getSession(roomCode));
     });
 
     // ── REQUEST state (any client) ───────────────────────────────────────

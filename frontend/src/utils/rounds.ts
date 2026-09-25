@@ -10,9 +10,3 @@ export function isRoundComplete(board: Board, answeredQuestions: string[], round
   const answered = new Set(answeredQuestions);
   return round.categories.every(c => c.questions.every(q => answered.has(q.id)));
 }
-
-export function countRoundQuestions(board: Board, roundIndex: number): number {
-  const round = board.rounds[roundIndex];
-  if (!round) return 0;
-  return round.categories.reduce((n, c) => n + c.questions.length, 0);
-}

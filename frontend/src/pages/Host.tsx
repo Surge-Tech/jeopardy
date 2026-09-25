@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
@@ -35,7 +35,6 @@ export default function Host() {
   const [renameValue, setRenameValue] = useState('');
   const [renameError, setRenameError] = useState('');
   const [tab, setTab] = useState<'players' | 'log' | 'stats'>('players');
-  const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch(`${API}/boards/${boardId}`).then(r => r.json()).then(setBoard);
@@ -633,7 +632,6 @@ export default function Host() {
                     <span className={LOG_COLORS[entry.type]}>{entry.msg}</span>
                   </div>
                 ))}
-                <div ref={logEndRef} />
               </div>
             )}
 

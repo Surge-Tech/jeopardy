@@ -21,7 +21,6 @@ interface GameStore {
   setConnected: (v: boolean) => void;
   addLog: (entry: Omit<LogEntry, 'id' | 'ts'>) => void;
   clearLog: () => void;
-  reset: () => void;
 }
 
 function now(): string {
@@ -42,5 +41,4 @@ export const useGameStore = create<GameStore>((set) => ({
     gameLog: [{ ...entry, id: crypto.randomUUID(), ts: now() }, ...s.gameLog].slice(0, 200),
   })),
   clearLog: () => set({ gameLog: [] }),
-  reset: () => set({ gameState: null, myPlayer: null, roomCode: null, gameLog: [] }),
 }));

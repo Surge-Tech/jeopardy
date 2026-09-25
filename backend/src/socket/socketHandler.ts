@@ -250,6 +250,10 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: award / deduct points ──────────────────────────────────────
     onHost(socket, 'host:score', ({ roomCode, playerId, delta, outcome, isDailyDouble }: { roomCode: string; playerId: string; delta: number; outcome?: 'correct' | 'wrong'; isDailyDouble?: boolean }) => {
+      // Only judged Correct/Wrong clicks (outcome present) are checked against
+      // who's actually eligible right now; manual score adjustments (no
+      // outcome) are a free-form host override and must not be blocked here.
+      if (outcome && !gm.validateScoreEligibility(roomCode, playerId, !!isDailyDouble)) return;
       gm.updateScore(roomCode, playerId, delta);
       if (outcome) {
         gm.recordOutcome(roomCode, playerId, outcome);

@@ -7,6 +7,15 @@ export { PERMANENT_LOCKOUT };
 
 const sessions = new Map<string, GameState>();
 
+// Internal-only bookkeeping: last time each room saw real activity. Kept as a
+// separate Map (rather than a field on GameState) because GameState is
+// broadcast wholesale to clients in many places, and this value must never
+// leak into an outbound payload. Touched inside getSession() below, which is
+// called from nearly every socket handler in socketHandler.ts (after almost
+// every mutation, for GET_STATE requests, on reconnect, etc.), making it a
+// single low-risk choke point that covers essentially all real room activity.
+const lastActivityAt = new Map<string, number>();
+
 function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 7).toUpperCase();
 }
@@ -54,15 +63,34 @@ export function createSession(boardId: string): GameState {
     currentRoundIndex: 0,
   };
   sessions.set(roomCode, state);
+  lastActivityAt.set(roomCode, Date.now());
   return state;
 }
 
 export function getSession(roomCode: string): GameState | undefined {
-  return sessions.get(roomCode);
+  const session = sessions.get(roomCode);
+  if (session) lastActivityAt.set(roomCode, Date.now());
+  return session;
 }
 
 export function deleteSession(roomCode: string) {
   sessions.delete(roomCode);
+  lastActivityAt.delete(roomCode);
+}
+
+// Returns the room codes of every session whose last observed activity is
+// older than `maxIdleMs`. Used by the idle-session reaper in
+// socketHandler.ts to find abandoned games (e.g. a host who closed their tab
+// without clicking "End Game") so they can be torn down and stop leaking
+// memory for the lifetime of the server process.
+export function getIdleSessions(maxIdleMs: number): string[] {
+  const now = Date.now();
+  const idle: string[] = [];
+  for (const roomCode of sessions.keys()) {
+    const last = lastActivityAt.get(roomCode) ?? 0;
+    if (now - last > maxIdleMs) idle.push(roomCode);
+  }
+  return idle;
 }
 
 // Case-insensitive, trimmed name-uniqueness check within a session. Excludes

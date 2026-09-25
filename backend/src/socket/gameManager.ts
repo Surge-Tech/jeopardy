@@ -57,6 +57,15 @@ export function removePlayer(roomCode: string, playerId: string) {
   session.players = session.players.filter(p => p.id !== playerId);
 }
 
+export function renamePlayer(roomCode: string, playerId: string, newName: string): boolean {
+  const session = sessions.get(roomCode);
+  if (!session) return false;
+  const player = session.players.find(p => p.id === playerId);
+  if (!player) return false;
+  player.name = newName.trim().slice(0, 32);
+  return true;
+}
+
 export function updateScore(roomCode: string, playerId: string, delta: number): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;

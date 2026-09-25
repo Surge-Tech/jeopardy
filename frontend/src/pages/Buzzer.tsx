@@ -21,6 +21,9 @@ export default function Buzzer() {
   const [error, setError] = useState('');
   const [winnerName, setWinnerName] = useState('');
   const [myId, setMyId] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState('');
+  const [editNameError, setEditNameError] = useState('');
 
   // Try to rejoin (e.g. after a phone screen sleeps and drops the socket).
   useEffect(() => {
@@ -95,6 +98,31 @@ export default function Buzzer() {
     if (phase === 'open') setPhase('waiting');
   }
 
+  function startEditName() {
+    setEditNameValue(name);
+    setEditNameError('');
+    setEditingName(true);
+  }
+
+  function cancelEditName() {
+    setEditingName(false);
+    setEditNameError('');
+  }
+
+  function saveEditName() {
+    const trimmed = editNameValue.trim();
+    if (!trimmed) { setEditNameError('Name cannot be empty'); return; }
+    socket.emit('player:rename', { newName: trimmed }, (res: { ok: boolean; error?: string }) => {
+      if (res.ok) {
+        setName(trimmed);
+        setEditingName(false);
+        setEditNameError('');
+      } else {
+        setEditNameError(res.error ?? 'Could not rename');
+      }
+    });
+  }
+
   const myScore = gameState?.players.find(p => p.id === myId)?.score ?? 0;
   const isDDWagering = !!(gameState?.dailyDouble && gameState.dailyDouble.playerId === myId
     && gameState.dailyDouble.stage === 'wagering' && gameState.dailyDouble.hasDevice);
@@ -149,6 +177,36 @@ export default function Buzzer() {
       {/* Daily Double wager — only the assigned contestant sees this */}
       {phase !== 'join' && !gameState?.finalJeopardy && isDDWagering && gameState?.dailyDouble && (
         <DDPlayerWager dailyDouble={gameState.dailyDouble} />
+      )}
+
+      {/* Inline name editor — lobby only, shown once regardless of sub-phase */}
+      {phase !== 'join' && phase !== 'finished' && phase !== 'closed' && gameState?.phase === 'lobby' && myId && (
+        <div className="mb-4 w-full max-w-xs">
+          {editingName ? (
+            <div className="flex flex-col gap-2">
+              <input
+                autoFocus
+                className="input-field text-sm text-center"
+                value={editNameValue}
+                onChange={e => setEditNameValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveEditName(); if (e.key === 'Escape') cancelEditName(); }}
+                maxLength={40}
+              />
+              {editNameError && <p className="text-red-400 text-xs text-center">{editNameError}</p>}
+              <div className="flex gap-2 justify-center">
+                <button className="btn-primary text-xs py-1 px-3" onClick={saveEditName}>Save</button>
+                <button className="btn-ghost text-xs py-1 px-3" onClick={cancelEditName}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="text-xs text-gray-500 hover:text-gray-300 underline underline-offset-2 mx-auto block"
+              onClick={startEditName}
+            >
+              ✎ Edit name
+            </button>
+          )}
+        </div>
       )}
 
       {/* WAITING phase */}

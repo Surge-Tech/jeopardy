@@ -1,6 +1,6 @@
 {
   "name": "jeopardy-board-backend",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Jeopardy board server with real-time buzzer system",
   "main": "dist/index.js",
   "type": "module",

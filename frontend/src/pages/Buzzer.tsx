@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
-import type { GameState } from '../types';
+import type { GameState } from '@shared/types';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';

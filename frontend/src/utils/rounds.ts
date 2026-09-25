@@ -1,4 +1,4 @@
-import type { Board, GameState, Round } from '../types';
+import type { Board, GameState, Round } from '@shared/types';
 
 export function getRound(board: Board, gameState: GameState): Round {
   return board.rounds[gameState.currentRoundIndex] ?? board.rounds[0];

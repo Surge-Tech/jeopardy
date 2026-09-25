@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { GameState } from '../../types';
+import type { GameState } from '@shared/types';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import { playFinalJeopardy, playTick, playTimesUp, playReveal, playThinkingPulse, stopThinkingPulse } from '../../utils/sounds';

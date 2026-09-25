@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
-import type { Board, GameState, Question } from '../types';
+import type { Board, GameState, Question } from '@shared/types';
 import { playDailyDouble, playBuzzerReady, playBuzzIn, playQuestionOpen, playCorrect, playWrong } from '../utils/sounds';
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { FinalJeopardyBoard } from '../../types';
+import type { FinalJeopardyBoard } from '@shared/types';
 import { hostFetch } from '../../lib/hostAuth';
 
 export default function FinalJeopardyEditor({

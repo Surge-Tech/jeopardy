@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, Player } from '../types';
+import type { GameState, Player } from '@shared/types';
 
 export interface LogEntry {
   id: string;

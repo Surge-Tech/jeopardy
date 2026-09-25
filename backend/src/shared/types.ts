@@ -1,3 +1,12 @@
+// Canonical shared type definitions for the Jeopardy game, used by both the
+// backend (imports directly) and the frontend (imports via the @shared alias,
+// see frontend/vite.config.ts and frontend/tsconfig.json).
+//
+// This file lives inside backend/src so the backend's existing tsc build
+// config (rootDir: "src", outDir: "dist") requires no changes. Do not import
+// anything backend-specific from here — it must stay safely importable from
+// the frontend too.
+
 export interface Question {
   id: string;
   value: number;
@@ -71,6 +80,8 @@ export interface FinalRevealEntry {
   correct: boolean | null;
 }
 
+// Public Final Jeopardy state — broadcast to every client via game:state.
+// Secrets (wagers/answers before reveal, timers) live server-side only, in finalJeopardy.ts.
 export interface FinalPublicState {
   stage: FinalStage;
   category: string | null;
@@ -104,6 +115,9 @@ export interface BuzzEntry {
   attemptedAnswer: boolean;
 }
 
+// Sentinel value used in GameState.buzzLockouts to mark a player as
+// permanently locked out of buzzing for the current question (as opposed to
+// a timed lockout, which stores a future timestamp).
 export const PERMANENT_LOCKOUT = Number.MAX_SAFE_INTEGER;
 
 export interface GameState {
@@ -117,8 +131,8 @@ export interface GameState {
   buzzedPlayerName: string | null;
   buzzTimestamp: number | null;
   phase: 'lobby' | 'playing' | 'finished';
-  dailyDoubleRevealed: boolean;
-  responseVisible: boolean;
+  dailyDoubleRevealed: boolean;  // false until host clicks "Reveal Question"
+  responseVisible: boolean;       // true after host clicks "Show Answer"
   finalJeopardy: FinalPublicState | null;
   dailyDouble: DailyDoubleState | null;
   lastCorrectPlayerId: string | null;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { socket } from '../../socket';
-import type { GameState, Question } from '../../types';
+import type { GameState, Question } from '@shared/types';
 
 export default function DDHostPanel({
   roomCode,

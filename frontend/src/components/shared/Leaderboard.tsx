@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import type { GameState } from '../../types';
+import type { GameState } from '@shared/types';
 import { playWinnerFanfare } from '../../utils/sounds';
 import { formatMoneyChange } from '../../utils/format';
 

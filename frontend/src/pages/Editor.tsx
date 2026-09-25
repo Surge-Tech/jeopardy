@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Board, Category, Question, FinalJeopardyBoard, Round } from '../types';
+import type { Board, Category, Question, FinalJeopardyBoard, Round } from '@shared/types';
 import FinalJeopardyEditor from '../components/final/FinalJeopardyEditor';
 import { hostFetch } from '../lib/hostAuth';
 

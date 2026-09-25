@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { socket } from '../../socket';
-import type { GameState } from '../../types';
+import type { GameState } from '@shared/types';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import WagerInput from '../shared/WagerInput';

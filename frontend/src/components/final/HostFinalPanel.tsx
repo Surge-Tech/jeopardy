@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { socket } from '../../socket';
-import type { Board, GameState } from '../../types';
+import type { Board, GameState } from '@shared/types';
 import { useCountdown } from './useCountdown';
 
 interface HostState {

@@ -1,7 +1,8 @@
 import { randomUUID as uuidv4 } from 'crypto';
 import type { GameState, Player, FinalPublicState, DailyDoubleState, BuzzEntry } from '../types.js';
+import { PERMANENT_LOCKOUT } from '../types.js';
 
-export const PERMANENT_LOCKOUT = Number.MAX_SAFE_INTEGER;
+export { PERMANENT_LOCKOUT };
 
 const sessions = new Map<string, GameState>();
 

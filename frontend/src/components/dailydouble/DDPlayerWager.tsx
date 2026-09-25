@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { socket } from '../../socket';
-import type { DailyDoubleState } from '../../types';
+import type { DailyDoubleState } from '@shared/types';
 import WagerInput from '../shared/WagerInput';
 
 type Ack = { ok: boolean; error?: string };

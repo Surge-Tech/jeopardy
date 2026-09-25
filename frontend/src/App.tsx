@@ -7,7 +7,7 @@ import Editor from './pages/Editor';
 import Host from './pages/Host';
 import BoardView from './pages/BoardView';
 import Buzzer from './pages/Buzzer';
-import type { GameState, Player } from './types';
+import type { GameState, Player } from '@shared/types';
 
 export default function App() {
   const { setGameState, setConnected } = useGameStore();

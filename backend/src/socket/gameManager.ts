@@ -9,6 +9,23 @@ function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 7).toUpperCase();
 }
 
+// Resets the buzzer-related fields shared by every "start fresh" transition
+// (openQuestion, closeQuestion, resetBuzzer, enableBuzzer, advanceRound,
+// endGame). Callers that need to reset additional fields (dailyDoubleRevealed,
+// responseVisible, dailyDouble, buzzLockouts, etc.) do so inline after calling
+// this helper — see each call site for the exact variation.
+function resetBuzzerFields(
+  session: GameState,
+  opts: { buzzerState: 'idle' | 'open'; clearLockouts?: boolean }
+) {
+  session.buzzerState = opts.buzzerState;
+  session.buzzedPlayerId = null;
+  session.buzzedPlayerName = null;
+  session.buzzTimestamp = null;
+  session.buzzQueue = [];
+  if (opts.clearLockouts) session.buzzLockouts = {};
+}
+
 export function createSession(boardId: string): GameState {
   let roomCode = generateRoomCode();
   while (sessions.has(roomCode)) roomCode = generateRoomCode();
@@ -46,9 +63,17 @@ export function deleteSession(roomCode: string) {
   sessions.delete(roomCode);
 }
 
+// Case-insensitive, trimmed name-uniqueness check within a session. Excludes
+// `excludePlayerId` so a rename can keep a player's own current name.
+export function isNameTaken(session: GameState, name: string, excludePlayerId?: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return session.players.some(p => p.id !== excludePlayerId && p.name.trim().toLowerCase() === normalized);
+}
+
 export function addPlayer(roomCode: string, name: string, color: string): Player | null {
   const session = sessions.get(roomCode);
   if (!session) return null;
+  if (isNameTaken(session, name)) return null;
   const player: Player = { id: uuidv4(), name, score: 0, color };
   session.players.push(player);
   return player;
@@ -65,6 +90,7 @@ export function renamePlayer(roomCode: string, playerId: string, newName: string
   if (!session) return false;
   const player = session.players.find(p => p.id === playerId);
   if (!player) return false;
+  if (isNameTaken(session, newName, playerId)) return false;
   player.name = newName.trim().slice(0, 32);
   return true;
 }
@@ -91,14 +117,9 @@ export function openQuestion(roomCode: string, questionId: string, isDailyDouble
   const session = sessions.get(roomCode);
   if (!session) return false;
   session.activeQuestionId = questionId;
-  session.buzzerState = 'idle';
-  session.buzzedPlayerId = null;
-  session.buzzedPlayerName = null;
-  session.buzzTimestamp = null;
+  resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
   session.dailyDoubleRevealed = !isDailyDouble; // DD starts unrevealed; regular questions start revealed
   session.responseVisible = false;
-  session.buzzLockouts = {};
-  session.buzzQueue = [];
   return true;
 }
 
@@ -123,36 +144,24 @@ export function closeQuestion(roomCode: string): boolean {
     session.answeredQuestions.push(session.activeQuestionId);
   }
   session.activeQuestionId = null;
-  session.buzzerState = 'idle';
-  session.buzzedPlayerId = null;
-  session.buzzedPlayerName = null;
-  session.buzzTimestamp = null;
+  resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
   session.dailyDoubleRevealed = false;
   session.responseVisible = false;
   session.dailyDouble = null;
-  session.buzzLockouts = {};
-  session.buzzQueue = [];
   return true;
 }
 
 export function enableBuzzer(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
-  session.buzzerState = 'open';
-  session.buzzedPlayerId = null;
-  session.buzzedPlayerName = null;
-  session.buzzTimestamp = null;
+  resetBuzzerFields(session, { buzzerState: 'open' });
   return true;
 }
 
 export function resetBuzzer(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
-  session.buzzerState = 'open';
-  session.buzzedPlayerId = null;
-  session.buzzedPlayerName = null;
-  session.buzzTimestamp = null;
-  session.buzzQueue = [];
+  resetBuzzerFields(session, { buzzerState: 'open' });
   return true;
 }
 
@@ -368,15 +377,10 @@ export function advanceRound(roomCode: string, roundCount: number): { ok: boolea
 
   session.currentRoundIndex += 1;
   session.activeQuestionId = null;
-  session.buzzerState = 'idle';
-  session.buzzedPlayerId = null;
-  session.buzzedPlayerName = null;
-  session.buzzTimestamp = null;
+  resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
   session.dailyDoubleRevealed = false;
   session.responseVisible = false;
   session.dailyDouble = null;
-  session.buzzLockouts = {};
-  session.buzzQueue = [];
   return { ok: true };
 }
 
@@ -385,13 +389,8 @@ export function endGame(roomCode: string): boolean {
   if (!session) return false;
   session.phase = 'finished';
   session.activeQuestionId = null;
-  session.buzzerState = 'idle';
-  session.buzzedPlayerId = null;
-  session.buzzedPlayerName = null;
-  session.buzzTimestamp = null;
+  resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
   session.dailyDouble = null;
-  session.buzzLockouts = {};
-  session.buzzQueue = [];
   return true;
 }
 
@@ -414,6 +413,9 @@ export function listSessions(): { roomCode: string; boardId: string; playerCount
 export function markWrongAndReopen(roomCode: string, playerId: string, delta: number): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
+  // Reject stale/duplicate/mismatched emits: only the currently-buzzed-in
+  // player can be marked wrong. Does not mutate state on mismatch.
+  if (playerId !== session.buzzedPlayerId) return false;
   const player = session.players.find(p => p.id === playerId);
   if (!player) return false;
   player.score += delta;

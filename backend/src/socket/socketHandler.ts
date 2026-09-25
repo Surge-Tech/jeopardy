@@ -70,6 +70,7 @@ export function registerSocketHandlers(io: Server) {
     socket.on('player:join', ({ roomCode, name, color }: { roomCode: string; name: string; color: string }) => {
       const session = gm.getSession(roomCode);
       if (!session) return socket.emit('error', { message: 'Room not found' });
+      if (gm.isNameTaken(session, name)) return socket.emit('error', { message: 'That name is already taken in this game' });
       const player = gm.addPlayer(roomCode, name, color);
       if (!player) return socket.emit('error', { message: 'Could not join room' });
       socketPlayers.set(socket.id, { roomCode, playerId: player.id, playerName: name });
@@ -86,6 +87,7 @@ export function registerSocketHandlers(io: Server) {
     onHost(socket, 'host:add-player', ({ roomCode, name, color }: { roomCode: string; name: string; color: string }) => {
       const session = gm.getSession(roomCode);
       if (!session) return socket.emit('error', { message: 'Room not found' });
+      if (gm.isNameTaken(session, name)) return socket.emit('error', { message: 'That name is already taken in this game' });
       const player = gm.addPlayer(roomCode, name, color);
       if (!player) return socket.emit('error', { message: 'Could not add player' });
       io.to(roomCode).emit('game:state', gm.getSession(roomCode));
@@ -110,6 +112,7 @@ export function registerSocketHandlers(io: Server) {
       const outcome = gm.recordBuzz(info.roomCode, info.playerId, info.playerName, buzzOpenedAt.get(info.roomCode) ?? null);
       const session = gm.getSession(info.roomCode);
       if (outcome === 'won') {
+        cancelAutoLockTimer(info.roomCode);
         io.to(info.roomCode).emit('buzz:winner', {
           playerId: info.playerId,
           playerName: info.playerName,
@@ -270,7 +273,9 @@ export function registerSocketHandlers(io: Server) {
       if (session.phase !== 'lobby') return ack?.({ ok: false, error: 'Name changes only allowed in lobby' });
       const trimmed = newName.trim();
       if (!trimmed) return ack?.({ ok: false, error: 'Name cannot be empty' });
-      gm.renamePlayer(info.roomCode, info.playerId, trimmed);
+      if (gm.isNameTaken(session, trimmed, info.playerId)) return ack?.({ ok: false, error: 'That name is already taken' });
+      const renamed = gm.renamePlayer(info.roomCode, info.playerId, trimmed);
+      if (!renamed) return ack?.({ ok: false, error: 'Could not rename player' });
       socketPlayers.set(socket.id, { ...info, playerName: trimmed.slice(0, 32) });
       ack?.({ ok: true });
       io.to(info.roomCode).emit('game:state', gm.getSession(info.roomCode));
@@ -280,6 +285,9 @@ export function registerSocketHandlers(io: Server) {
     onHost(socket, 'host:rename-player', ({ roomCode, playerId, newName }: { roomCode: string; playerId: string; newName: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
       const trimmed = newName.trim();
       if (!trimmed) return ack?.({ ok: false, error: 'Name cannot be empty' });
+      const session = gm.getSession(roomCode);
+      if (!session) return ack?.({ ok: false, error: 'Room not found' });
+      if (gm.isNameTaken(session, trimmed, playerId)) return ack?.({ ok: false, error: 'That name is already taken' });
       const renamed = gm.renamePlayer(roomCode, playerId, trimmed);
       if (!renamed) return ack?.({ ok: false, error: 'Player not found' });
       // Update socketPlayers entry for this player if they have a live socket
@@ -332,7 +340,8 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: wrong answer — reopen or advance to next in queue ──────────
     onHost(socket, 'host:wrong-reopen', ({ roomCode, playerId, delta }: { roomCode: string; playerId: string; delta: number }) => {
-      gm.markWrongAndReopen(roomCode, playerId, delta);
+      const ok = gm.markWrongAndReopen(roomCode, playerId, delta);
+      if (!ok) return;
       io.to(roomCode).emit('score:result', { playerId, correct: false });
 
       gm.markBuzzAttempted(roomCode, playerId);

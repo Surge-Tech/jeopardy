@@ -21,6 +21,15 @@ export default function BoardView() {
   const prevBuzzerState = useRef<string>('idle');
   const prevActiveId = useRef<string | null>(null);
 
+  // Re-join the host:<roomCode> room after a socket reconnect (WiFi blip,
+  // browser sleep, backend restart) so this board keeps receiving host-only state.
+  useEffect(() => {
+    if (!roomCode) return;
+    function rejoin() { socket.emit('host:join', { roomCode }); }
+    socket.on('connect', rejoin);
+    return () => { socket.off('connect', rejoin); };
+  }, [roomCode]);
+
   useEffect(() => {
     if (!roomCode) return;
     socket.emit('host:join', { roomCode });

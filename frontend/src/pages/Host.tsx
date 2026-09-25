@@ -63,6 +63,16 @@ export default function Host() {
     };
   }, [boardId]);
 
+  // Re-join the host:<roomCode> room after a socket reconnect (WiFi blip,
+  // laptop sleep, backend restart) so host-only socket events keep working.
+  useEffect(() => {
+    function rejoinAsHost() {
+      if (roomCode) socket.emit('host:join', { roomCode });
+    }
+    socket.on('connect', rejoinAsHost);
+    return () => { socket.off('connect', rejoinAsHost); };
+  }, [roomCode]);
+
   useEffect(() => {
     if (!gameState || !board) return;
     if (!gameState.activeQuestionId) { setActiveQ(null); return; }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Board, Category, Question, FinalJeopardyBoard, Round } from '../types';
 import FinalJeopardyEditor from '../components/final/FinalJeopardyEditor';
+import { hostFetch } from '../lib/hostAuth';
 
 const API = '/api';
 
@@ -51,7 +52,7 @@ export default function Editor() {
 
   const save = useCallback(async (b: Board) => {
     setSaving(true);
-    await fetch(`${API}/boards/${b.id}`, {
+    await hostFetch(`${API}/boards/${b.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(b),
@@ -344,10 +345,16 @@ function QuestionEditor({
     setUploading(true);
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch('/api/media/upload', { method: 'POST', body: form });
-    const data = await res.json();
-    onChange({ mediaType: data.mediaType, mediaUrl: data.url });
-    setUploading(false);
+    try {
+      const res = await hostFetch('/api/media/upload', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Upload failed');
+      onChange({ mediaType: data.mediaType, mediaUrl: data.url });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (

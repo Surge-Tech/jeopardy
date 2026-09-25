@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { hostFetch } from '../lib/hostAuth';
 const API = '/api';
 
 type BoardSummary = { id: string; name: string; roundCount: number; hasFinal: boolean; createdAt: string; updatedAt: string };
@@ -23,7 +24,7 @@ export default function Dashboard() {
 
   async function handleCreate() {
     if (!newName.trim()) return;
-    const res = await fetch(`${API}/boards`, {
+    const res = await hostFetch(`${API}/boards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName.trim() }),
@@ -36,7 +37,7 @@ export default function Dashboard() {
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    await fetch(`${API}/boards/${id}`, { method: 'DELETE' });
+    await hostFetch(`${API}/boards/${id}`, { method: 'DELETE' });
     setBoards(prev => prev.filter(b => b.id !== id));
   }
 
@@ -45,7 +46,7 @@ export default function Dashboard() {
     if (!file) return;
     const text = await file.text();
     const data = JSON.parse(text);
-    const res = await fetch(`${API}/boards`, {
+    const res = await hostFetch(`${API}/boards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, id: undefined, createdAt: undefined, updatedAt: undefined }),

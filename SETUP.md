@@ -284,6 +284,31 @@ These can be set in a `.env` file in the `backend/` folder (for local dev) or in
 | `PORT` | `3001` | Port the server listens on |
 | `NODE_ENV` | `development` | Set to `production` for deployment |
 | `DATA_DIR` | `./data` | Path where boards and uploads are stored |
+| `HOST_PASSCODE` | *(unset)* | Shared passcode required to create/edit/delete boards and upload/delete media. **Required in production** — the server refuses to start without it when `NODE_ENV=production`. Left unset in dev for convenience. |
+
+### Setting `HOST_PASSCODE`
+
+Board and media writes (`POST`/`PUT`/`DELETE`) are gated behind this passcode so a stranger who finds your app's URL can't edit or wipe out a game in progress. Reads (viewing boards, the TV board view, the buzzer) stay open — anyone with a room code can still watch or play, which is the intended trade-off for a home-party tool; room/board IDs are unlisted but not secret.
+
+The first time the frontend needs to make a write, it'll prompt for the passcode and remember it in the browser's `localStorage`.
+
+**Local dev:** add it to `backend/.env`:
+```
+HOST_PASSCODE=choose-a-passcode
+```
+
+**Fly.io:** set it as a secret (not in `fly.toml`, so it isn't committed):
+```bash
+fly secrets set HOST_PASSCODE=choose-a-passcode
+```
+To rotate it later, just run `fly secrets set HOST_PASSCODE=new-passcode` again — the app restarts and any browser with the old passcode gets a 401 and is re-prompted.
+
+**Docker:** pass it as an env var:
+```bash
+HOST_PASSCODE=choose-a-passcode docker compose up -d
+```
+
+> There's no per-user accounts or rate-limiting on the passcode itself — it's a shared secret for a private/LAN game night, not a substitute for real auth on a public deployment.
 
 ---
 

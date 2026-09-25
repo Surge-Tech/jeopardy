@@ -2,6 +2,7 @@ import type { Server, Socket } from 'socket.io';
 import * as gm from './gameManager.js';
 import * as boardStorage from '../storage/boardStorage.js';
 import type { FinalPublicState, FinalJeopardyBoard, FinalContestant, FinalRevealEntry } from '../types.js';
+import { onHost } from './hostAuth.js';
 
 // ── Secret, per-room Final Jeopardy state ──────────────────────────────────
 // Kept OUTSIDE GameState because a NodeJS.Timeout can't be serialized over
@@ -419,57 +420,57 @@ export function registerFinalHandlers(
   socket: Socket,
   socketPlayers: Map<string, { roomCode: string; playerId: string; playerName: string }>,
 ) {
-  socket.on('host:fj-start', async ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-start', async ({ roomCode }: { roomCode: string }) => {
     const res = await startFinal(io, roomCode);
     if (!res.ok) socket.emit('error', { message: res.error });
   });
 
-  socket.on('host:fj-reveal-category', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-reveal-category', ({ roomCode }: { roomCode: string }) => {
     revealCategory(io, roomCode);
   });
 
-  socket.on('host:fj-reveal-clue', ({ roomCode, force }: { roomCode: string; force?: boolean }) => {
+  onHost(socket, 'host:fj-reveal-clue', ({ roomCode, force }: { roomCode: string; force?: boolean }) => {
     const res = revealClue(io, roomCode, !!force);
     if (!res.ok) socket.emit('error', { message: res.error });
   });
 
-  socket.on('host:fj-start-timer', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-start-timer', ({ roomCode }: { roomCode: string }) => {
     startTimer(io, roomCode);
   });
 
-  socket.on('host:fj-begin-reveal', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-begin-reveal', ({ roomCode }: { roomCode: string }) => {
     beginReveal(io, roomCode);
   });
 
-  socket.on('host:fj-reveal-step', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-reveal-step', ({ roomCode }: { roomCode: string }) => {
     revealStep(io, roomCode);
   });
 
-  socket.on('host:fj-judge', ({ roomCode, playerId, correct }: { roomCode: string; playerId: string; correct: boolean }) => {
+  onHost(socket, 'host:fj-judge', ({ roomCode, playerId, correct }: { roomCode: string; playerId: string; correct: boolean }) => {
     judge(io, roomCode, playerId, correct);
   });
 
-  socket.on('host:fj-undo', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-undo', ({ roomCode }: { roomCode: string }) => {
     undo(io, roomCode);
   });
 
-  socket.on('host:fj-next', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-next', ({ roomCode }: { roomCode: string }) => {
     next(io, roomCode);
   });
 
-  socket.on('host:fj-show-response', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-show-response', ({ roomCode }: { roomCode: string }) => {
     showResponse(io, roomCode);
   });
 
-  socket.on('host:fj-scoreboard', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-scoreboard', ({ roomCode }: { roomCode: string }) => {
     showScoreboard(io, roomCode);
   });
 
-  socket.on('host:fj-exit', ({ roomCode }: { roomCode: string }) => {
+  onHost(socket, 'host:fj-exit', ({ roomCode }: { roomCode: string }) => {
     exitFinal(io, roomCode);
   });
 
-  socket.on('host:fj-set-for-player', ({ roomCode, playerId, wager, answer }: { roomCode: string; playerId: string; wager?: number; answer?: string }) => {
+  onHost(socket, 'host:fj-set-for-player', ({ roomCode, playerId, wager, answer }: { roomCode: string; playerId: string; wager?: number; answer?: string }) => {
     setForPlayer(io, roomCode, playerId, wager, answer);
   });
 

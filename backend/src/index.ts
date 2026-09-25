@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import boardsRouter from './routes/boards.js';
 import mediaRouter from './routes/media.js';
 import { registerSocketHandlers } from './socket/socketHandler.js';
+import { CONTENT_TYPE_BY_EXT } from './mediaTypes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 3001);
@@ -26,7 +27,14 @@ app.use(express.json({ limit: '10mb' }));
 
 // Serve uploaded media files
 const mediaPath = path.resolve(DATA_DIR, 'media');
-app.use('/media', express.static(mediaPath));
+app.use('/media', express.static(mediaPath, {
+  index: false,
+  setHeaders: (res, filePath) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    const ext = path.extname(filePath).toLowerCase();
+    res.setHeader('Content-Type', CONTENT_TYPE_BY_EXT[ext] ?? 'application/octet-stream');
+  },
+}));
 
 // API routes
 app.use('/api/boards', boardsRouter);
@@ -34,6 +42,11 @@ app.use('/api/media', mediaRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  res.status(400).json({ error: err.message });
 });
 
 registerSocketHandlers(io);

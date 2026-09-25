@@ -401,15 +401,6 @@ export function resumeGame(roomCode: string): boolean {
   return true;
 }
 
-export function listSessions(): { roomCode: string; boardId: string; playerCount: number; phase: string }[] {
-  return Array.from(sessions.entries()).map(([roomCode, s]) => ({
-    roomCode,
-    boardId: s.boardId,
-    playerCount: s.players.length,
-    phase: s.phase,
-  }));
-}
-
 // Reject stale/duplicate/mismatched "Correct"/"Wrong" judging clicks: the
 // awarded playerId must match whoever is actually eligible right now — the
 // currently-buzzed-in player for a regular question, or the Daily Double

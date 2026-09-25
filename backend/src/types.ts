@@ -131,9 +131,3 @@ export interface GameState {
   };
   currentRoundIndex: number;
 }
-
-export interface BuzzerPlayer {
-  playerId: string;
-  playerName: string;
-  socketId: string;
-}

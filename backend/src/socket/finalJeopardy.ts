@@ -1,7 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import * as gm from './gameManager.js';
 import * as boardStorage from '../storage/boardStorage.js';
-import type { FinalPublicState, FinalJeopardyBoard, FinalContestant, FinalRevealEntry } from '../types.js';
+import type { FinalPublicState, FinalJeopardyBoard, FinalContestant } from '../types.js';
 import { onHost } from './hostAuth.js';
 
 // ── Secret, per-room Final Jeopardy state ──────────────────────────────────

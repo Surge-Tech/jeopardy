@@ -13,17 +13,6 @@
 }
 
 @layer components {
-  .jeopardy-card {
-    @apply bg-jeopardy-blue border-4 border-black text-jeopardy-gold font-bold
-           flex items-center justify-center cursor-pointer select-none
-           transition-all duration-150 active:scale-95;
-  }
-  .jeopardy-card:hover {
-    @apply brightness-125;
-  }
-  .jeopardy-card.answered {
-    @apply bg-jeopardy-dark text-gray-700 cursor-default;
-  }
   .btn-primary {
     @apply bg-jeopardy-gold text-jeopardy-dark font-bold py-2 px-4 rounded
            hover:brightness-110 active:scale-95 transition-all;

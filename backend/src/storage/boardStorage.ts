@@ -27,12 +27,6 @@ export function normalizeBoard(raw: any): Board {
   return { ...rest, rounds: [round] } as Board;
 }
 
-export function countRoundQuestions(board: Board, roundIndex: number): number {
-  const round = board.rounds[roundIndex];
-  if (!round) return 0;
-  return round.categories.reduce((n, c) => n + c.questions.length, 0);
-}
-
 export function isRoundComplete(board: Board, answeredQuestions: string[], roundIndex: number): boolean {
   const round = board.rounds[roundIndex];
   if (!round) return true;

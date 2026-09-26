@@ -179,7 +179,7 @@ export default function BoardView() {
 
       {/* Question overlay — shown after DD reveal or immediately for regular questions */}
       {showQuestion && !isDDSplash && (
-        <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col items-center justify-center p-8 flip-in relative">
+        <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col items-center justify-center p-8 flip-in">
           <div className="text-jeopardy-gold font-black text-2xl mb-4 tracking-widest">
             ${showQuestion.value}
             {showQuestion.isDailyDouble && (

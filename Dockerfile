@@ -1,17 +1,19 @@
 FROM node:20-alpine AS builder
 WORKDIR /build
 
+# Build backend first: the frontend's @shared/* alias resolves into
+# ../backend/src/shared, so that source must exist on disk before the
+# frontend build (tsc + vite) runs.
+COPY backend/package*.json backend/
+RUN cd backend && npm ci
+COPY backend/ backend/
+RUN cd backend && npm run build
+
 # Build frontend (outputs to /build/backend/public via vite.config.ts outDir)
 COPY frontend/package*.json frontend/
 RUN cd frontend && npm ci
 COPY frontend/ frontend/
 RUN cd frontend && npm run build
-
-# Build backend TypeScript
-COPY backend/package*.json backend/
-RUN cd backend && npm ci
-COPY backend/ backend/
-RUN cd backend && npm run build
 
 # ── Production image ──────────────────────────────────────────────────────────
 FROM node:20-alpine

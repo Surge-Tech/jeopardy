@@ -1,6 +1,6 @@
 {
   "name": "jeopardy-board-frontend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Jeopardy board web interface for host and contestants",
   "type": "module",
   "scripts": {

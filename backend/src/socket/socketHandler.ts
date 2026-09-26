@@ -316,9 +316,8 @@ export function registerSocketHandlers(io: Server) {
       if (session.phase !== 'lobby') return ack?.({ ok: false, error: 'Name changes only allowed in lobby' });
       const trimmed = newName.trim();
       if (!trimmed) return ack?.({ ok: false, error: 'Name cannot be empty' });
-      if (gm.isNameTaken(session, trimmed, info.playerId)) return ack?.({ ok: false, error: 'That name is already taken' });
-      const renamed = gm.renamePlayer(info.roomCode, info.playerId, trimmed);
-      if (!renamed) return ack?.({ ok: false, error: 'Could not rename player' });
+      const res = gm.renamePlayer(info.roomCode, info.playerId, trimmed);
+      if (!res.ok) return ack?.(res);
       socketPlayers.set(socket.id, { ...info, playerName: trimmed.slice(0, LIMITS.PLAYER_NAME_MAX) });
       ack?.({ ok: true });
       io.to(info.roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(info.roomCode));
@@ -328,11 +327,8 @@ export function registerSocketHandlers(io: Server) {
     onHost(socket, SOCKET_EVENTS.HOST_RENAME_PLAYER, ({ roomCode, playerId, newName }: { roomCode: string; playerId: string; newName: string }, ack?: (res: { ok: boolean; error?: string }) => void) => {
       const trimmed = newName.trim();
       if (!trimmed) return ack?.({ ok: false, error: 'Name cannot be empty' });
-      const session = gm.getSession(roomCode);
-      if (!session) return ack?.({ ok: false, error: 'Room not found' });
-      if (gm.isNameTaken(session, trimmed, playerId)) return ack?.({ ok: false, error: 'That name is already taken' });
-      const renamed = gm.renamePlayer(roomCode, playerId, trimmed);
-      if (!renamed) return ack?.({ ok: false, error: 'Player not found' });
+      const res = gm.renamePlayer(roomCode, playerId, trimmed);
+      if (!res.ok) return ack?.(res);
       // Update socketPlayers entry for this player if they have a live socket
       for (const [sid, info] of socketPlayers) {
         if (info.roomCode === roomCode && info.playerId === playerId) {

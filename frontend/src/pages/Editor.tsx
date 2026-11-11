@@ -298,7 +298,7 @@ export default function Editor() {
                           )}
                           {q.mediaType && (
                             <span className="absolute bottom-1 right-1 text-xs">
-                              {q.mediaType === 'image' ? '🖼' : q.mediaType === 'video' ? '🎬' : '▶'}
+                              {q.mediaType === 'image' ? '🖼' : q.mediaType === 'video' ? '🎬' : q.mediaType === 'audio' ? '🎵' : '▶'}
                             </span>
                           )}
                         </button>

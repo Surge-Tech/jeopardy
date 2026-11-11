@@ -15,8 +15,8 @@ test('answer media persists independently and Final Jeopardy publishes it only o
   const io = { to: () => ({ emit: () => {} }) } as unknown as Server;
   let room: string | undefined;
   try {
-    const question = { id: 'question', value: 200, clue: 'Clue', response: '', mediaType: 'image' as const, mediaUrl: '/media/clue.png', responseMediaType: 'video' as const, responseMediaUrl: '/media/answer.mp4' };
-    const board = await storage.createBoard({ name: 'Test', rounds: [{ id: 'round', pointValues: [200], categories: [{ id: 'category', name: 'Test', questions: [question] }] }], finalJeopardy: { category: 'Final', clue: 'Final clue', response: 'Final answer', mediaType: 'image', mediaUrl: '/media/final-clue.png', responseMediaType: 'image', responseMediaUrl: '/media/final-answer.png' } });
+    const question = { id: 'question', value: 200, clue: 'Clue', response: '', mediaType: 'audio' as const, mediaUrl: '/media/clue.mp3', responseMediaType: 'audio' as const, responseMediaUrl: '/media/answer.wav' };
+    const board = await storage.createBoard({ name: 'Test', rounds: [{ id: 'round', pointValues: [200], categories: [{ id: 'category', name: 'Test', questions: [question] }] }], finalJeopardy: { category: 'Final', clue: 'Final clue', response: 'Final answer', mediaType: 'audio', mediaUrl: '/media/final-clue.mp3', responseMediaType: 'audio', responseMediaUrl: '/media/final-answer.wav' } });
     assert.deepEqual((await storage.getBoard(board.id))?.rounds[0].categories[0].questions[0], question);
     const session = gm.createSession(board.id);
     room = session.roomCode;
@@ -24,11 +24,12 @@ test('answer media persists independently and Final Jeopardy publishes it only o
     assert.equal(session.finalJeopardy?.responseMediaUrl, undefined);
     final.revealCategory(io, room);
     final.revealClue(io, room, true);
-    assert.equal(session.finalJeopardy?.mediaUrl, '/media/final-clue.png');
+    assert.equal(session.finalJeopardy?.mediaUrl, '/media/final-clue.mp3');
     assert.equal(session.finalJeopardy?.responseMediaUrl, undefined);
     final.showResponse(io, room);
-    assert.equal(session.finalJeopardy?.responseMediaUrl, '/media/final-answer.png');
-    assert.equal(session.finalJeopardy?.responseMediaType, 'image');
+    assert.equal(session.finalJeopardy?.responseMediaUrl, '/media/final-answer.wav');
+    assert.equal(session.finalJeopardy?.mediaType, 'audio');
+    assert.equal(session.finalJeopardy?.responseMediaType, 'audio');
     assert.equal(session.finalJeopardy?.response, 'Final answer');
     const updated = await storage.updateBoard(board.id, { name: 'Renamed' });
     assert.deepEqual(updated?.rounds, board.rounds);

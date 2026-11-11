@@ -12,9 +12,9 @@ export interface Question {
   value: number;
   clue: string;
   response: string;
-  responseMediaType?: 'image' | 'video' | 'youtube';
+  responseMediaType?: 'image' | 'video' | 'audio' | 'youtube';
   responseMediaUrl?: string;
-  mediaType?: 'image' | 'video' | 'youtube';
+  mediaType?: 'image' | 'video' | 'audio' | 'youtube';
   mediaUrl?: string;
   isDailyDouble?: boolean;
 }
@@ -29,9 +29,9 @@ export interface FinalJeopardyBoard {
   category: string;
   clue: string;
   response: string;
-  responseMediaType?: 'image' | 'video' | 'youtube';
+  responseMediaType?: 'image' | 'video' | 'audio' | 'youtube';
   responseMediaUrl?: string;
-  mediaType?: 'image' | 'video' | 'youtube';
+  mediaType?: 'image' | 'video' | 'audio' | 'youtube';
   mediaUrl?: string;
   timerSeconds?: number;
 }
@@ -90,7 +90,7 @@ export interface FinalPublicState {
   stage: FinalStage;
   category: string | null;
   clue: string | null;
-  mediaType?: 'image' | 'video' | 'youtube';
+  mediaType?: 'image' | 'video' | 'audio' | 'youtube';
   mediaUrl?: string;
   deadline: number | null;
   serverNow: number;
@@ -100,7 +100,7 @@ export interface FinalPublicState {
   currentReveal: { wager: number; answer: string } | null;
   revealed: Record<string, FinalRevealEntry>;
   response: string | null;
-  responseMediaType?: 'image' | 'video' | 'youtube';
+  responseMediaType?: 'image' | 'video' | 'audio' | 'youtube';
   responseMediaUrl?: string;
 }
 

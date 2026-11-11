@@ -42,11 +42,12 @@ const router = Router();
 
 router.post('/upload', requireHostPasscode, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const isVideo = req.file.mimetype.startsWith('video/');
+  const mediaType = req.file.mimetype.startsWith('audio/') ? 'audio'
+    : req.file.mimetype.startsWith('video/') ? 'video' : 'image';
   res.json({
     filename: req.file.filename,
     url: `/media/${req.file.filename}`,
-    mediaType: isVideo ? 'video' : 'image',
+    mediaType,
   });
 });
 

@@ -108,6 +108,9 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
           {fj.mediaType === 'image' && fj.mediaUrl && (
             <img src={fj.mediaUrl} alt="clue" className="max-h-64 max-w-full object-contain mb-6 rounded mx-auto" />
           )}
+          {fj.mediaType === 'audio' && fj.mediaUrl && (
+            <audio key={fj.mediaUrl} src={fj.mediaUrl} autoPlay controls aria-label="Clue audio" className="mb-6 w-full max-w-2xl mx-auto" />
+          )}
           {fj.mediaType === 'video' && fj.mediaUrl && (
             <video src={fj.mediaUrl} autoPlay controls className="max-h-64 max-w-2xl mb-6 rounded w-full mx-auto" />
           )}

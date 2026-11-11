@@ -6,7 +6,7 @@ A self-hosted, fully customizable Jeopardy game platform. Build your own boards,
 
 ## Features
 
-- **Board Editor** — Create unlimited Jeopardy boards with up to 6 categories and 5 clues each per round. Supports text, images, and video clues, with separate image/video uploads or YouTube links for correct answers, including Final Jeopardy. Answer media appears on the board when the host reveals the answer.
+- **Board Editor** — Create unlimited Jeopardy boards with up to 6 categories and 5 clues each per round. Supports text, images, video, and audio clues, with separate image/video/audio uploads or YouTube links for correct answers, including Final Jeopardy. Answer media appears on the board when the host reveals the answer. Audio uploads support MP3, WAV, Ogg, M4A, AAC, FLAC, and WebM, with playback controls in the editor and on the board.
 - **Multi-Round Boards** — A board can hold several rounds (Jeopardy!, Double Jeopardy!, and beyond). Players, scores, and stats all carry over when the host advances to the next round — no need to start a new game.
 - **Real-time Buzzer System** — Players connect on any device via a browser. First buzz wins, ties are impossible. A configurable lockout (250/500/1000ms, or off) penalizes buzzing before the host opens it, so mashing the button no longer beats reacting to it.
 - **Daily Doubles with Wagering** — Mark any clue as a Daily Double. The host reveals it and the game automatically prompts the right player to wager on their phone (with a host override, and a manual picker for the rare case no player has answered correctly yet) — scoring then uses their wager instead of the clue's face value.
@@ -107,7 +107,7 @@ jeopardy/
 │   │   ├── index.ts            # Express server + static file serving
 │   │   ├── routes/
 │   │   │   ├── boards.ts       # Board CRUD API
-│   │   │   └── media.ts        # Image/video upload
+│   │   │   └── media.ts        # Image/video/audio upload
 │   │   ├── socket/
 │   │   │   ├── gameManager.ts    # In-memory game sessions
 │   │   │   ├── socketHandler.ts  # Core game + buzzer + Daily Double events

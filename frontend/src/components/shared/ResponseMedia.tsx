@@ -6,6 +6,9 @@ export default function ResponseMedia({ responseMediaType, responseMediaUrl, aut
   if (responseMediaType === 'image') {
     return <img src={responseMediaUrl} alt="Correct answer" className="max-h-[50dvh] max-w-full object-contain rounded mx-auto mt-3" />;
   }
+  if (responseMediaType === 'audio') {
+    return <audio key={responseMediaUrl} src={responseMediaUrl} autoPlay={autoPlay} controls aria-label="Correct answer audio" className="w-full mt-3" />;
+  }
   if (responseMediaType === 'video') {
     return <video key={responseMediaUrl} src={responseMediaUrl} autoPlay={autoPlay} controls className="max-h-[50dvh] w-full object-contain rounded mt-3" />;
   }

@@ -37,8 +37,8 @@ export default function MediaEditor({ label, mediaType, mediaUrl, onChange, onUp
       <legend className="text-sm text-gray-400 mb-2">{label}</legend>
       <div className="flex gap-2 flex-wrap">
         <label className={`btn-ghost text-sm py-1 px-3 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
-          {uploading ? 'Uploading...' : '📁 Upload Image/Video'}
-          <input type="file" aria-label={`${label} upload`} className="hidden" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/ogg"
+          {uploading ? 'Uploading...' : '📁 Upload Image/Video/Audio'}
+          <input type="file" aria-label={`${label} upload`} className="hidden" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/ogg,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/x-flac,audio/webm,.mp3,.wav,.ogg,.m4a,.aac,.flac,.weba"
             onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void upload(file); }} />
         </label>
         <button type="button" className="btn-ghost text-sm py-1 px-3" onClick={() => onChange({ mediaType: 'youtube', mediaUrl: '' })}>▶ YouTube URL</button>
@@ -46,6 +46,7 @@ export default function MediaEditor({ label, mediaType, mediaUrl, onChange, onUp
       </div>
       {mediaType === 'youtube' && <input aria-label={`${label} YouTube URL`} className="input-field" placeholder="https://www.youtube.com/watch?v=..." value={mediaUrl ?? ''} onChange={e => onChange({ mediaType, mediaUrl: e.target.value })} />}
       {mediaUrl && mediaType === 'image' && <img src={mediaUrl} alt={`${label} preview`} className="max-h-40 rounded border border-gray-600" />}
+      {mediaUrl && mediaType === 'audio' && <audio key={mediaUrl} src={mediaUrl} controls aria-label={`${label} preview`} className="w-full" />}
       {mediaUrl && mediaType === 'video' && <video key={mediaUrl} src={mediaUrl} controls className="max-h-40 rounded border border-gray-600 w-full" />}
       {mediaUrl && mediaType === 'youtube' && <p className="text-sm text-gray-400">YouTube video will be embedded during the game.</p>}
       {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}

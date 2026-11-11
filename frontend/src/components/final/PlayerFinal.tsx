@@ -6,7 +6,7 @@ import { LIMITS } from '@shared/limits';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import WagerInput from '../shared/WagerInput';
-import { formatMoney } from '../../utils/format';
+import { formatScore } from '../../utils/format';
 
 type Ack = { ok: boolean; error?: string };
 
@@ -77,7 +77,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
     return (
       <WagerInput
         heading={fj.category ?? undefined}
-        subtitle={`Your score: $${contestant.preScore} · Max wager: $${contestant.maxWager}`}
+        subtitle={`Your score: ${contestant.preScore} · Max wager: ${contestant.maxWager}`}
         maxWager={contestant.maxWager}
         locked={wagerLocked || contestant.hasWagered}
         lockedAmount={wagerLocked ? lockedWagerAmount : contestant.maxWager}
@@ -152,9 +152,9 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
         <div className={`inline-block font-black text-2xl px-6 py-3 rounded-xl mb-3 ${revealed.correct ? 'bg-green-600' : 'bg-red-600'} text-white`}>
           {revealed.correct ? '✓ Correct!' : '✗ Wrong'}
         </div>
-        <p className="text-gray-300">Wager: ${revealed.wager}</p>
+        <p className="text-gray-300">Wager: {revealed.wager}</p>
         <p className="text-jeopardy-gold font-black text-xl mt-2">
-          {formatMoney(myScore)}
+          {formatScore(myScore)}
         </p>
       </div>
     );

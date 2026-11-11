@@ -40,7 +40,7 @@ export default function DDHostPanel({
   return (
     <div className="space-y-3">
       <div className="text-yellow-300 font-black text-lg">⭐ Daily Double</div>
-      <div className="text-jeopardy-gold font-black text-xl">${activeQ.value}</div>
+      <div className="text-jeopardy-gold font-black text-xl">{activeQ.value}</div>
 
       {dd.stage === 'picking' && (
         <div className="space-y-2">
@@ -65,7 +65,7 @@ export default function DDHostPanel({
         <div className="space-y-2">
           <div className="bg-gray-800 rounded p-3 text-sm">
             <div className="font-bold">{player.name}</div>
-            <div className="text-gray-400">Max wager: ${dd.maxWager}</div>
+            <div className="text-gray-400">Max wager: {dd.maxWager}</div>
             <div className="text-gray-400 mt-1 animate-pulse">
               {dd.hasDevice ? 'Waiting for their wager…' : 'No device connected — enter their wager below.'}
             </div>
@@ -96,7 +96,7 @@ export default function DDHostPanel({
         <div className="space-y-3">
           <div className="bg-gray-800 rounded p-3 text-sm">
             <div className="font-bold">{player.name}</div>
-            <div className="text-jeopardy-gold font-black text-lg">Wager: ${dd.wager}</div>
+            <div className="text-jeopardy-gold font-black text-lg">Wager: {dd.wager}</div>
           </div>
 
           {!gameState.dailyDoubleRevealed ? (

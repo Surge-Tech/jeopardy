@@ -10,7 +10,7 @@ import FinalBoardScreen from '../components/final/FinalBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
 import { getYouTubeEmbedUrl } from '../utils/media';
-import { formatMoney } from '../utils/format';
+import { formatScore } from '../utils/format';
 
 const API = '/api';
 
@@ -173,7 +173,7 @@ export default function BoardView() {
             DOUBLE!
           </div>
           <div className="mt-8 text-white text-xl font-bold opacity-60 animate-pulse">
-            ${showQuestion?.value}
+            {showQuestion?.value}
           </div>
         </div>
       )}
@@ -183,7 +183,7 @@ export default function BoardView() {
         <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col overflow-y-auto p-8 flip-in">
           <div className="my-auto flex w-full shrink-0 flex-col items-center">
           <div className="text-jeopardy-gold font-black text-2xl mb-4 tracking-widest">
-            ${showQuestion.value}
+            {showQuestion.value}
             {showQuestion.isDailyDouble && (
               <span className="ml-4 bg-yellow-400 text-black px-3 py-1 rounded text-xl">DAILY DOUBLE!</span>
             )}
@@ -289,7 +289,7 @@ export default function BoardView() {
                   ${isAnswered ? 'bg-jeopardy-dark text-gray-800' : 'bg-jeopardy-blue text-jeopardy-gold'}`}
                 style={{ fontSize: 'clamp(18px, 3vw, 48px)', textShadow: isAnswered ? 'none' : '2px 2px 0 #000', minHeight: '60px' }}
               >
-                {isAnswered ? '' : `$${pv}`}
+                {isAnswered ? '' : pv}
               </div>
             );
           })
@@ -309,7 +309,7 @@ export default function BoardView() {
               className="font-black text-xl"
               style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}
             >
-              {formatMoney(player.score)}
+              {formatScore(player.score)}
             </div>
           </div>
         ))}

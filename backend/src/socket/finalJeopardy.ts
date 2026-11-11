@@ -74,7 +74,7 @@ export async function startFinal(io: Server, roomCode: string): Promise<{ ok: bo
   const contestants: FinalContestant[] = order.map(playerId => {
     const player = session.players.find(p => p.id === playerId)!;
     const maxWager = Math.max(player.score, 0);
-    // Players at $0 or below have only one legal wager ($0), so lock it in now
+    // Players at 0 or below have only one legal wager (0), so lock it in now
     // rather than making them submit — they can't be stuck waiting on the phone.
     const autoLocked = maxWager === 0;
     if (autoLocked) wagers.set(playerId, 0);
@@ -146,7 +146,7 @@ export function submitWager(io: Server, roomCode: string, playerId: string, amou
   setFj(roomCode, fj);
   broadcastState(io, roomCode);
   broadcastHostState(io, roomCode);
-  hostLog(io, roomCode, `${contestant.playerName} wagered $${amount}`);
+  hostLog(io, roomCode, `${contestant.playerName} wagered ${amount}`);
   return { ok: true };
 }
 
@@ -160,7 +160,7 @@ export function setForPlayer(io: Server, roomCode: string, playerId: string, wag
   if (wager !== undefined && Number.isFinite(wager) && Number.isInteger(wager) && wager >= 0 && wager <= contestant.maxWager) {
     secret.wagers.set(playerId, wager);
     contestant.hasWagered = true;
-    hostLog(io, roomCode, `Host set ${contestant.playerName}'s wager to $${wager}`);
+    hostLog(io, roomCode, `Host set ${contestant.playerName}'s wager to ${wager}`);
   }
   if (answer !== undefined) {
     const trimmed = answer.trim().slice(0, LIMITS.ANSWER_MAX);
@@ -182,7 +182,7 @@ export function revealClue(io: Server, roomCode: string, force: boolean): { ok: 
   if (missing.length && !force) {
     return { ok: false, error: `Missing wagers: ${missing.map(m => m.playerName).join(', ')}` };
   }
-  // Force reveal: missing wagers default to $0.
+  // Force reveal: missing wagers default to 0.
   for (const c of missing) {
     secret.wagers.set(c.playerId, 0);
     c.hasWagered = true;
@@ -337,7 +337,7 @@ export function judge(io: Server, roomCode: string, playerId: string, correct: b
   fj.currentReveal = null;
   setFj(roomCode, fj);
   broadcastState(io, roomCode);
-  hostLog(io, roomCode, `${contestant.playerName} was judged ${correct ? 'correct' : 'wrong'} (${correct ? '+' : '-'}$${wager})`);
+  hostLog(io, roomCode, `${contestant.playerName} was judged ${correct ? 'correct' : 'wrong'} (${correct ? '+' : '-'}${wager})`);
 }
 
 export function undo(io: Server, roomCode: string) {

@@ -1,6 +1,6 @@
 import type { Player } from '@shared/types';
 import { LIMITS } from '@shared/limits';
-import { formatMoney } from '../../utils/format';
+import { formatScore } from '../../utils/format';
 
 export default function PlayersTab({
   players,
@@ -78,7 +78,7 @@ export default function PlayersTab({
                 </div>
               )}
               <div className="font-black" style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}>
-                {formatMoney(player.score)}
+                {formatScore(player.score)}
               </div>
             </div>
             <div className="flex gap-1 flex-shrink-0">

@@ -18,7 +18,7 @@ export default function DDPlayerWager({ dailyDouble }: { dailyDouble: DailyDoubl
   return (
     <WagerInput
       heading="Daily Double!"
-      subtitle={`Max wager: $${dailyDouble.maxWager}`}
+      subtitle={`Max wager: ${dailyDouble.maxWager}`}
       maxWager={dailyDouble.maxWager}
       locked={dailyDouble.stage !== 'wagering'}
       lockedAmount={dailyDouble.wager ?? undefined}

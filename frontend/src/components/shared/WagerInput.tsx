@@ -11,7 +11,7 @@ interface WagerInputProps {
   error?: string;
 }
 
-// Shared wager UI: numeric input + $0/Half/All-in quick buttons + a
+// Shared wager UI: numeric input + 0/Half/All-in quick buttons + a
 // confirm-to-lock step, since a locked wager can't be taken back.
 // Used by both Final Jeopardy (PlayerFinal) and Daily Double.
 export default function WagerInput({ heading, subtitle, maxWager, locked, lockedAmount, waitingText, onLock, error }: WagerInputProps) {
@@ -24,7 +24,7 @@ export default function WagerInput({ heading, subtitle, maxWager, locked, locked
       <div className="text-center">
         {heading && <h2 className="text-xl font-black text-jeopardy-gold mb-2">{heading}</h2>}
         <p className="text-white text-lg">
-          Wager locked: <span className="text-jeopardy-gold font-black">${lockedAmount ?? maxWager}</span>
+          Wager locked: <span className="text-jeopardy-gold font-black">{lockedAmount ?? maxWager}</span>
         </p>
         {waitingText && <p className="text-gray-500 text-sm mt-4 animate-pulse">{waitingText}</p>}
       </div>
@@ -45,18 +45,18 @@ export default function WagerInput({ heading, subtitle, maxWager, locked, locked
             onChange={e => setWagerInput(e.target.value.replace(/[^0-9]/g, ''))}
           />
           <div className="flex gap-2 mb-4">
-            <button className="btn-ghost flex-1 text-sm" onClick={() => setWagerInput('0')}>$0</button>
+            <button className="btn-ghost flex-1 text-sm" onClick={() => setWagerInput('0')}>0</button>
             <button className="btn-ghost flex-1 text-sm" onClick={() => setWagerInput(String(Math.floor(maxWager / 2)))}>Half</button>
             <button className="btn-ghost flex-1 text-sm" onClick={() => setWagerInput(String(maxWager))}>All-in</button>
           </div>
           {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
           <button className="btn-primary w-full py-3" onClick={() => setConfirming(true)}>
-            Wager ${amount}
+            Wager {amount}
           </button>
         </>
       ) : (
         <div>
-          <p className="text-white text-lg mb-4">Lock in <span className="text-jeopardy-gold font-black">${amount}</span>? This can't be changed.</p>
+          <p className="text-white text-lg mb-4">Lock in <span className="text-jeopardy-gold font-black">{amount}</span>? This can't be changed.</p>
           <div className="flex gap-2">
             <button className="btn-ghost flex-1" onClick={() => setConfirming(false)}>Back</button>
             <button className="btn-primary flex-1" onClick={() => onLock(amount)}>Confirm</button>

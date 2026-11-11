@@ -154,7 +154,7 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
           </div>
           {(fj.revealStep === 'wager' || fj.revealStep === 'answer' || fj.revealStep === 'judged') && liveWager !== undefined && (
             <div className="fade-up text-jeopardy-gold font-black text-3xl mb-4">
-              Wagered ${liveWager}
+              Wagered {liveWager}
             </div>
           )}
           {(fj.revealStep === 'answer' || fj.revealStep === 'judged') && liveAnswer !== undefined && (
@@ -170,7 +170,7 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
                 {revealed.correct ? '✓ CORRECT' : '✗ WRONG'}
               </div>
               <div className="count-pop mt-4 text-jeopardy-gold font-black text-3xl">
-                ${gameState.players.find(p => p.id === contestant.playerId)?.score ?? 0}
+                {gameState.players.find(p => p.id === contestant.playerId)?.score ?? 0}
               </div>
             </div>
           )}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import type { GameState } from '@shared/types';
 import { playWinnerFanfare } from '../../utils/sounds';
-import { formatMoneyChange } from '../../utils/format';
+import { formatScoreChange } from '../../utils/format';
 
 interface Row {
   playerId: string;
@@ -108,7 +108,7 @@ export default function Leaderboard({ gameState, compact, myId }: { gameState: G
         {rows.map(r => (
           <div key={r.playerId} className={`flex justify-between text-sm py-1 border-b border-gray-800 ${r.playerId === myId ? 'text-white font-bold' : ''}`}>
             <span>{rankLabel(r)} {r.name}</span>
-            <span className="text-jeopardy-gold font-bold">${r.finalScore}</span>
+            <span className="text-jeopardy-gold font-bold">{r.finalScore}</span>
           </div>
         ))}
         {me && <div className="text-gray-400 text-xs mt-2">You finished {rankLabel(me)}</div>}
@@ -156,7 +156,7 @@ export default function Leaderboard({ gameState, compact, myId }: { gameState: G
                 <div key={r.playerId} className="mb-1">
                   <div className="w-2 h-2 rounded-full mx-auto mb-1" style={{ background: r.color }} />
                   <div className="font-bold text-white truncate max-w-[140px]">{r.name}</div>
-                  <div className="text-jeopardy-gold font-black text-xl">${r.finalScore}</div>
+                  <div className="text-jeopardy-gold font-black text-xl">{r.finalScore}</div>
                 </div>
               ))}
               <div
@@ -197,15 +197,15 @@ export default function Leaderboard({ gameState, compact, myId }: { gameState: G
                   <span className="w-2 h-2 rounded-full inline-block" style={{ background: r.color }} />
                   {r.name}
                 </td>
-                {hasFj && <td className="p-2 text-right text-gray-400">${r.preScore}</td>}
-                {hasFj && <td className="p-2 text-right">{r.wager !== null ? `$${r.wager}` : '—'}</td>}
+                {hasFj && <td className="p-2 text-right text-gray-400">{r.preScore}</td>}
+                {hasFj && <td className="p-2 text-right">{r.wager ?? '—'}</td>}
                 {hasFj && <td className="p-2 text-center">{r.result === 'correct' ? '✅' : r.result === 'wrong' ? '❌' : '—'}</td>}
                 {hasFj && (
                   <td className={`p-2 text-right ${r.change > 0 ? 'text-green-400' : r.change < 0 ? 'text-red-400' : 'text-gray-500'}`}>
-                    {formatMoneyChange(r.change)}
+                    {formatScoreChange(r.change)}
                   </td>
                 )}
-                <td className="p-2 text-right font-black text-jeopardy-gold">${r.finalScore}</td>
+                <td className="p-2 text-right font-black text-jeopardy-gold">{r.finalScore}</td>
                 <td className="p-2 text-right text-green-400">{r.correct}</td>
                 <td className="p-2 text-right text-red-400">{r.wrong}</td>
                 <td className="p-2 text-right">{r.accuracy}%</td>

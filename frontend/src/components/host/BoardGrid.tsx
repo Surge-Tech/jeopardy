@@ -40,7 +40,7 @@ export default function BoardGrid({
                     isAnswered ? 'bg-gray-900 text-gray-700 cursor-not-allowed' :
                     'bg-jeopardy-blue text-jeopardy-gold hover:brightness-125'}`}
               >
-                {isAnswered ? '—' : `$${pv}`}
+                {isAnswered ? '—' : pv}
                 {q.isDailyDouble && !isAnswered && (
                   <span className="absolute top-1 right-1 bg-yellow-400 text-black text-[9px] font-black px-1 rounded leading-tight">DD</span>
                 )}

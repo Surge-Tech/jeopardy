@@ -45,7 +45,7 @@ export default function ActiveQuestionPanel({
 
   return (
     <div className="space-y-3">
-      <div className="text-jeopardy-gold font-black text-xl">${activeQ.value}</div>
+      <div className="text-jeopardy-gold font-black text-xl">{activeQ.value}</div>
 
       <div className="bg-gray-800 rounded p-3 text-sm text-white leading-relaxed">{activeQ.clue}</div>
 

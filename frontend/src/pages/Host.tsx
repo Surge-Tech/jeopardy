@@ -127,9 +127,9 @@ export default function Host() {
     const boardHighValue = Math.max(...round.pointValues);
     socket.emit(SOCKET_EVENTS.HOST_OPEN_QUESTION, { roomCode, questionId: q.id, isDailyDouble: !!q.isDailyDouble, boardHighValue });
     if (q.isDailyDouble) {
-      addLog({ type: 'dd', msg: `Daily Double opened — $${q.value} (${getCatName(q)})` });
+      addLog({ type: 'dd', msg: `Daily Double opened — ${q.value} (${getCatName(q)})` });
     } else {
-      addLog({ type: 'open', msg: `Opened $${q.value} — ${getCatName(q)}` });
+      addLog({ type: 'open', msg: `Opened ${q.value} — ${getCatName(q)}` });
     }
   }
 
@@ -141,7 +141,7 @@ export default function Host() {
   function closeQuestion() {
     setBuzzWinner(null);
     setBuzzWinnerId(null);
-    const label = activeQ ? `$${activeQ.value} — ${getCatName(activeQ)}` : 'question';
+    const label = activeQ ? `${activeQ.value} — ${getCatName(activeQ)}` : 'question';
     socket.emit(SOCKET_EVENTS.HOST_CLOSE_QUESTION, { roomCode });
     addLog({ type: 'close', msg: `Closed ${label} (no score)` });
   }
@@ -177,9 +177,9 @@ export default function Host() {
     const player = gameState!.players.find(p => p.id === playerId);
     socket.emit(SOCKET_EVENTS.HOST_SCORE, { roomCode, playerId, delta, outcome: correct ? 'correct' : 'wrong', isDailyDouble: isDD });
     if (correct) {
-      addLog({ type: 'correct', msg: `${player?.name} answered correctly (+$${value})`, player: player?.name });
+      addLog({ type: 'correct', msg: `${player?.name} answered correctly (+${value})`, player: player?.name });
     } else {
-      addLog({ type: 'wrong', msg: `${player?.name} answered wrong (-$${value})`, player: player?.name });
+      addLog({ type: 'wrong', msg: `${player?.name} answered wrong (-${value})`, player: player?.name });
     }
     // close without double-logging
     setBuzzWinner(null);
@@ -191,7 +191,7 @@ export default function Host() {
     const value = activeQ?.value ?? 0;
     const player = gameState!.players.find(p => p.id === playerId);
     socket.emit(SOCKET_EVENTS.HOST_WRONG_REOPEN, { roomCode, playerId, delta: -value });
-    addLog({ type: 'wrong', msg: `${player?.name ?? 'Player'} answered wrong (-$${value})`, player: player?.name });
+    addLog({ type: 'wrong', msg: `${player?.name ?? 'Player'} answered wrong (-${value})`, player: player?.name });
     setBuzzWinner(null);
     setBuzzWinnerId(null);
   }

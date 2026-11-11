@@ -67,10 +67,10 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
             <div key={c.playerId} className={`bg-gray-800 rounded p-2 text-xs ${isCurrent ? 'ring-2 ring-jeopardy-gold' : ''}`}>
               <div className="flex justify-between items-center">
                 <span className="font-bold">{c.playerName}</span>
-                <span className="text-gray-500">max ${c.maxWager}</span>
+                <span className="text-gray-500">max {c.maxWager}</span>
               </div>
               <div className="text-gray-400 mt-1">
-                Wager: <span className="text-white">{wager !== undefined ? `$${wager}` : '—'}</span>
+                Wager: <span className="text-white">{wager ?? '—'}</span>
               </div>
               <div className="text-gray-400 truncate">
                 Answer: <span className="text-white">{answer || (draft ? `(typing) ${draft}` : '—')}</span>
@@ -104,7 +104,7 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
               className={`w-full font-bold py-2 rounded ${missing.length ? 'bg-orange-600 hover:bg-orange-500 text-white' : 'bg-jeopardy-gold text-jeopardy-dark'}`}
               onClick={() => socket.emit(SOCKET_EVENTS.HOST_FJ_REVEAL_CLUE, { roomCode, force: missing.length > 0 })}
             >
-              {missing.length ? `Force reveal — ${missing.length} missing wager(s) = $0` : 'Reveal Clue'}
+              {missing.length ? `Force reveal — ${missing.length} missing wager(s) = 0` : 'Reveal Clue'}
             </button>
           );
         })()}

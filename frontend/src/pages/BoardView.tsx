@@ -179,7 +179,8 @@ export default function BoardView() {
 
       {/* Question overlay — shown after DD reveal or immediately for regular questions */}
       {showQuestion && !isDDSplash && (
-        <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col items-center justify-center p-8 flip-in">
+        <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col overflow-y-auto p-8 flip-in">
+          <div className="my-auto flex w-full shrink-0 flex-col items-center">
           <div className="text-jeopardy-gold font-black text-2xl mb-4 tracking-widest">
             ${showQuestion.value}
             {showQuestion.isDailyDouble && (
@@ -192,10 +193,10 @@ export default function BoardView() {
             <img src={showQuestion.mediaUrl} alt="clue" className="max-h-64 max-w-full object-contain mb-6 rounded" />
           )}
           {showQuestion.mediaType === 'video' && showQuestion.mediaUrl && (
-            <video src={showQuestion.mediaUrl} autoPlay controls className="max-h-64 max-w-2xl mb-6 rounded w-full" />
+            <video src={showQuestion.mediaUrl} autoPlay controls className="max-h-[60dvh] object-contain mb-6 rounded w-full" />
           )}
           {showQuestion.mediaType === 'youtube' && showQuestion.mediaUrl && (
-            <div className="mb-6 w-full max-w-2xl aspect-video">
+            <div className="mb-6 w-full aspect-video max-h-[60dvh]">
               <iframe
                 className="w-full h-full rounded"
                 src={getYouTubeEmbedUrl(showQuestion.mediaUrl)}
@@ -235,7 +236,7 @@ export default function BoardView() {
 
           {/* Buzz order panel */}
           {gameState?.buzzQueue && gameState.buzzQueue.length > 0 && (
-            <div className="absolute bottom-4 right-4 bg-gray-900 bg-opacity-90 border border-gray-600 rounded-lg p-3 text-sm min-w-[160px]">
+            <div className="mt-6 self-end bg-gray-900 bg-opacity-90 border border-gray-600 rounded-lg p-3 text-sm min-w-[160px]">
               <div className="text-[10px] text-gray-500 uppercase mb-2">Buzz Order</div>
               {gameState.buzzQueue.map((entry, i) => (
                 <div
@@ -253,6 +254,7 @@ export default function BoardView() {
               ))}
             </div>
           )}
+          </div>
         </div>
       )}
 

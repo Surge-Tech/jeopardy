@@ -36,6 +36,13 @@ export default function Host() {
 
   useEffect(() => {
     fetch(`${API}/boards/${boardId}`).then(r => r.json()).then(setBoard);
+    const storageKey = `jeopardy:host-room:${boardId}`;
+    let savedRoom: string | null = null;
+    try { savedRoom = window.sessionStorage.getItem(storageKey); } catch { /* Storage may be disabled. */ }
+
+    function startSession() {
+      socket.emit(SOCKET_EVENTS.HOST_CREATE, { boardId, roomCode: savedRoom ?? undefined });
+    }
 
     socket.on(SOCKET_EVENTS.GAME_STATE, (state: GameState) => {
       setGameState(state);
@@ -46,11 +53,17 @@ export default function Host() {
       setBuzzWinnerId(playerId);
       addLog({ type: 'buzz', msg: `${playerName} buzzed in`, player: playerName });
     });
-    socket.on(SOCKET_EVENTS.HOST_CREATED, ({ roomCode: rc, state }: { roomCode: string; state: GameState }) => {
+    socket.on(SOCKET_EVENTS.HOST_CREATED, ({ roomCode: rc, state, resumed }: { roomCode: string; state: GameState; resumed?: boolean }) => {
+      savedRoom = rc;
+      try { window.sessionStorage.setItem(storageKey, rc); } catch { /* Storage may be disabled. */ }
       setRoomCode(rc);
       setGameState(state);
-      clearLog();
-      addLog({ type: 'open', msg: 'Game session started' });
+      setBuzzWinner(state.buzzedPlayerName);
+      setBuzzWinnerId(state.buzzedPlayerId);
+      if (!resumed) {
+        clearLog();
+        addLog({ type: 'open', msg: 'Game session started' });
+      }
     });
     socket.on(SOCKET_EVENTS.FJ_HOST_LOG, ({ msg }: { msg: string }) => {
       addLog({ type: 'fj', msg });
@@ -61,9 +74,15 @@ export default function Host() {
       addLog({ type: 'buzz', msg: `Queue advance → ${playerName}`, player: playerName });
     });
 
-    socket.emit(SOCKET_EVENTS.HOST_CREATE, { boardId });
+    socket.on('connect', startSession);
+    // Defer until after React's StrictMode effect cleanup/replay so a fresh
+    // mount on an already-connected socket creates only one room.
+    let disposed = false;
+    if (socket.connected) queueMicrotask(() => { if (!disposed) startSession(); });
 
     return () => {
+      disposed = true;
+      socket.off('connect', startSession);
       socket.off('game:state');
       socket.off('buzz:winner');
       socket.off('host:created');
@@ -71,16 +90,6 @@ export default function Host() {
       socket.off('buzz:next-in-queue');
     };
   }, [boardId]);
-
-  // Re-join the host:<roomCode> room after a socket reconnect (WiFi blip,
-  // laptop sleep, backend restart) so host-only socket events keep working.
-  useEffect(() => {
-    function rejoinAsHost() {
-      if (roomCode) socket.emit(SOCKET_EVENTS.HOST_JOIN, { roomCode });
-    }
-    socket.on('connect', rejoinAsHost);
-    return () => { socket.off('connect', rejoinAsHost); };
-  }, [roomCode]);
 
   useEffect(() => {
     if (!gameState || !board) return;
@@ -264,6 +273,7 @@ export default function Host() {
 
   function closeRoom() {
     if (!confirm('Close this room? This ends the session for everyone and cannot be undone.')) return;
+    try { window.sessionStorage.removeItem(`jeopardy:host-room:${boardId}`); } catch { /* Storage may be disabled. */ }
     socket.emit(SOCKET_EVENTS.HOST_END, { roomCode });
     navigate('/');
   }

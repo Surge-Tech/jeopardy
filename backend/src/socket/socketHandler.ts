@@ -87,12 +87,14 @@ export function registerSocketHandlers(io: Server) {
     registerFinalHandlers(io, socket, socketPlayers);
 
     // ── HOST: create a game session ──────────────────────────────────────
-    socket.on(SOCKET_EVENTS.HOST_CREATE, ({ boardId }: { boardId: string }) => {
-      const session = gm.createSession(boardId);
+    socket.on(SOCKET_EVENTS.HOST_CREATE, ({ boardId, roomCode }: { boardId: string; roomCode?: string }) => {
+      const existing = roomCode ? gm.getSession(roomCode) : undefined;
+      const resumed = existing?.boardId === boardId;
+      const session = resumed ? existing! : gm.createSession(boardId);
       socket.join(session.roomCode);
       socket.join(`host:${session.roomCode}`);
       socket.join(`hostpanel:${session.roomCode}`);
-      socket.emit(SOCKET_EVENTS.HOST_CREATED, { roomCode: session.roomCode, state: session });
+      socket.emit(SOCKET_EVENTS.HOST_CREATED, { roomCode: session.roomCode, state: session, resumed });
     });
 
     // ── HOST: rejoin an existing session ────────────────────────────────

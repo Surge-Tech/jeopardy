@@ -35,7 +35,7 @@ Game sessions are **in-memory only** (`backend/src/socket/gameManager.ts`), keye
 
 ## Data Model
 
-Canonical types live in `backend/src/types.ts` (frontend has a mirrored copy in `frontend/src/types.ts`).
+Canonical types live in `backend/src/shared/types.ts`, imported by the frontend through `@shared/types` and re-exported by `backend/src/types.ts`.
 
 | Type | Purpose |
 |---|---|
@@ -78,7 +78,13 @@ $DATA_DIR/
 
 ## REST API
 
-Base path: `/api`. All bodies are JSON.
+Base path: `/api`. Board request bodies are JSON (`Content-Type: application/json`); media uploads use multipart form data. The backend defaults to `http://localhost:3001`; use the deployed origin when editing a remote instance.
+
+### Authentication
+
+Board and media reads do not require authentication. All board and media writes require the `X-Host-Passcode` request header when the server's `HOST_PASSCODE` environment variable is set. Missing or incorrect credentials return `401` with `{ "error": "Invalid or missing host passcode" }`. Development permits writes without the header when no passcode is configured; production refuses to start without a passcode. See `backend/src/middleware/requireHostPasscode.ts`.
+
+Keep the passcode in a private environment variable or credential store; do not put its value in board JSON, documentation, or committed scripts.
 
 ### Boards — `backend/src/routes/boards.ts`
 
@@ -89,6 +95,45 @@ Base path: `/api`. All bodies are JSON.
 | `POST` | `/api/boards` | `Partial<Board>` (accepts either `rounds` or legacy `categories`/`pointValues`) | `201` + `Board` | Missing fields get defaults (one empty round, `[200,400,600,800,1000]` point values). |
 | `PUT` | `/api/boards/:id` | `Partial<Board>` | `Board` | Shallow-merges onto the existing (normalized) board; 404 if not found. |
 | `DELETE` | `/api/boards/:id` | — | `204` | 404 if not found. |
+
+#### Content payloads and updates
+
+Questions use `clue` for the prompt and `response` for the correct answer. The following is a minimal creation payload with one category and one question (a full round normally has more):
+
+```json
+{
+  "name": "Geography Night",
+  "rounds": [
+    {
+      "id": "be648575-7ec4-441c-8412-bd3053da37fe",
+      "name": "Jeopardy!",
+      "pointValues": [200],
+      "categories": [
+        {
+          "id": "07dc12fa-c4a4-49b1-a084-90c7d580dbb8",
+          "name": "European Capitals",
+          "questions": [
+            {
+              "id": "541bd1a4-956b-48b5-8561-114a87583698",
+              "value": 200,
+              "clue": "This city is the capital of Denmark.",
+              "response": "What is Copenhagen?"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+`POST` generates the board ID and timestamps, but callers must supply IDs for nested rounds, categories, and questions. Generate fresh UUIDs for new items; preserve IDs when editing existing items. Question IDs must be unique across the board. In a normal grid, every category has one question for each entry in its round's `pointValues`, in the same order and with matching `value` fields.
+
+Optional question fields are `isDailyDouble`, `mediaType` (`image`, `video`, or `youtube`), and `mediaUrl`. Optional top-level `finalJeopardy` contains `category`, `clue`, `response`, and optional `mediaType`, `mediaUrl`, and `timerSeconds`. See the canonical shared types for the complete schema.
+
+`PUT` merges only top-level properties: sending `rounds` replaces the entire rounds array, including all categories and questions. There are no individual category/question endpoints. Fetch the full board, change the intended items, and send the complete modified `rounds` array while preserving unrelated content. Omitted top-level properties are retained; send `"finalJeopardy": null` to remove Final Jeopardy (runtime storage accepts this although the TypeScript interface models only an optional object).
+
+The API has no schema validation or conditional update support (such as `If-Match`). Validate payloads before writing, and avoid concurrent edits: re-read the board before saving and reconcile if `updatedAt` changed. Read it back after saving to verify the intended content persisted. A successful response alone does not prove the board has a playable shape. If a creation request times out, check the board list before retrying to avoid creating duplicates.
 
 ### Media — `backend/src/routes/media.ts`
 

@@ -191,7 +191,7 @@ export default function BoardView() {
 
           {/* Media */}
           {showQuestion.mediaType === 'image' && showQuestion.mediaUrl && (
-            <img src={showQuestion.mediaUrl} alt="clue" className="max-h-64 max-w-full object-contain mb-6 rounded" />
+            <img src={showQuestion.mediaUrl} alt="clue" className="max-h-[60dvh] object-contain mb-6 rounded w-full" />
           )}
           {(!gameState.responseVisible || !showQuestion.responseMediaUrl) && showQuestion.mediaType === 'audio' && showQuestion.mediaUrl && (
             <audio key={`${showQuestion.id}:${showQuestion.mediaUrl}`} src={showQuestion.mediaUrl} autoPlay controls aria-label="Clue audio" className="mb-6 w-full max-w-2xl" />

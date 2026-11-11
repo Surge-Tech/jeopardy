@@ -178,8 +178,8 @@ export default function BoardView() {
         </div>
       )}
 
-      {/* Question overlay — shown after DD reveal or immediately for regular questions */}
-      {showQuestion && !isDDSplash && (
+      {/* Question overlay — shown only after the host reveals the clue */}
+      {showQuestion && !isDDSplash && (showQuestion.isDailyDouble || gameState.clueVisible) && (
         <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col overflow-y-auto p-8 flip-in">
           <div className="my-auto flex w-full shrink-0 flex-col items-center">
           <div className="text-jeopardy-gold font-black text-2xl mb-4 tracking-widest">

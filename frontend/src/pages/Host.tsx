@@ -9,6 +9,7 @@ import DDHostPanel from '../components/dailydouble/DDHostPanel';
 import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
 import { PLAYER_COLORS } from '../utils/colors';
+import { getQuestionShortcut } from '../utils/questionShortcuts';
 import ShareLink from '../components/host/ShareLink';
 import BoardGrid from '../components/host/BoardGrid';
 import ActiveQuestionPanel from '../components/host/ActiveQuestionPanel';
@@ -88,6 +89,25 @@ export default function Host() {
     setActiveQ(q ?? null);
   }, [gameState?.activeQuestionId, board, gameState?.currentRoundIndex]);
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ||
+          target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (!gameState?.activeQuestionId || gameState.phase === 'finished' || gameState.finalJeopardy || !activeQ) return;
+      if (activeQ.isDailyDouble) return;
+      const action = getQuestionShortcut(event, gameState);
+      if (!action) return;
+      event.preventDefault();
+      if (action === 'reveal') revealClue();
+      else if (action === 'open') enableBuzzer();
+      else if (action === 'response') showAnswer();
+      else if (action === 'close') closeQuestion();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [gameState, activeQ, roomCode]);
+
   if (!board || !gameState || !roomCode) {
     return <div className="flex items-center justify-center h-screen text-gray-400">Starting game session...</div>;
   }
@@ -124,6 +144,10 @@ export default function Host() {
     const label = activeQ ? `$${activeQ.value} — ${getCatName(activeQ)}` : 'question';
     socket.emit(SOCKET_EVENTS.HOST_CLOSE_QUESTION, { roomCode });
     addLog({ type: 'close', msg: `Closed ${label} (no score)` });
+  }
+
+  function revealClue() {
+    socket.emit(SOCKET_EVENTS.HOST_REVEAL_CLUE, { roomCode });
   }
 
   function enableBuzzer() {
@@ -400,6 +424,8 @@ export default function Host() {
             ) : activeQ ? (
               <ActiveQuestionPanel
                 activeQ={activeQ}
+                clueVisible={gameState.clueVisible}
+                onRevealClue={revealClue}
                 responseVisible={gameState.responseVisible}
                 buzzerState={gameState.buzzerState}
                 buzzWinner={buzzWinner}

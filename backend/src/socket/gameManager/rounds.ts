@@ -34,6 +34,7 @@ export function advanceRound(roomCode: string, roundCount: number): { ok: boolea
   session.currentRoundIndex += 1;
   session.activeQuestionId = null;
   resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
+  session.clueVisible = false;
   session.dailyDoubleRevealed = false;
   session.responseVisible = false;
   session.dailyDouble = null;

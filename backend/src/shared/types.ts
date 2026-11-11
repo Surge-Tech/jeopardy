@@ -137,6 +137,7 @@ export interface GameState {
   buzzedPlayerName: string | null;
   buzzTimestamp: number | null;
   phase: 'lobby' | 'playing' | 'finished';
+  clueVisible: boolean;  // regular clue explicitly revealed by host
   dailyDoubleRevealed: boolean;  // false until host clicks "Reveal Question"
   responseVisible: boolean;       // true after host clicks "Show Answer"
   finalJeopardy: FinalPublicState | null;

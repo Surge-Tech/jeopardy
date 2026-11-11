@@ -4,6 +4,8 @@ import { PERMANENT_LOCKOUT } from '@shared/types';
 
 export default function ActiveQuestionPanel({
   activeQ,
+  clueVisible,
+  onRevealClue,
   responseVisible,
   buzzerState,
   buzzWinner,
@@ -21,6 +23,8 @@ export default function ActiveQuestionPanel({
   onClose,
 }: {
   activeQ: Question;
+  clueVisible: boolean;
+  onRevealClue: () => void;
   responseVisible: boolean;
   buzzerState: 'idle' | 'open' | 'locked';
   buzzWinner: string | null;
@@ -53,15 +57,18 @@ export default function ActiveQuestionPanel({
       </div>
 
       {/* Show on board button — only relevant until revealed */}
-      {!responseVisible && (
-        <button className="btn-ghost text-sm w-full" onClick={onShowAnswer}>Show Answer on Board</button>
+      {clueVisible && !responseVisible && (
+        <button className="btn-ghost text-sm w-full" onClick={onShowAnswer}>Show Answer on Board (R)</button>
       )}
 
       {/* Buzzer controls */}
       <div className="space-y-2">
-        {buzzerState === 'idle' && (
+        {!clueVisible && (
+          <button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded" onClick={onRevealClue}>Show Clue (Space)</button>
+        )}
+        {clueVisible && buzzerState === 'idle' && (
           <button className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors" onClick={onEnableBuzzer}>
-            🔔 Open Buzzers
+            🔔 Open Buzzers (Space)
           </button>
         )}
         {buzzerState === 'open' && (
@@ -134,7 +141,7 @@ export default function ActiveQuestionPanel({
         </div>
       )}
 
-      <button className="btn-danger text-sm w-full" onClick={onClose}>Close Question</button>
+      <button className="btn-danger text-sm w-full" onClick={onClose}>Close Question{responseVisible ? ' (Space)' : ''}</button>
     </div>
   );
 }

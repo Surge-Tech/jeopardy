@@ -24,6 +24,7 @@ export function createSession(boardId: string): GameState {
     buzzedPlayerName: null,
     buzzTimestamp: null,
     phase: 'lobby',
+    clueVisible: false,
     dailyDoubleRevealed: false,
     responseVisible: false,
     finalJeopardy: null,

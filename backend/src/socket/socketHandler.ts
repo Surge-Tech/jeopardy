@@ -178,7 +178,7 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: open buzzer ────────────────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_ENABLE_BUZZER, ({ roomCode }: { roomCode: string }) => {
-      gm.enableBuzzer(roomCode);
+      if (!gm.enableBuzzer(roomCode)) return;
       buzzOpenedAt.set(roomCode, Date.now());
       startAutoLockTimer(io, roomCode);
       io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
@@ -187,7 +187,7 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: reset buzzer (allow re-buzz) ───────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_RESET_BUZZER, ({ roomCode }: { roomCode: string }) => {
-      gm.resetBuzzer(roomCode);
+      if (!gm.resetBuzzer(roomCode)) return;
       buzzOpenedAt.set(roomCode, Date.now());
       startAutoLockTimer(io, roomCode);
       io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
@@ -242,6 +242,11 @@ export function registerSocketHandlers(io: Server) {
     // ── HOST: reveal DD clue (after DD splash screen) ────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_REVEAL_DD, ({ roomCode }: { roomCode: string }) => {
       gm.revealDailyDouble(roomCode);
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+
+    onHost(socket, SOCKET_EVENTS.HOST_REVEAL_CLUE, ({ roomCode }: { roomCode: string }) => {
+      if (!gm.revealClue(roomCode)) return;
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
@@ -403,7 +408,7 @@ export function registerSocketHandlers(io: Server) {
         });
         startAutoLockTimer(io, roomCode);
       } else {
-        gm.resetBuzzer(roomCode);
+        if (!gm.resetBuzzer(roomCode)) return;
         buzzOpenedAt.set(roomCode, Date.now());
         io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
         io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));

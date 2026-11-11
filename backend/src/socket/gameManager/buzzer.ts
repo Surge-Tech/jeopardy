@@ -7,9 +7,17 @@ export function openQuestion(roomCode: string, questionId: string, isDailyDouble
   const session = sessions.get(roomCode);
   if (!session) return false;
   session.activeQuestionId = questionId;
+  session.clueVisible = false;
   resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
-  session.dailyDoubleRevealed = !isDailyDouble; // DD starts unrevealed; regular questions start revealed
+  session.dailyDoubleRevealed = !isDailyDouble; // Daily Double splash is separate from regular clue visibility
   session.responseVisible = false;
+  return true;
+}
+
+export function revealClue(roomCode: string): boolean {
+  const session = sessions.get(roomCode);
+  if (!session?.activeQuestionId || session.dailyDouble || session.phase === 'finished') return false;
+  session.clueVisible = true;
   return true;
 }
 
@@ -28,6 +36,7 @@ export function closeQuestion(roomCode: string): boolean {
   }
   session.activeQuestionId = null;
   resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
+  session.clueVisible = false;
   session.dailyDoubleRevealed = false;
   session.responseVisible = false;
   session.dailyDouble = null;
@@ -36,14 +45,16 @@ export function closeQuestion(roomCode: string): boolean {
 
 export function enableBuzzer(roomCode: string): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session?.activeQuestionId || session.phase === 'finished') return false;
+  if (session.dailyDouble || !session.clueVisible) return false;
   resetBuzzerFields(session, { buzzerState: 'open' });
   return true;
 }
 
 export function resetBuzzer(roomCode: string): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session?.activeQuestionId || session.phase === 'finished') return false;
+  if (session.dailyDouble || !session.clueVisible) return false;
   resetBuzzerFields(session, { buzzerState: 'open' });
   return true;
 }

@@ -41,6 +41,7 @@ export const SOCKET_EVENTS = {
   HOST_ADD_PLAYER: 'host:add-player',
   HOST_REMOVE_PLAYER: 'host:remove-player',
   HOST_RENAME_PLAYER: 'host:rename-player',
+  HOST_REVEAL_CLUE: 'host:reveal-clue',
   HOST_OPEN_QUESTION: 'host:open-question',
   HOST_CLOSE_QUESTION: 'host:close-question',
   HOST_SHOW_RESPONSE: 'host:show-response',

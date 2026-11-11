@@ -11,7 +11,7 @@ import Editor from '../src/pages/Editor';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { FinalJeopardyBoard, GameState } from '../../backend/src/shared/types';
 
-test('answer images, videos and YouTube render with manual playback for host previews', () => {
+test('answer media uses manual playback in host previews and autoplay on the board', () => {
   assert.equal(renderToStaticMarkup(<ResponseMedia />), '');
   const image = renderToStaticMarkup(<ResponseMedia responseMediaType="image" responseMediaUrl="/answer.png" />);
   assert.match(image, /<img/);
@@ -21,6 +21,7 @@ test('answer images, videos and YouTube render with manual playback for host pre
   assert.match(renderToStaticMarkup(<ResponseMedia responseMediaType="video" responseMediaUrl="/answer.mp4" autoPlay />), /autoPlay/i);
   const youtube = renderToStaticMarkup(<ResponseMedia responseMediaType="youtube" responseMediaUrl="https://youtu.be/dQw4w9WgXcQ" />);
   assert.match(youtube, /autoplay=0/);
+  assert.match(renderToStaticMarkup(<ResponseMedia responseMediaType="youtube" responseMediaUrl="https://youtu.be/dQw4w9WgXcQ" autoPlay />), /autoplay=1/);
 });
 
 test('Final Jeopardy screen hides answer media until the correct response stage', () => {

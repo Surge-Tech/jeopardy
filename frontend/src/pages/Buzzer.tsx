@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { GameState } from '@shared/types';
+import { PERMANENT_LOCKOUT } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
 import { LIMITS } from '@shared/limits';
 import PlayerFinal from '../components/final/PlayerFinal';
@@ -11,7 +12,7 @@ import Leaderboard from '../components/shared/Leaderboard';
 import { randomPlayerColor } from '../utils/colors';
 import { formatScore } from '../utils/format';
 
-type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'armed' | 'open' | 'winner' | 'too-late' | 'locked-out' | 'finished' | 'closed';
+type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'armed' | 'open' | 'winner' | 'too-late' | 'locked-out' | 'incorrect' | 'finished' | 'closed';
 
 function rejoinKey(roomCode: string | undefined) {
   return `jeopardy:player:${roomCode ?? ''}`;
@@ -20,7 +21,7 @@ function rejoinKey(roomCode: string | undefined) {
 export default function Buzzer() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const { gameState, setGameState, setMyPlayer } = useGameStore();
-  const [phase, setPhase] = useState<BuzzerPhase>('join');
+  const [buzzerPhase, setPhase] = useState<BuzzerPhase>('join');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [winnerName, setWinnerName] = useState('');
@@ -28,6 +29,14 @@ export default function Buzzer() {
   const [editingName, setEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
   const [editNameError, setEditNameError] = useState('');
+
+  // Server lockouts take precedence over broadcasts and transient feedback.
+  // Derive this from game state so it also survives a reconnect or page reload.
+  const isIncorrect = !!gameState?.activeQuestionId
+    && gameState.buzzLockouts[myId] === PERMANENT_LOCKOUT;
+  const phase: BuzzerPhase = isIncorrect && gameState?.phase !== 'finished'
+    && buzzerPhase !== 'join' && buzzerPhase !== 'closed'
+    ? 'incorrect' : buzzerPhase;
 
   // Kept in sync with `phase`/`myId` state below so the socket-handler effect
   // can read the current values without needing them in its dependency
@@ -81,6 +90,8 @@ export default function Buzzer() {
       setTimeout(() => setPhase(prev => prev === 'winner' || prev === 'too-late' ? 'waiting' : prev), 5000);
     });
     socket.on(SOCKET_EVENTS.BUZZ_LOCKED_OUT, ({ until }: { until: number }) => {
+      // A wrong-answer lockout ends with the question, never with a timer.
+      if (until === PERMANENT_LOCKOUT) return;
       setPhase('locked-out');
       const delay = Math.max(0, until - Date.now());
       setTimeout(() => setPhase(prev => prev === 'locked-out' ? 'armed' : prev), delay);
@@ -253,6 +264,20 @@ export default function Buzzer() {
             Wait...
           </button>
           <p className="text-gray-500 font-bold mt-6">Get ready</p>
+        </div>
+      )}
+
+      {/* Wrong answer — ineligible for the rest of this question */}
+      {!gameState?.finalJeopardy && !isDDWagering && phase === 'incorrect' && (
+        <div className="text-center" role="status">
+          <h2 className="text-3xl font-black text-red-400 mb-2">Incorrect answer</h2>
+          <p className="text-gray-400 mb-6">Wait for the next question</p>
+          <button
+            disabled
+            className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 text-gray-500 text-xl font-bold cursor-not-allowed"
+          >
+            Locked out
+          </button>
         </div>
       )}
 

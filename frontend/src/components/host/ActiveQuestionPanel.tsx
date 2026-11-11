@@ -1,3 +1,4 @@
+import ResponseMedia from '../shared/ResponseMedia';
 import type { BuzzEntry, Player, Question } from '@shared/types';
 import { PERMANENT_LOCKOUT } from '@shared/types';
 
@@ -48,6 +49,7 @@ export default function ActiveQuestionPanel({
       <div className="bg-green-950 border border-green-700 rounded p-3 text-sm text-green-300">
         <div className="text-[10px] text-gray-500 uppercase mb-1">Answer</div>
         {activeQ.response}
+        <ResponseMedia {...activeQ} />
       </div>
 
       {/* Show on board button — only relevant until revealed */}

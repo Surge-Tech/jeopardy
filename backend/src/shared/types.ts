@@ -12,6 +12,8 @@ export interface Question {
   value: number;
   clue: string;
   response: string;
+  responseMediaType?: 'image' | 'video' | 'youtube';
+  responseMediaUrl?: string;
   mediaType?: 'image' | 'video' | 'youtube';
   mediaUrl?: string;
   isDailyDouble?: boolean;
@@ -27,6 +29,8 @@ export interface FinalJeopardyBoard {
   category: string;
   clue: string;
   response: string;
+  responseMediaType?: 'image' | 'video' | 'youtube';
+  responseMediaUrl?: string;
   mediaType?: 'image' | 'video' | 'youtube';
   mediaUrl?: string;
   timerSeconds?: number;
@@ -96,6 +100,8 @@ export interface FinalPublicState {
   currentReveal: { wager: number; answer: string } | null;
   revealed: Record<string, FinalRevealEntry>;
   response: string | null;
+  responseMediaType?: 'image' | 'video' | 'youtube';
+  responseMediaUrl?: string;
 }
 
 export interface DailyDoubleState {

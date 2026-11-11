@@ -1,3 +1,4 @@
+import ResponseMedia from '../shared/ResponseMedia';
 import { useState } from 'react';
 import { socket } from '../../socket';
 import type { GameState, Question } from '@shared/types';
@@ -108,6 +109,7 @@ export default function DDHostPanel({
               <div className="bg-green-950 border border-green-700 rounded p-3 text-sm text-green-300">
                 <div className="text-[10px] text-gray-500 uppercase mb-1">Answer</div>
                 {activeQ.response}
+                <ResponseMedia {...activeQ} />
               </div>
               <div className="flex gap-2">
                 <button className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded" onClick={() => onAward(player.id, true)}>

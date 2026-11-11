@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Board, Category, Question, FinalJeopardyBoard, Round } from '@shared/types';
 import FinalJeopardyEditor from '../components/final/FinalJeopardyEditor';
 import { hostFetch } from '../lib/hostAuth';
+import MediaEditor from '../components/shared/MediaEditor';
 
 const API = '/api';
 
@@ -282,7 +283,7 @@ export default function Editor() {
                   {round.categories.map((cat, ci) => {
                     const q = cat.questions[qi];
                     if (!q) return <td key={ci} />;
-                    const hasContent = q.clue || q.response || q.mediaUrl;
+                    const hasContent = q.clue || q.response || q.mediaUrl || q.responseMediaUrl;
                     return (
                       <td key={cat.id} className="p-1">
                         <button
@@ -315,6 +316,7 @@ export default function Editor() {
       {/* Question editor panel */}
       {editingQuestion && activeQ && (
         <QuestionEditor
+          key={activeQ.id}
           question={activeQ}
           onChange={updates => updateQuestion(editingQuestion.catIdx, editingQuestion.qIdx, updates)}
           onClose={() => { save(board); setEditingQuestion(null); }}
@@ -342,98 +344,56 @@ function QuestionEditor({
 }) {
   const [uploading, setUploading] = useState(false);
 
-  async function handleFileUpload(file: File) {
-    setUploading(true);
-    const form = new FormData();
-    form.append('file', file);
-    try {
-      const res = await hostFetch('/api/media/upload', { method: 'POST', body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Upload failed');
-      onChange({ mediaType: data.mediaType, mediaUrl: data.url });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  }
-
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 border-2 border-jeopardy-gold rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <h2 className="text-xl font-bold text-jeopardy-gold">${question.value} Question</h2>
-          <button className="text-gray-400 hover:text-white text-2xl" onClick={onClose}>✕</button>
+          <button className="text-gray-400 hover:text-white text-2xl" onClick={onClose} disabled={uploading}>✕</button>
         </div>
 
         <div className="p-4 space-y-4">
-          {/* Clue */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Clue (shown to contestants)</label>
-            <textarea
-              className="input-field h-24 resize-none"
-              placeholder="This is the clue displayed on screen..."
-              value={question.clue}
-              onChange={e => onChange({ clue: e.target.value })}
-            />
-          </div>
-
-          {/* Response */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Response (correct answer)</label>
-            <input
-              className="input-field"
-              placeholder="What is...?"
-              value={question.response}
-              onChange={e => onChange({ response: e.target.value })}
-            />
-          </div>
-
-          {/* Media */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Media (optional)</label>
-            <div className="flex gap-2 mb-3 flex-wrap">
-              <label className={`btn-ghost text-sm py-1 px-3 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
-                {uploading ? 'Uploading...' : '📁 Upload Image/Video'}
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*,video/*"
-                  disabled={uploading}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
-                />
-              </label>
-              <button
-                className="btn-ghost text-sm py-1 px-3"
-                onClick={() => onChange({ mediaType: 'youtube', mediaUrl: '' })}
-              >▶ YouTube URL</button>
-              {question.mediaUrl && (
-                <button
-                  className="btn-danger text-sm py-1 px-3"
-                  onClick={() => onChange({ mediaType: undefined, mediaUrl: undefined })}
-                >Remove Media</button>
-              )}
+          <fieldset className="rounded-lg border border-gray-700 bg-gray-800/30 p-4 space-y-3">
+            <legend className="px-2 text-lg font-bold text-jeopardy-gold">Clue</legend>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Clue (shown to contestants)</label>
+              <textarea
+                className="input-field h-24 resize-none"
+                placeholder="This is the clue displayed on screen..."
+                value={question.clue}
+                onChange={e => onChange({ clue: e.target.value })}
+              />
             </div>
+            <MediaEditor
+              disabled={uploading}
+              label="Clue media (optional)"
+              mediaType={question.mediaType}
+              mediaUrl={question.mediaUrl}
+              onChange={onChange}
+              onUploadingChange={setUploading}
+            />
+          </fieldset>
 
-            {question.mediaType === 'youtube' && (
+          <fieldset className="rounded-lg border border-gray-700 bg-gray-800/30 p-4 space-y-3">
+            <legend className="px-2 text-lg font-bold text-jeopardy-gold">Response</legend>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Response (correct answer)</label>
               <input
                 className="input-field"
-                placeholder="https://www.youtube.com/watch?v=..."
-                value={question.mediaUrl ?? ''}
-                onChange={e => onChange({ mediaUrl: e.target.value })}
+                placeholder="What is...?"
+                value={question.response}
+                onChange={e => onChange({ response: e.target.value })}
               />
-            )}
-
-            {question.mediaUrl && question.mediaType === 'image' && (
-              <img src={question.mediaUrl} alt="preview" className="max-h-40 rounded border border-gray-600 mt-2" />
-            )}
-            {question.mediaUrl && question.mediaType === 'video' && (
-              <video src={question.mediaUrl} controls className="max-h-40 rounded border border-gray-600 mt-2 w-full" />
-            )}
-            {question.mediaUrl && question.mediaType === 'youtube' && (
-              <div className="mt-2 text-sm text-gray-400">YouTube video will be embedded during the game.</div>
-            )}
-          </div>
+            </div>
+            <MediaEditor
+              disabled={uploading}
+              label="Response media (shown when the answer is revealed)"
+              mediaType={question.responseMediaType}
+              mediaUrl={question.responseMediaUrl}
+              onChange={({ mediaType, mediaUrl }) => onChange({ responseMediaType: mediaType, responseMediaUrl: mediaUrl })}
+              onUploadingChange={setUploading}
+            />
+          </fieldset>
 
           {/* Daily Double */}
           <label className="flex items-center gap-3 cursor-pointer">

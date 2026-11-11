@@ -1,3 +1,4 @@
+import ResponseMedia from '../shared/ResponseMedia';
 import { useEffect, useState } from 'react';
 import { socket } from '../../socket';
 import type { Board, GameState } from '@shared/types';
@@ -45,6 +46,7 @@ export default function HostFinalPanel({ roomCode, gameState, board }: { roomCod
         <div className="bg-green-950 border border-green-700 rounded p-3 text-sm text-green-300">
           <div className="text-[10px] text-gray-500 uppercase mb-1">Correct Response</div>
           {board.finalJeopardy.response}
+          <ResponseMedia {...board.finalJeopardy} />
         </div>
       )}
 

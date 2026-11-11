@@ -1,3 +1,4 @@
+import ResponseMedia from '../shared/ResponseMedia';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '@shared/types';
 import { useCountdown } from './useCountdown';
@@ -177,10 +178,11 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
       )}
 
       {fj.stage === 'response' && (
-        <div className="text-center fade-up">
+        <div className="text-center fade-up w-full max-w-4xl">
           <div className="text-gray-400 text-xl uppercase tracking-widest mb-3">Correct Response</div>
           <div className="bg-black/60 border-4 border-jeopardy-gold rounded-2xl px-12 py-8 text-jeopardy-gold font-black text-3xl md:text-5xl max-w-4xl" style={{ textShadow: '2px 2px 0 #000' }}>
             {fj.response}
+            <ResponseMedia {...fj} autoPlay />
           </div>
         </div>
       )}

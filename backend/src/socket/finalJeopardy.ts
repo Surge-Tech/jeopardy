@@ -389,6 +389,8 @@ export function showResponse(io: Server, roomCode: string) {
   if (!fj || !secret) return;
   fj.stage = 'response';
   fj.response = secret.board.response;
+  fj.responseMediaType = secret.board.responseMediaType;
+  fj.responseMediaUrl = secret.board.responseMediaUrl;
   setFj(roomCode, fj);
   broadcastState(io, roomCode);
   hostLog(io, roomCode, 'Correct response revealed');

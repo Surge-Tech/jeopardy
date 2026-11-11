@@ -9,6 +9,7 @@ import DDHostPanel from '../components/dailydouble/DDHostPanel';
 import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
 import { PLAYER_COLORS } from '../utils/colors';
+import { hasPendingAnswer } from '@shared/questionFlow';
 import { getQuestionShortcut } from '../utils/questionShortcuts';
 import ShareLink from '../components/host/ShareLink';
 import BoardGrid from '../components/host/BoardGrid';
@@ -122,6 +123,7 @@ export default function Host() {
   }
 
   function openQuestion(q: Question) {
+    if (gameState && hasPendingAnswer(gameState)) return;
     setBuzzWinner(null);
     setBuzzWinnerId(null);
     const boardHighValue = Math.max(...round.pointValues);
@@ -139,6 +141,7 @@ export default function Host() {
   }
 
   function closeQuestion() {
+    if (gameState && hasPendingAnswer(gameState)) return;
     setBuzzWinner(null);
     setBuzzWinnerId(null);
     const label = activeQ ? `${activeQ.value} — ${getCatName(activeQ)}` : 'question';
@@ -151,6 +154,7 @@ export default function Host() {
   }
 
   function enableBuzzer() {
+    if (gameState && hasPendingAnswer(gameState)) return;
     setBuzzWinner(null);
     setBuzzWinnerId(null);
     socket.emit(SOCKET_EVENTS.HOST_ENABLE_BUZZER, { roomCode });
@@ -161,6 +165,7 @@ export default function Host() {
   }
 
   function resetBuzzer() {
+    if (gameState && hasPendingAnswer(gameState)) return;
     setBuzzWinner(null);
     setBuzzWinnerId(null);
     socket.emit(SOCKET_EVENTS.HOST_RESET_BUZZER, { roomCode });
@@ -376,9 +381,9 @@ export default function Host() {
           <Leaderboard gameState={gameState} />
         </div>
       ) : (
-      <div className="flex-1 flex gap-0 overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row gap-0 overflow-hidden">
         {/* Left: Board grid */}
-        <div className="flex-1 overflow-auto p-3">
+        <div className="flex-1 min-w-0 overflow-auto p-3">
           <BoardGrid
             round={round}
             answered={answered}
@@ -405,11 +410,11 @@ export default function Host() {
         </div>
 
         {/* Right panel */}
-        <div className="w-80 bg-gray-900 border-l border-gray-700 flex flex-col overflow-hidden">
+        <div className="w-full lg:w-1/3 shrink-0 bg-gray-900 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col overflow-hidden">
 
           {/* Active question panel */}
-          <div className="p-4 border-b border-gray-700 flex-shrink-0">
-            <h2 className="text-sm font-bold text-gray-400 uppercase mb-3">Active Question</h2>
+          <div className="p-5 xl:p-6 border-b border-gray-700 flex-shrink-0">
+            <h2 className="text-base font-bold text-gray-400 uppercase mb-4">Active Question</h2>
             {gameState.finalJeopardy ? (
               <HostFinalPanel roomCode={roomCode} gameState={gameState} board={board} />
             ) : activeQ?.isDailyDouble && gameState.dailyDouble ? (
@@ -428,8 +433,8 @@ export default function Host() {
                 onRevealClue={revealClue}
                 responseVisible={gameState.responseVisible}
                 buzzerState={gameState.buzzerState}
-                buzzWinner={buzzWinner}
-                buzzWinnerId={buzzWinnerId}
+                buzzWinner={gameState.buzzedPlayerName ?? buzzWinner}
+                buzzWinnerId={gameState.buzzedPlayerId ?? buzzWinnerId}
                 players={gameState.players}
                 buzzLockouts={gameState.buzzLockouts}
                 buzzQueue={gameState.buzzQueue}

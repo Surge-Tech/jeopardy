@@ -204,7 +204,7 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: open a question ────────────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_OPEN_QUESTION, ({ roomCode, questionId, isDailyDouble, boardHighValue }: { roomCode: string; questionId: string; isDailyDouble: boolean; boardHighValue?: number }) => {
-      gm.openQuestion(roomCode, questionId, isDailyDouble);
+      if (!gm.openQuestion(roomCode, questionId, isDailyDouble)) return;
       if (isDailyDouble) {
         const session = gm.getSession(roomCode);
         const lastCorrect = session?.lastCorrectPlayerId ?? null;
@@ -261,9 +261,9 @@ export function registerSocketHandlers(io: Server) {
     // was the last one AND the board has no Final Jeopardy configured — with
     // FJ, or on an earlier round, the host is prompted client-side instead.
     onHost(socket, SOCKET_EVENTS.HOST_CLOSE_QUESTION, async ({ roomCode }: { roomCode: string }) => {
+      if (!gm.closeQuestion(roomCode)) return;
       cancelAutoLockTimer(roomCode);
       buzzOpenedAt.delete(roomCode);
-      gm.closeQuestion(roomCode);
       const session = gm.getSession(roomCode);
       if (session && session.phase !== 'finished') {
         const board = await boardStorage.getBoard(session.boardId);

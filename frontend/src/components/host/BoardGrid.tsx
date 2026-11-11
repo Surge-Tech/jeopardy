@@ -35,7 +35,7 @@ export default function BoardGrid({
                 key={q.id}
                 disabled={isAnswered}
                 onClick={() => !isAnswered && onOpenQuestion(q)}
-                className={`relative border-2 border-black text-center font-black py-3 text-sm transition-all
+                className={`relative border-2 border-black text-center font-black min-h-24 py-6 text-xl transition-all
                   ${isActive ? 'bg-yellow-500 text-black border-yellow-300' :
                     isAnswered ? 'bg-gray-900 text-gray-700 cursor-not-allowed' :
                     'bg-jeopardy-blue text-jeopardy-gold hover:brightness-125'}`}

@@ -1,3 +1,4 @@
+import { hasPendingAnswer } from '../../shared/questionFlow.js';
 import type { BuzzEntry } from '../../types.js';
 import { sessions, resetBuzzerFields, PERMANENT_LOCKOUT } from './state.js';
 
@@ -6,6 +7,7 @@ import { sessions, resetBuzzerFields, PERMANENT_LOCKOUT } from './state.js';
 export function openQuestion(roomCode: string, questionId: string, isDailyDouble: boolean): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
+  if (hasPendingAnswer(session)) return false;
   session.activeQuestionId = questionId;
   session.clueVisible = false;
   resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
@@ -31,6 +33,7 @@ export function showResponse(roomCode: string): boolean {
 export function closeQuestion(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
+  if (hasPendingAnswer(session)) return false;
   if (session.activeQuestionId) {
     session.answeredQuestions.push(session.activeQuestionId);
   }
@@ -46,7 +49,7 @@ export function closeQuestion(roomCode: string): boolean {
 export function enableBuzzer(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session?.activeQuestionId || session.phase === 'finished') return false;
-  if (session.dailyDouble || !session.clueVisible) return false;
+  if (session.dailyDouble || !session.clueVisible || hasPendingAnswer(session)) return false;
   resetBuzzerFields(session, { buzzerState: 'open' });
   return true;
 }
@@ -54,7 +57,7 @@ export function enableBuzzer(roomCode: string): boolean {
 export function resetBuzzer(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session?.activeQuestionId || session.phase === 'finished') return false;
-  if (session.dailyDouble || !session.clueVisible) return false;
+  if (session.dailyDouble || !session.clueVisible || hasPendingAnswer(session)) return false;
   resetBuzzerFields(session, { buzzerState: 'open' });
   return true;
 }
@@ -126,6 +129,7 @@ export function recordOutcome(roomCode: string, playerId: string, outcome: 'corr
   if (!session) return false;
   const player = session.players.find(p => p.id === playerId);
   if (!player) return false;
+  markBuzzAttempted(roomCode, playerId);
   if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
   if (outcome === 'correct') player.stats.correct += 1;
   else player.stats.wrong += 1;
@@ -167,6 +171,7 @@ export function markWrongAndReopen(roomCode: string, playerId: string, delta: nu
   if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
   player.stats.wrong += 1;
   session.buzzLockouts[playerId] = PERMANENT_LOCKOUT;
+  markBuzzAttempted(roomCode, playerId);
   // Does NOT touch buzzerState, buzzedPlayerId, buzzedPlayerName, buzzTimestamp
   return true;
 }

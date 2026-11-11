@@ -46,6 +46,28 @@ Run the frontend QR decode and sharing checks with `npm test --prefix frontend`.
 
 ## Quick Start (Local)
 
+### Nix
+
+From the repository directory, run:
+
+```bash
+nix run
+```
+
+This uses a pinned Node.js 24 environment, installs the locked npm dependencies,
+builds the frontend and backend, and starts the app at http://localhost:3001.
+The first run requires internet access to download Nix packages and npm dependencies.
+Subsequent runs also install dependencies and rebuild the current checkout.
+Stop the server with Ctrl+C. Boards and uploaded media are stored in `backend/data/`.
+Other devices on the same network can open `http://YOUR_LAN_IP:3001`.
+
+For development with live reload, run `nix develop` in each of two terminals.
+Run `npm run install:all` once, then `npm run dev --prefix backend` in one terminal
+and `npm run dev --prefix frontend` in the other. Open http://localhost:5173.
+The root `npm run dev` script below is Windows-specific.
+
+### Node.js
+
 **Prerequisites:** Node.js 18+
 
 ```bash

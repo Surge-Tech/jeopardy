@@ -145,7 +145,9 @@ export interface GameState {
   dailyDouble: DailyDoubleState | null;
   lastCorrectPlayerId: string | null;
   buzzLockouts: Record<string, number>;
-  buzzQueue: BuzzEntry[];
+  // Results for the current buzz attempt; never used to assign the next turn.
+  buzzHistory: BuzzEntry[];
+  buzzWindow: { deadline: number; serverNow: number } | null;
   settings: {
     lockoutMs: number;
     answerTimeS: number; // 0 disables the answer countdown

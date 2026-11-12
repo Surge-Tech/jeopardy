@@ -34,6 +34,7 @@ export function resetBuzzerFields(
   session.buzzedPlayerName = null;
   session.buzzTimestamp = null;
   session.answerTimer = null;
-  session.buzzQueue = [];
+  session.buzzHistory = [];
+  session.buzzWindow = null;
   if (opts.clearLockouts) session.buzzLockouts = {};
 }

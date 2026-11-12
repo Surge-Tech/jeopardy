@@ -4,7 +4,7 @@ import type { GameState } from '@shared/types';
 // Called only for an active regular question, after excluding typing and repeats.
 export function getQuestionShortcut(
   event: Pick<KeyboardEvent, 'code' | 'key'>,
-  state: Pick<GameState, 'clueVisible' | 'responseVisible' | 'buzzerState' | 'buzzedPlayerId' | 'buzzQueue'>,
+  state: Pick<GameState, 'clueVisible' | 'responseVisible' | 'buzzerState' | 'buzzedPlayerId' | 'buzzHistory'>,
 ): 'reveal' | 'open' | 'response' | 'close' | null {
   if (event.code === 'Space' || event.key === ' ') {
     if (state.responseVisible) return hasPendingAnswer(state) ? null : 'close';

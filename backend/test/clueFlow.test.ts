@@ -63,7 +63,7 @@ test('an unresolved buzz blocks closing or replacing the question until judged',
     gm.revealClue(room);
     gm.enableBuzzer(room);
     assert.equal(gm.recordBuzz(room, first.id, first.name, Date.now()), 'won');
-    assert.equal(gm.recordBuzz(room, second.id, second.name, Date.now()), 'queued');
+    assert.equal(gm.recordBuzz(room, second.id, second.name, Date.now()), 'recorded');
     gm.showResponse(room);
     assert.equal(gm.closeQuestion(room), false);
     assert.equal(gm.openQuestion(room, 'other', false), false);
@@ -71,8 +71,9 @@ test('an unresolved buzz blocks closing or replacing the question until judged',
     assert.equal(session.activeQuestionId, 'clue');
     assert.deepEqual(session.answeredQuestions, []);
     gm.markWrongAndReopen(room, first.id, -200);
-    const next = gm.getNextInQueue(room, new Set([first.id]))!;
-    gm.advanceToBuzzEntry(room, next);
+    assert.equal(session.buzzedPlayerId, null);
+    assert.equal(session.buzzerState, 'open');
+    assert.equal(gm.recordBuzz(room, second.id, second.name, Date.now()), 'won');
     assert.equal(gm.closeQuestion(room), false);
     gm.recordOutcome(room, second.id, 'correct');
     assert.equal(gm.closeQuestion(room), true);
@@ -83,7 +84,7 @@ test('an unresolved buzz blocks closing or replacing the question until judged',
 });
 
 
-test('reset cancels a pending answer and queue without scoring, then accepts a fresh buzz', () => {
+test('reset cancels a pending answer and buzz results without scoring, then accepts a fresh buzz', () => {
   const session = gm.createSession('test-board');
   const room = session.roomCode;
   const first = gm.addPlayer(room, 'First', '#ff0000')!;
@@ -100,7 +101,7 @@ test('reset cancels a pending answer and queue without scoring, then accepts a f
     assert.equal(session.buzzedPlayerName, null);
     assert.equal(session.buzzTimestamp, null);
     assert.equal(session.answerTimer, null);
-    assert.deepEqual(session.buzzQueue, []);
+    assert.deepEqual(session.buzzHistory, []);
     assert.equal(session.activeQuestionId, 'clue');
     assert.deepEqual(session.answeredQuestions, []);
     assert.equal(first.score, 0);

@@ -1,6 +1,7 @@
 import ResponseMedia from '../components/shared/ResponseMedia';
 import ClueMedia from '../components/shared/ClueMedia';
 import BuzzerStatus from '../components/shared/BuzzerStatus';
+import BuzzResults from '../components/shared/BuzzResults';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
@@ -220,24 +221,9 @@ export default function BoardView() {
           <div className="board-buzzer-dock">
             <div className="board-buzzer-dock__status"><BuzzerStatus gameState={gameState} display /></div>
 
-          {/* Buzz order panel */}
-          {gameState?.buzzQueue && gameState.buzzQueue.length > 0 && (
-            <div className="board-buzz-order bg-gray-900 bg-opacity-90 border border-gray-600 rounded-lg p-3 text-sm">
-              <div className="text-[10px] text-gray-500 uppercase mb-2">Buzz Order</div>
-              {gameState.buzzQueue.map((entry, i) => (
-                <div
-                  key={entry.playerId}
-                  className={`flex items-center gap-2 py-0.5 ${
-                    entry.attemptedAnswer ? 'text-gray-600 line-through' :
-                    entry.playerId === gameState.buzzedPlayerId ? 'text-yellow-400 font-bold' :
-                    'text-gray-300'
-                  }`}
-                >
-                  <span className="text-gray-500 w-4 text-xs">{i + 1}.</span>
-                  <span className="flex-1 text-xs">{entry.playerName}</span>
-                  <span className="text-gray-500 text-xs tabular-nums">{entry.reactionMs}ms</span>
-                </div>
-              ))}
+          {!gameState.buzzWindow && (
+            <div className="board-buzz-order">
+              <BuzzResults entries={gameState.buzzHistory} winnerId={gameState.buzzedPlayerId} />
             </div>
           )}
           </div>

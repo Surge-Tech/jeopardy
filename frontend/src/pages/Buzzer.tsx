@@ -10,6 +10,7 @@ import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
 import BuzzerStatus from '../components/shared/BuzzerStatus';
+import BuzzResults from '../components/shared/BuzzResults';
 import { hasPendingAnswer } from '@shared/questionFlow';
 import { randomPlayerColor } from '../utils/colors';
 import { formatScore } from '../utils/format';
@@ -70,7 +71,16 @@ export default function Buzzer() {
       setGameState(state);
       if (state.phase === 'finished') { setPhase('finished'); return; }
       const currentPhase = phaseRef.current;
-      const transient = currentPhase === 'winner' || currentPhase === 'too-late' || currentPhase === 'locked-out';
+      if (state.buzzerState === 'locked' && currentPhase !== 'join' && currentPhase !== 'lobby' && currentPhase !== 'closed') {
+        setWinnerName(state.buzzedPlayerName ?? 'Another player');
+        if (state.buzzedPlayerId === myIdRef.current) setPhase('winner');
+        else if (currentPhase !== 'locked-out') {
+          const alreadyBuzzed = state.buzzHistory?.some(entry => entry.playerId === myIdRef.current);
+          setPhase(state.buzzWindow && !alreadyBuzzed ? 'open' : 'too-late');
+        }
+        return;
+      }
+      const transient = currentPhase === 'locked-out';
       if (!state.finalJeopardy && currentPhase !== 'join' && currentPhase !== 'lobby' && currentPhase !== 'finished' && currentPhase !== 'closed' && !transient) {
         if (state.buzzerState === 'open') setPhase('open');
         else if (state.activeQuestionId) setPhase('armed');
@@ -81,7 +91,11 @@ export default function Buzzer() {
       setMyId(player.id);
       setMyPlayer(player as any);
       setGameState(state);
-      setPhase('waiting');
+      setWinnerName(state.buzzedPlayerName ?? 'Another player');
+      if (state.buzzerState === 'locked') {
+        const alreadyBuzzed = state.buzzHistory?.some(entry => entry.playerId === player.id);
+        setPhase(state.buzzedPlayerId === player.id ? 'winner' : state.buzzWindow && !alreadyBuzzed ? 'open' : 'too-late');
+      } else setPhase(state.buzzerState === 'open' ? 'open' : 'waiting');
       if (roomCode) localStorage.setItem(rejoinKey(roomCode), player.id);
     });
     socket.on(SOCKET_EVENTS.BUZZ_WINNER, ({ playerId, playerName }: { playerId: string; playerName: string }) => {
@@ -94,6 +108,8 @@ export default function Buzzer() {
       }
       setTimeout(() => setPhase(prev => prev === 'winner' || prev === 'too-late' ? 'waiting' : prev), 5000);
     });
+    socket.on(SOCKET_EVENTS.BUZZ_RECORDED, () => setPhase('too-late'));
+    socket.on(SOCKET_EVENTS.BUZZ_TOO_LATE, () => setPhase('too-late'));
     socket.on(SOCKET_EVENTS.BUZZ_LOCKED_OUT, ({ until }: { until: number }) => {
       // A wrong-answer lockout ends with the question, never with a timer.
       if (until === PERMANENT_LOCKOUT) return;
@@ -110,6 +126,8 @@ export default function Buzzer() {
       socket.off(SOCKET_EVENTS.PLAYER_JOINED);
       socket.off(SOCKET_EVENTS.BUZZ_WINNER);
       socket.off(SOCKET_EVENTS.BUZZ_LOCKED_OUT);
+      socket.off(SOCKET_EVENTS.BUZZ_RECORDED);
+      socket.off(SOCKET_EVENTS.BUZZ_TOO_LATE);
       socket.off(SOCKET_EVENTS.BUZZER_OPEN);
       socket.off(SOCKET_EVENTS.BUZZER_LOCKED);
       socket.off(SOCKET_EVENTS.GAME_ENDED);
@@ -280,6 +298,11 @@ export default function Buzzer() {
               </div>
             )}
           </div>
+          {gameState && !gameState.buzzWindow && (
+            <div className="w-full max-w-sm mt-6">
+              <BuzzResults entries={gameState.buzzHistory} winnerId={gameState.buzzedPlayerId} myId={myId} />
+            </div>
+          )}
         </>
       )}
 

@@ -10,9 +10,7 @@ export const SOCKET_EVENTS = {
   BUZZ_WINNER: 'buzz:winner',
   BUZZ_TOO_LATE: 'buzz:too-late',
   BUZZ_LOCKED_OUT: 'buzz:locked-out',
-  BUZZ_QUEUED: 'buzz:queued',
-  BUZZ_QUEUE_LOCKED: 'buzz:queue-locked',
-  BUZZ_NEXT_IN_QUEUE: 'buzz:next-in-queue',
+  BUZZ_RECORDED: 'buzz:recorded',
   BUZZER_OPEN: 'buzzer:open',
   BUZZER_LOCKED: 'buzzer:locked',
 

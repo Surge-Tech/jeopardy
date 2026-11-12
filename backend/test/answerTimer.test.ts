@@ -18,20 +18,21 @@ test('answer countdown starts on winning buzz, resets for the next contestant, a
     assert.equal(gm.recordBuzz(room, first.id, first.name, now), 'won');
     assert.deepEqual(session.answerTimer, { deadline: 115000, serverNow: now });
     now += 2000;
-    assert.equal(gm.recordBuzz(room, second.id, second.name, now), 'queued');
+    assert.equal(gm.recordBuzz(room, second.id, second.name, now), 'ignored');
     assert.equal(session.answerTimer?.deadline, 115000);
     gm.getSession(room);
     assert.equal(session.answerTimer?.serverNow, now);
     gm.setAnswerTime(room, 5);
     assert.equal(session.answerTimer?.deadline, 115000);
     now = 120000;
-    // Expiry leaves judging and the buzz queue under host control.
+    // Expiry leaves judging under host control.
     assert.equal(gm.getSession(room)?.buzzedPlayerId, first.id);
     assert.equal(gm.closeQuestion(room), false);
     gm.markWrongAndReopen(room, first.id, -200);
     assert.equal(session.answerTimer, null);
-    const next = gm.getNextInQueue(room, new Set([first.id]))!;
-    gm.advanceToBuzzEntry(room, next);
+    assert.equal(session.buzzedPlayerId, null);
+    assert.equal(session.buzzerState, 'open');
+    assert.equal(gm.recordBuzz(room, second.id, second.name, now), 'won');
     assert.deepEqual(session.answerTimer, { deadline: 125000, serverNow: now });
     gm.recordOutcome(room, second.id, 'correct');
     assert.equal(session.answerTimer, null);
@@ -64,9 +65,10 @@ test('revealing the response stops the countdown and keeps it stopped for later 
     assert.equal(session.responseVisible, true);
     assert.equal(session.answerTimer, null);
     assert.equal(session.buzzedPlayerId, first.id);
-    assert.equal(session.buzzQueue[0].attemptedAnswer, false);
+    assert.equal(session.buzzHistory[0].attemptedAnswer, false);
     gm.markWrongAndReopen(room, first.id, -200);
-    gm.advanceToBuzzEntry(room, gm.getNextInQueue(room, new Set([first.id]))!);
+    assert.equal(session.buzzedPlayerId, null);
+    gm.recordBuzz(room, second.id, second.name, Date.now());
     assert.equal(session.answerTimer, null);
     gm.resetBuzzer(room);
     gm.recordBuzz(room, second.id, second.name, Date.now());

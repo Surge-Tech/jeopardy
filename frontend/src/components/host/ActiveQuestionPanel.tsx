@@ -1,5 +1,6 @@
 import { hasPendingAnswer } from '@shared/questionFlow';
 import ResponseMedia from '../shared/ResponseMedia';
+import BuzzResults from '../shared/BuzzResults';
 import type { BuzzEntry, Player, Question } from '@shared/types';
 import { PERMANENT_LOCKOUT } from '@shared/types';
 
@@ -13,7 +14,8 @@ export default function ActiveQuestionPanel({
   buzzWinnerId,
   players,
   buzzLockouts,
-  buzzQueue,
+  buzzHistory,
+  collectingBuzzes = false,
   buzzedPlayerId,
   onShowAnswer,
   onEnableBuzzer,
@@ -32,7 +34,8 @@ export default function ActiveQuestionPanel({
   buzzWinnerId: string | null;
   players: Player[];
   buzzLockouts: Record<string, number>;
-  buzzQueue: BuzzEntry[];
+  buzzHistory: BuzzEntry[];
+  collectingBuzzes?: boolean;
   buzzedPlayerId: string | null;
   onShowAnswer: () => void;
   onEnableBuzzer: () => void;
@@ -42,7 +45,7 @@ export default function ActiveQuestionPanel({
   onMarkWrong: (playerId: string) => void;
   onClose: () => void;
 }) {
-  const pendingAnswer = hasPendingAnswer({ buzzedPlayerId, buzzQueue });
+  const pendingAnswer = hasPendingAnswer({ buzzedPlayerId, buzzHistory });
   const lockedOut = players.filter(p => buzzLockouts[p.id] === PERMANENT_LOCKOUT);
 
   return (
@@ -96,7 +99,7 @@ export default function ActiveQuestionPanel({
               <button
                 className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm"
                 aria-label="Reset Buzzers"
-                title="Cancel the current buzz and clear the queue without changing scores, then reopen buzzers."
+                title="Cancel the current buzz and clear the buzz results without changing scores, then reopen buzzers."
                 onClick={onResetBuzzer}
               >↺</button>
             </div>
@@ -122,29 +125,7 @@ export default function ActiveQuestionPanel({
         </div>
       )}
 
-      {buzzQueue && buzzQueue.length > 0 && (
-        <div className="mt-2">
-          <div className="text-[10px] text-gray-500 uppercase mb-1">Buzz Queue</div>
-          <div className="space-y-1">
-            {buzzQueue.map((entry, i) => (
-              <div
-                key={entry.playerId}
-                className={`flex items-center gap-2 text-xs px-2 py-1 rounded ${
-                  entry.attemptedAnswer
-                    ? 'bg-gray-800 text-gray-500 line-through'
-                    : buzzedPlayerId === entry.playerId
-                    ? 'bg-blue-900 text-white font-bold'
-                    : 'bg-gray-800 text-gray-300'
-                }`}
-              >
-                <span className="text-gray-500 w-4">{i + 1}.</span>
-                <span className="flex-1">{entry.playerName}</span>
-                <span className="text-gray-500 tabular-nums">{entry.reactionMs}ms</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {!collectingBuzzes && <BuzzResults entries={buzzHistory} winnerId={buzzedPlayerId} />}
 
       <button className="btn-danger text-sm w-full disabled:opacity-40 disabled:cursor-not-allowed" disabled={pendingAnswer} onClick={onClose}>Close Question{responseVisible && !pendingAnswer ? ' (Space)' : ''}</button>
       {pendingAnswer && <p className="text-xs text-yellow-300">Judge the current answer or reset buzzers before closing.</p>}

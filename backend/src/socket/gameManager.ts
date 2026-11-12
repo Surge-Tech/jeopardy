@@ -1,5 +1,5 @@
 // Barrel file: gameManager.ts used to be a single 500-line file mixing
-// session CRUD, the buzzer/lockout/queue state machine, the Daily Double
+// session CRUD, the buzzer/lockout/history state machine, the Daily Double
 // wager state machine, and round-progression logic, all as flat exported
 // functions mutating a shared module-level `sessions` Map. It has since been
 // split into focused submodules under ./gameManager/ — this file re-exports

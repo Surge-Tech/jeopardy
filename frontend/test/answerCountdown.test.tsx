@@ -22,7 +22,7 @@ test('answer countdown uses server time, reaches time up, and disappears after j
   });
   const root = createRoot(document.getElementById('root')!);
   const state = {
-    buzzedPlayerId: 'first', buzzQueue: [{ playerId: 'first', attemptedAnswer: false }],
+    buzzedPlayerId: 'first', buzzHistory: [{ playerId: 'first', attemptedAnswer: false }],
     buzzTimestamp: 100000,
     answerTimer: { deadline: 110000, serverNow: 100000 },
   } as GameState;
@@ -53,11 +53,11 @@ test('answer countdown uses server time, reaches time up, and disappears after j
     now += 6000;
     await act(async () => frame!(0));
     assert.match(document.querySelector('[role=timer]')?.textContent ?? '', /Time’s up!/);
-    assert.equal(state.buzzQueue[0].attemptedAnswer, false);
-    state.buzzQueue[0].attemptedAnswer = true;
+    assert.equal(state.buzzHistory[0].attemptedAnswer, false);
+    state.buzzHistory[0].attemptedAnswer = true;
     await act(async () => root.render(<AnswerCountdown gameState={state} />));
     assert.equal(document.querySelector('[role=timer]'), null);
-    state.buzzQueue[0].attemptedAnswer = false;
+    state.buzzHistory[0].attemptedAnswer = false;
     state.answerTimer = null;
     await act(async () => root.render(<AnswerCountdown gameState={state} />));
     assert.equal(document.querySelector('[role=timer]'), null);

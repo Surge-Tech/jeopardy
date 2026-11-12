@@ -143,7 +143,7 @@
   max-height: 10rem;
 }
 .board-buzzer-dock__status { flex: 1; min-width: 0; max-width: 48rem; max-height: 10rem; overflow-y: auto; }
-.board-buzz-order { width: 12rem; flex-shrink: 0; max-height: 10rem; overflow-y: auto; }
+.board-buzz-order { width: 16rem; flex-shrink: 0; max-height: 10rem; overflow-y: auto; }
 @media (max-width: 640px) {
   .board-clue-content { height: calc(100% - 17rem); padding: 1.25rem; }
   .board-clue-content--solo { height: 100%; }

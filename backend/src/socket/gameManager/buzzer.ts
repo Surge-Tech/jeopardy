@@ -1,5 +1,5 @@
 import { hasPendingAnswer } from '../../shared/questionFlow.js';
-import type { BuzzEntry, GameState, Question } from '../../types.js';
+import type { GameState, Question } from '../../types.js';
 import { sessions, resetBuzzerFields, PERMANENT_LOCKOUT } from './state.js';
 
 // ── Question lifecycle (buzzer-adjacent) ────────────────────────────────────
@@ -73,9 +73,11 @@ export function lockBuzzer(roomCode: string): boolean {
   return true;
 }
 
-// ── Buzzing / lockout / queue state machine ─────────────────────────────────
+// ── Buzzing / lockout / history state machine ─────────────────────────────────
 
-export type BuzzOutcome = 'won' | 'early' | 'locked-out' | 'ignored' | 'queued';
+export const BUZZ_COLLECTION_MS = 500;
+
+export type BuzzOutcome = 'won' | 'early' | 'locked-out' | 'ignored' | 'recorded';
 
 function startAnswerTimer(session: GameState, now: number) {
   session.answerTimer = !session.responseVisible && session.settings.answerTimeS > 0
@@ -98,6 +100,7 @@ export function recordBuzz(roomCode: string, playerId: string, playerName: strin
 
   const now = Date.now();
   const player = session.players.find(p => p.id === playerId);
+  if (session.buzzLockouts[playerId] === PERMANENT_LOCKOUT) return 'locked-out';
 
   if (session.buzzerState === 'idle') {
     if (session.settings.lockoutMs > 0) {
@@ -110,31 +113,28 @@ export function recordBuzz(roomCode: string, playerId: string, playerName: strin
     return 'early';
   }
 
+  const lockedUntil = session.buzzLockouts[playerId];
+  if (lockedUntil && now < lockedUntil) return 'locked-out';
+
   if (session.buzzerState === 'locked') {
-    // Player already in queue
-    if (session.buzzQueue.some(e => e.playerId === playerId)) return 'ignored';
-    // Player permanently locked out
-    if (session.buzzLockouts[playerId] === PERMANENT_LOCKOUT) return 'ignored';
-    // Queue the buzz
+    if (!session.buzzWindow || now >= session.buzzWindow.deadline) return 'ignored';
+    // Record each player only once in the half-second collection window
+    if (session.buzzHistory.some(e => e.playerId === playerId)) return 'ignored';
+    // Late buzzes are feedback only; they never get an automatic turn.
     const reactionMs = buzzOpenedAt ? (now - buzzOpenedAt) : 0;
-    session.buzzQueue.push({ playerId, playerName, reactionMs, attemptedAnswer: false });
-    session.buzzQueue.sort((a, b) => a.reactionMs - b.reactionMs);
-    return 'queued';
+    session.buzzHistory.push({ playerId, playerName, reactionMs, attemptedAnswer: false });
+    return 'recorded';
   }
 
   // buzzerState === 'open'
-  const lockedUntil = session.buzzLockouts[playerId];
-  if (lockedUntil && now < lockedUntil) {
-    return 'locked-out';
-  }
-
   const reactionMs = buzzOpenedAt ? (now - buzzOpenedAt) : 0;
   session.buzzerState = 'locked';
   session.buzzedPlayerId = playerId;
   session.buzzedPlayerName = playerName;
   session.buzzTimestamp = now;
+  session.buzzWindow = { deadline: now + BUZZ_COLLECTION_MS, serverNow: now };
   startAnswerTimer(session, now);
-  session.buzzQueue.unshift({ playerId, playerName, reactionMs, attemptedAnswer: false });
+  session.buzzHistory.unshift({ playerId, playerName, reactionMs, attemptedAnswer: false });
   if (player) {
     if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
     player.stats.buzzes += 1;
@@ -191,33 +191,24 @@ export function markWrongAndReopen(roomCode: string, playerId: string, delta: nu
   player.stats.wrong += 1;
   session.buzzLockouts[playerId] = PERMANENT_LOCKOUT;
   markBuzzAttempted(roomCode, playerId);
-  // Does NOT touch buzzerState, buzzedPlayerId, buzzedPlayerName, buzzTimestamp
+  resetBuzzerFields(session, { buzzerState: 'open' });
   return true;
 }
 
 export function markBuzzAttempted(roomCode: string, playerId: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
-  const entry = session.buzzQueue.find(e => e.playerId === playerId);
+  const entry = session.buzzHistory.find(e => e.playerId === playerId);
   if (entry) entry.attemptedAnswer = true;
   if (session.buzzedPlayerId === playerId) session.answerTimer = null;
   return true;
 }
 
-export function getNextInQueue(roomCode: string, ineligibleIds: Set<string>): BuzzEntry | null {
+// The window identity prevents an old callback from closing a newly reopened buzzer.
+export function finishBuzzCollection(roomCode: string, window: GameState['buzzWindow']): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return null;
-  return session.buzzQueue.find(e => !e.attemptedAnswer && !ineligibleIds.has(e.playerId)) ?? null;
-}
-
-export function advanceToBuzzEntry(roomCode: string, entry: BuzzEntry): boolean {
-  const session = sessions.get(roomCode);
-  if (!session) return false;
-  session.buzzerState = 'locked';
-  session.buzzedPlayerId = entry.playerId;
-  session.buzzedPlayerName = entry.playerName;
-  session.buzzTimestamp = Date.now();
-  startAnswerTimer(session, session.buzzTimestamp);
+  if (!window || session?.buzzWindow !== window) return false;
+  session.buzzWindow = null;
   return true;
 }
 

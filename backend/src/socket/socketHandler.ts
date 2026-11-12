@@ -133,13 +133,18 @@ export function registerSocketHandlers(io: Server) {
           timestamp: Date.now(),
         });
         io.to(info.roomCode).emit(SOCKET_EVENTS.GAME_STATE, session);
+        const window = session!.buzzWindow;
+        setTimeout(() => {
+          if (!gm.finishBuzzCollection(info.roomCode, window)) return;
+          io.to(info.roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(info.roomCode));
+        }, gm.BUZZ_COLLECTION_MS);
       } else if (outcome === 'early' || outcome === 'locked-out') {
         const until = session?.buzzLockouts[info.playerId] ?? Date.now();
         socket.emit(SOCKET_EVENTS.BUZZ_LOCKED_OUT, { until });
         io.to(`hostpanel:${info.roomCode}`).emit(SOCKET_EVENTS.GAME_STATE, session);
-      } else if (outcome === 'queued') {
-        socket.emit(SOCKET_EVENTS.BUZZ_QUEUED);
-        io.to(`hostpanel:${info.roomCode}`).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(info.roomCode));
+      } else if (outcome === 'recorded') {
+        socket.emit(SOCKET_EVENTS.BUZZ_RECORDED);
+        io.to(info.roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(info.roomCode));
       } else {
         socket.emit(SOCKET_EVENTS.BUZZ_TOO_LATE);
       }
@@ -366,40 +371,15 @@ export function registerSocketHandlers(io: Server) {
       endRoom(io, roomCode);
     });
 
-    // ── HOST: wrong answer — reopen or advance to next in queue ──────────
+    // ── HOST: wrong answer — reopen for a fresh buzz ──────────
     onHost(socket, SOCKET_EVENTS.HOST_WRONG_REOPEN, ({ roomCode, playerId, delta }: { roomCode: string; playerId: string; delta: number }) => {
       const ok = gm.markWrongAndReopen(roomCode, playerId, delta);
       if (!ok) return;
       io.to(roomCode).emit(SOCKET_EVENTS.SCORE_RESULT, { playerId, correct: false });
 
-      gm.markBuzzAttempted(roomCode, playerId);
-
-      const session = gm.getSession(roomCode);
-      if (!session) return;
-      const ineligibleIds = new Set(
-        Object.keys(session.buzzLockouts).filter(id => session.buzzLockouts[id] === gm.PERMANENT_LOCKOUT)
-      );
-
-      const next = gm.getNextInQueue(roomCode, ineligibleIds);
-      if (next) {
-        gm.advanceToBuzzEntry(roomCode, next);
-        const updated = gm.getSession(roomCode);
-        io.to(roomCode).emit(SOCKET_EVENTS.BUZZ_WINNER, {
-          playerId: next.playerId,
-          playerName: next.playerName,
-          timestamp: Date.now(),
-        });
-        io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, updated);
-        io.to(`hostpanel:${roomCode}`).emit(SOCKET_EVENTS.BUZZ_NEXT_IN_QUEUE, {
-          playerId: next.playerId,
-          playerName: next.playerName,
-        });
-      } else {
-        if (!gm.resetBuzzer(roomCode)) return;
-        buzzOpenedAt.set(roomCode, Date.now());
-        io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
-        io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
-      }
+      buzzOpenedAt.set(roomCode, Date.now());
+      io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
     // ── REQUEST state (any client) ───────────────────────────────────────

@@ -84,7 +84,7 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
     await fire(E.BUZZ_WINNER, { playerId: player.id, playerName: player.name });
     await fire(E.GAME_STATE, {
       ...state, buzzerState: 'locked', buzzedPlayerId: player.id, buzzedPlayerName: player.name,
-      buzzQueue: [{ playerId: player.id, attemptedAnswer: false }], answerTimer: null,
+      buzzHistory: [{ playerId: player.id, attemptedAnswer: false }], answerTimer: null,
     });
     assert.match(document.body.textContent!, /You buzzed in/);
     assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
@@ -125,6 +125,37 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
     assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
     await act(async () => timers.splice(0).forEach(callback => callback()));
     assert.match(document.body.textContent!, /Get ready/);
+    // Other players can still press during collection, and only see results afterwards.
+    await fire(E.BUZZER_OPEN);
+    await fire(E.BUZZ_WINNER, { playerId: 'p2', playerName: 'Bob' });
+    const collecting = {
+      ...state, activeQuestionId: 'q2', buzzerState: 'locked',
+      buzzedPlayerId: 'p2', buzzedPlayerName: 'Bob',
+      buzzWindow: { deadline: Date.now() + 500, serverNow: Date.now() },
+      buzzHistory: [{ playerId: 'p2', playerName: 'Bob', reactionMs: 100, attemptedAnswer: false }],
+    };
+    await fire(E.GAME_STATE, collecting);
+    const lateBuzz = document.querySelector('.player-buzz-button') as HTMLButtonElement;
+    assert.equal(lateBuzz.disabled, false);
+    assert.equal(document.querySelector('[aria-label="Buzz order"]'), null);
+    await act(async () => lateBuzz.click());
+    assert.equal(emitted.filter(e => e === E.BUZZ).length, 2);
+    await fire(E.BUZZ_RECORDED);
+    const results = { ...collecting, buzzWindow: null, buzzHistory: [
+      ...collecting.buzzHistory,
+      { playerId: player.id, playerName: player.name, reactionMs: 350, attemptedAnswer: false },
+    ] };
+    await fire(E.GAME_STATE, results);
+    assert.equal(lateBuzz.disabled, true);
+    const list = document.querySelector('[aria-label="Buzz order"]')!;
+    assert.match(list.textContent!, /BobFirst/);
+    assert.match(list.textContent!, /Alice \(you\)Too late/);
+    assert.equal(list.querySelectorAll('li').length, 2);
+    // Reopening clears the previous results and requires pressing again.
+    await fire(E.BUZZER_OPEN);
+    await fire(E.GAME_STATE, { ...state, buzzWindow: null, buzzHistory: [], buzzedPlayerId: null });
+    assert.equal(lateBuzz.disabled, false);
+    assert.equal(document.querySelector('[aria-label="Buzz order"]'), null);
     await fire(E.GAME_STATE, lockedState);
     await fire(E.GAME_ENDED);
     assert.match(document.body.textContent!, /Room Closed/);

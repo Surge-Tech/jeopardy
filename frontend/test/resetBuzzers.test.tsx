@@ -19,7 +19,7 @@ test('host can reset an unresolved buzz while closing stays disabled', async () 
       clueVisible responseVisible={false} buzzerState="locked"
       buzzWinner="Per" buzzWinnerId="per" buzzedPlayerId="per"
       players={[]} buzzLockouts={{}}
-      buzzQueue={[{ playerId: 'per', playerName: 'Per', reactionMs: 49, attemptedAnswer: false }]}
+      buzzHistory={[{ playerId: 'per', playerName: 'Per', reactionMs: 49, attemptedAnswer: false }]}
       onRevealClue={noop} onShowAnswer={noop} onEnableBuzzer={noop} onLockBuzzer={noop}
       onResetBuzzer={() => { resets++; }} onAward={noop} onMarkWrong={noop} onClose={noop}
     />));

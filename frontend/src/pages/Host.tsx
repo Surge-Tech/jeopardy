@@ -70,12 +70,6 @@ export default function Host() {
     socket.on(SOCKET_EVENTS.FJ_HOST_LOG, ({ msg }: { msg: string }) => {
       addLog({ type: 'fj', msg });
     });
-    socket.on(SOCKET_EVENTS.BUZZ_NEXT_IN_QUEUE, ({ playerName, playerId }: { playerName: string; playerId: string }) => {
-      setBuzzWinner(playerName);
-      setBuzzWinnerId(playerId);
-      addLog({ type: 'buzz', msg: `Queue advance → ${playerName}`, player: playerName });
-    });
-
     socket.on('connect', startSession);
     // Defer until after React's StrictMode effect cleanup/replay so a fresh
     // mount on an already-connected socket creates only one room.
@@ -89,7 +83,6 @@ export default function Host() {
       socket.off('buzz:winner');
       socket.off('host:created');
       socket.off('fj:host-log');
-      socket.off('buzz:next-in-queue');
     };
   }, [boardId]);
 
@@ -424,7 +417,8 @@ export default function Host() {
                 buzzWinnerId={gameState.buzzedPlayerId ?? buzzWinnerId}
                 players={gameState.players}
                 buzzLockouts={gameState.buzzLockouts}
-                buzzQueue={gameState.buzzQueue}
+                buzzHistory={gameState.buzzHistory}
+                collectingBuzzes={!!gameState.buzzWindow}
                 buzzedPlayerId={gameState.buzzedPlayerId}
                 onShowAnswer={showAnswer}
                 onEnableBuzzer={enableBuzzer}

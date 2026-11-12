@@ -57,11 +57,12 @@ test('all buzzers stay open until manually closed, including after reopening', {
       t.mock.timers.tick(60000);
       assert.equal(session.buzzerState, 'open');
       assert.equal(gm.recordBuzz(room, player.id, player.name, Date.now()), 'won');
-      assert.equal(gm.recordBuzz(room, second.id, second.name, Date.now()), 'queued');
+      assert.equal(gm.recordBuzz(room, second.id, second.name, Date.now()), 'recorded');
       await dispatch(E.HOST_WRONG_REOPEN, { roomCode: room, playerId: player.id, delta: -200 });
       t.mock.timers.tick(60000);
-      assert.equal(session.buzzerState, 'locked');
-      assert.equal(session.buzzedPlayerId, second.id);
+      assert.equal(session.buzzerState, 'open');
+      assert.equal(session.buzzedPlayerId, null);
+      assert.equal(gm.recordBuzz(room, second.id, second.name, Date.now()), 'won');
       await dispatch(E.HOST_WRONG_REOPEN, { roomCode: room, playerId: second.id, delta: -200 });
       t.mock.timers.tick(60000);
       assert.equal(session.buzzerState, 'open');

@@ -32,7 +32,8 @@ export function createSession(boardId: string): GameState {
     dailyDouble: null,
     lastCorrectPlayerId: null,
     buzzLockouts: {},
-    buzzQueue: [],
+    buzzHistory: [],
+    buzzWindow: null,
     settings: { lockoutMs: 250, answerTimeS: 10 },
     currentRoundIndex: 0,
   };
@@ -46,6 +47,7 @@ export function getSession(roomCode: string): GameState | undefined {
   if (session) {
     const now = Date.now();
     lastActivityAt.set(roomCode, now);
+    if (session.buzzWindow) session.buzzWindow.serverNow = now;
     if (session.answerTimer) session.answerTimer.serverNow = now;
   }
   return session;

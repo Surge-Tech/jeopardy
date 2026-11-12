@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { hostFetch } from '../lib/hostAuth';
+import { getHostRoom } from '../lib/hostRoom';
 const API = '/api';
 
 type BoardSummary = { id: string; name: string; roundCount: number; hasFinal: boolean; createdAt: string; updatedAt: string };
@@ -116,6 +117,7 @@ export default function Dashboard() {
               <BoardCard
                 key={board.id}
                 board={board}
+                savedRoom={getHostRoom(board.id)}
                 onEdit={() => navigate(`/editor/${board.id}`)}
                 onHost={() => navigate(`/host/${board.id}`)}
                 onExport={() => handleExport(board.id, board.name)}
@@ -129,9 +131,10 @@ export default function Dashboard() {
 }
 
 function BoardCard({
-  board, onEdit, onHost, onExport
+  board, savedRoom, onEdit, onHost, onExport
 }: {
   board: BoardSummary;
+  savedRoom: string | null;
   onEdit: () => void;
   onHost: () => void;
   onExport: () => void;
@@ -143,9 +146,10 @@ function BoardCard({
         <h3 className="text-xl font-bold text-white truncate">{board.name}</h3>
         <p className="text-gray-400 text-sm">Updated {updated}</p>
         <p className="text-gray-500 text-xs mt-1">{board.roundCount} round{board.roundCount === 1 ? '' : 's'}{board.hasFinal ? ' · Final ✓' : ''}</p>
+        {savedRoom && <p className="text-gray-400 text-sm mt-1">Saved room: {savedRoom}</p>}
       </div>
       <div className="flex gap-2 flex-wrap">
-        <button className="btn-primary text-sm py-1 px-3" onClick={onHost}>▶ Host</button>
+        <button className="btn-primary text-sm py-1 px-3" onClick={onHost}>{savedRoom ? '▶ Resume game' : '▶ Host'}</button>
         <button className="btn-ghost text-sm py-1 px-3" onClick={onEdit}>✏ Edit</button>
         <button className="btn-ghost text-sm py-1 px-3" onClick={onExport}>↓ Export</button>
       </div>

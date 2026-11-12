@@ -9,7 +9,7 @@ import { JSDOM } from 'jsdom';
 import { SOCKET_EVENTS as E } from '../../backend/src/shared/socketEvents';
 import * as gm from '../../backend/src/socket/gameManager';
 
-test('host remembers its room across remounts, reconnects, and clears it when closed', async () => {
+test('host remembers its room across browser closures, reconnects, and clears it when closed', async () => {
   const testDir = dirname(fileURLToPath(import.meta.url));
   const tempDir = await mkdtemp(join(testDir, '.host-'));
   const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
@@ -63,6 +63,7 @@ test('host remembers its room across remounts, reconnects, and clears it when cl
     assert.deepEqual(emitted.at(-1), { event: E.HOST_CREATE, payload: { boardId: 'board', roomCode: undefined } });
     await act(async () => handlers.get(E.HOST_CREATED)!({ roomCode: state.roomCode, state, resumed: false }));
     assert.equal(window.sessionStorage.getItem('jeopardy:host-room:board'), state.roomCode);
+    assert.equal(window.localStorage.getItem('jeopardy:host-room:board'), state.roomCode);
 
     // Correct awards points but leaves the clue open for a separate close action.
     const player = gm.addPlayer(state.roomCode, 'Player', '#ff0000')!;
@@ -118,20 +119,26 @@ test('host remembers its room across remounts, reconnects, and clears it when cl
     gm.closeQuestion(state.roomCode);
 
     await act(async () => root.unmount());
+    // Closing a browser discards tab storage; persistent storage must recover it.
+    window.sessionStorage.clear();
     root = createRoot(document.getElementById('root')!);
     await mount();
     assert.deepEqual(emitted.at(-1), { event: E.HOST_CREATE, payload: { boardId: 'board', roomCode: state.roomCode } });
     await act(async () => handlers.get(E.HOST_CREATED)!({ roomCode: state.roomCode, state, resumed: true }));
+    assert.ok(document.body.textContent?.includes('Player'));
     await act(async () => handlers.get('connect')!());
     assert.equal(emitted.at(-1)!.payload.roomCode, state.roomCode);
 
     // A replacement room after server restart becomes the next resume target.
     const replacement = { ...state, roomCode: 'NEW12' };
     await act(async () => handlers.get(E.HOST_CREATED)!({ roomCode: replacement.roomCode, state: replacement, resumed: false }));
+    assert.ok(document.body.textContent?.includes('The previous room is no longer available'));
+    assert.equal(window.localStorage.getItem('jeopardy:host-room:board'), 'NEW12');
     await act(async () => handlers.get('connect')!());
     assert.equal(emitted.at(-1)!.payload.roomCode, 'NEW12');
     await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent === 'Close Room')!.click());
     assert.equal(window.sessionStorage.getItem('jeopardy:host-room:board'), null);
+    assert.equal(window.localStorage.getItem('jeopardy:host-room:board'), null);
     assert.deepEqual(emitted.at(-1), { event: E.HOST_END, payload: { roomCode: 'NEW12' } });
   } finally {
     await act(async () => root.unmount());

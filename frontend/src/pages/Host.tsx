@@ -22,6 +22,7 @@ import AnswerTimeSetting from '../components/host/AnswerTimeSetting';
 import PlayersTab from '../components/host/PlayersTab';
 import LogTab from '../components/host/LogTab';
 import StatsTab from '../components/host/StatsTab';
+import { getHostRoom, saveHostRoom, clearHostRoom } from '../lib/hostRoom';
 
 const API = '/api';
 
@@ -38,13 +39,12 @@ export default function Host() {
   const [renameValue, setRenameValue] = useState('');
   const [renameError, setRenameError] = useState('');
   const [hostError, setHostError] = useState('');
+  const [sessionNotice, setSessionNotice] = useState('');
   const [tab, setTab] = useState<'players' | 'log' | 'stats'>('players');
 
   useEffect(() => {
     fetch(`${API}/boards/${boardId}`).then(r => r.json()).then(setBoard);
-    const storageKey = `jeopardy:host-room:${boardId}`;
-    let savedRoom: string | null = null;
-    try { savedRoom = window.sessionStorage.getItem(storageKey); } catch { /* Storage may be disabled. */ }
+    let savedRoom = getHostRoom(boardId!);
 
     function startSession() {
       socket.emit(SOCKET_EVENTS.HOST_CREATE, { boardId, roomCode: savedRoom ?? undefined });
@@ -62,8 +62,9 @@ export default function Host() {
       addLog({ type: 'buzz', msg: `${playerName} buzzed in`, player: playerName });
     });
     socket.on(SOCKET_EVENTS.HOST_CREATED, ({ roomCode: rc, state, resumed }: { roomCode: string; state: GameState; resumed?: boolean }) => {
+      setSessionNotice(savedRoom && !resumed ? 'The previous room is no longer available. A new game has been started.' : '');
       savedRoom = rc;
-      try { window.sessionStorage.setItem(storageKey, rc); } catch { /* Storage may be disabled. */ }
+      saveHostRoom(boardId!, rc);
       setRoomCode(rc);
       setGameState(state);
       setBuzzWinner(state.buzzedPlayerName);
@@ -273,7 +274,7 @@ export default function Host() {
 
   function closeRoom() {
     if (!confirm('Close this room? This ends the session for everyone and cannot be undone.')) return;
-    try { window.sessionStorage.removeItem(`jeopardy:host-room:${boardId}`); } catch { /* Storage may be disabled. */ }
+    clearHostRoom(boardId!);
     socket.emit(SOCKET_EVENTS.HOST_END, { roomCode });
     navigate('/');
   }
@@ -350,6 +351,7 @@ export default function Host() {
       </div>
 
       {hostError && <p role="alert" className="bg-red-950 text-red-300 px-4 py-2">{hostError}</p>}
+      {sessionNotice && <p role="status" className="bg-gray-900 text-jeopardy-gold px-4 py-2">{sessionNotice}</p>}
       {/* Game-over banner */}
       {gameState.phase === 'finished' && (
         <div className="bg-jeopardy-gold text-jeopardy-dark px-4 py-2 flex items-center gap-4 flex-wrap font-bold">

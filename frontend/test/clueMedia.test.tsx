@@ -37,7 +37,7 @@ for (const mediaType of ['audio', 'video', 'youtube'] as const) {
       assert.equal(document.querySelector('audio,video,iframe'), player);
       if (mediaType === 'youtube') {
         assert.equal(commands.at(-1), 'pauseVideo');
-        assert.equal(player.parentElement!.hidden, true);
+        assert.equal(player.parentElement!.style.visibility, 'hidden');
         // A late player-ready event must respect the buzz that already arrived.
         window.dispatchEvent(new dom.window.MessageEvent('message', {
           origin: 'https://www.youtube.com', source: (player as HTMLIFrameElement).contentWindow,
@@ -47,17 +47,17 @@ for (const mediaType of ['audio', 'video', 'youtube'] as const) {
       } else {
         assert.equal(pauses, 1);
         assert.equal((player as HTMLMediaElement).currentTime, 12);
-        if (mediaType === 'video') assert.equal(player.hidden, true);
+        if (mediaType === 'video') assert.equal(player.style.visibility, 'hidden');
       }
       await render(false);
       assert.equal(document.querySelector('audio,video,iframe'), player);
       if (mediaType === 'youtube') {
         assert.equal(commands.at(-1), 'playVideo');
-        assert.equal(player.parentElement!.hidden, false);
+        assert.equal(player.parentElement!.style.visibility, 'visible');
       } else {
         assert.equal(plays, 2);
         assert.equal((player as HTMLMediaElement).currentTime, 12);
-        assert.equal(player.hidden, false);
+        if (mediaType === 'video') assert.equal(player.style.visibility, 'visible');
       }
     } finally {
       await act(async () => root.unmount());

@@ -14,7 +14,7 @@ import { getQuestionShortcut } from '../utils/questionShortcuts';
 import ShareLink from '../components/host/ShareLink';
 import BoardGrid from '../components/host/BoardGrid';
 import ActiveQuestionPanel from '../components/host/ActiveQuestionPanel';
-import AnswerCountdown from '../components/shared/AnswerCountdown';
+import BuzzerStatus from '../components/shared/BuzzerStatus';
 import AnswerTimeSetting from '../components/host/AnswerTimeSetting';
 import PlayersTab from '../components/host/PlayersTab';
 import LogTab from '../components/host/LogTab';
@@ -401,7 +401,7 @@ export default function Host() {
           {/* Active question panel */}
           <div className="p-5 xl:p-6 border-b border-gray-700 flex-shrink-0">
             <h2 className="text-base font-bold text-gray-400 uppercase mb-4">Active Question</h2>
-            <AnswerCountdown gameState={gameState} />
+            <div className="mb-4"><BuzzerStatus gameState={gameState} /></div>
             {gameState.finalJeopardy ? (
               <HostFinalPanel roomCode={roomCode} gameState={gameState} board={board} />
             ) : activeQ?.isDailyDouble && gameState.dailyDouble ? (

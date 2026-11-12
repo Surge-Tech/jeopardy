@@ -1,0 +1,33 @@
+import type { GameState } from '@shared/types';
+import { hasPendingAnswer } from '@shared/questionFlow';
+import AnswerCountdown from './AnswerCountdown';
+
+export default function BuzzerStatus({ gameState, display = false, personal = false }: {
+  gameState: GameState;
+  display?: boolean;
+  personal?: boolean;
+}) {
+  const open = gameState.buzzerState === 'open';
+  const player = gameState.players.find(player => player.id === gameState.buzzedPlayerId);
+  const pending = hasPendingAnswer(gameState);
+  if (!open && !gameState.buzzedPlayerId) return null;
+  return (
+    <div className={`buzzer-status ${open ? 'buzzer-status--open' : 'buzzer-status--answering'} ${display ? 'buzzer-status--display' : ''}`}>
+      <div className="buzzer-status__identity" role="status">
+        {open ? (
+          <span className="buzzer-status__signal" aria-hidden="true"><span /></span>
+        ) : (
+          <span className="buzzer-status__avatar" style={{ backgroundColor: player?.color ?? '#FFD700' }} aria-hidden="true">
+            {(gameState.buzzedPlayerName ?? '?').trim().slice(0, 1).toUpperCase()}
+          </span>
+        )}
+        <div className="min-w-0">
+          {!open && <div className="buzzer-status__eyebrow">{pending ? personal ? 'You buzzed in' : 'Buzzed in' : 'Answer recorded'}</div>}
+          <div className="buzzer-status__title">{open ? 'Buzzers open' : gameState.buzzedPlayerName}</div>
+          {!open && (!pending || personal) && <div className="buzzer-status__hint">{pending ? 'Your turn to answer' : 'Waiting for the host'}</div>}
+        </div>
+      </div>
+      {!open && <AnswerCountdown gameState={gameState} />}
+    </div>
+  );
+}

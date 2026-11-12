@@ -1,6 +1,6 @@
 import ResponseMedia from '../components/shared/ResponseMedia';
 import ClueMedia from '../components/shared/ClueMedia';
-import AnswerCountdown from '../components/shared/AnswerCountdown';
+import BuzzerStatus from '../components/shared/BuzzerStatus';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
@@ -152,15 +152,11 @@ export default function BoardView() {
           <p className="text-gray-400 text-xl animate-pulse">Waiting for the host to start the next round…</p>
         </div>
       )}
-      {/* Buzz winner overlay */}
+      {/* Brief buzz announcement; the persistent card keeps the timer visible. */}
       {buzzWinner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-jeopardy-blue border-8 border-jeopardy-gold rounded-2xl px-16 py-10 text-center flip-in">
-            <div className="text-3xl text-gray-300 mb-2">BUZZED IN</div>
-            <div className="text-6xl font-black text-jeopardy-gold" style={{ textShadow: '3px 3px 0 #000' }}>
-              {buzzWinner.playerName}
-            </div>
-          </div>
+        <div className="buzz-announcement" aria-hidden="true">
+          <span className="buzzer-status__eyebrow">First buzz</span>
+          <span className="buzz-announcement__name">{buzzWinner.playerName}</span>
         </div>
       )}
 
@@ -184,7 +180,8 @@ export default function BoardView() {
 
       {/* Question overlay — shown only after the host reveals the clue */}
       {showQuestion && !isDDSplash && (showQuestion.isDailyDouble || gameState.clueVisible) && (
-        <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col overflow-y-auto p-8 flip-in">
+        <div className="fixed inset-0 bg-jeopardy-blue z-40 overflow-hidden flip-in">
+          <div className={`board-clue-content ${showQuestion.isDailyDouble ? 'board-clue-content--solo' : ''}`}>
           <div className="my-auto flex w-full shrink-0 flex-col items-center">
           <div className="text-jeopardy-gold font-black text-2xl mb-4 tracking-widest">
             {showQuestion.value}
@@ -217,22 +214,15 @@ export default function BoardView() {
             </div>
           )}
 
-          {/* Buzzer state indicator */}
-          <AnswerCountdown gameState={gameState} />
-          <div className="mt-6">
-            {gameState.buzzerState === 'open' && (
-              <div className="text-green-400 text-2xl font-bold animate-pulse">🔔 BUZZERS OPEN</div>
-            )}
-            {gameState.buzzerState === 'locked' && gameState.buzzedPlayerName && (
-              <div className="text-jeopardy-gold text-2xl font-bold">
-                ⚡ {gameState.buzzedPlayerName}
-              </div>
-            )}
           </div>
+          </div>
+
+          <div className="board-buzzer-dock">
+            <div className="board-buzzer-dock__status"><BuzzerStatus gameState={gameState} display /></div>
 
           {/* Buzz order panel */}
           {gameState?.buzzQueue && gameState.buzzQueue.length > 0 && (
-            <div className="mt-6 self-end bg-gray-900 bg-opacity-90 border border-gray-600 rounded-lg p-3 text-sm min-w-[160px]">
+            <div className="board-buzz-order bg-gray-900 bg-opacity-90 border border-gray-600 rounded-lg p-3 text-sm">
               <div className="text-[10px] text-gray-500 uppercase mb-2">Buzz Order</div>
               {gameState.buzzQueue.map((entry, i) => (
                 <div

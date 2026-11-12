@@ -9,7 +9,8 @@ import { LIMITS } from '@shared/limits';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
-import AnswerCountdown from '../components/shared/AnswerCountdown';
+import BuzzerStatus from '../components/shared/BuzzerStatus';
+import { hasPendingAnswer } from '@shared/questionFlow';
 import { randomPlayerColor } from '../utils/colors';
 import { formatScore } from '../utils/format';
 
@@ -37,7 +38,10 @@ export default function Buzzer() {
     && gameState.buzzLockouts[myId] === PERMANENT_LOCKOUT;
   const phase: BuzzerPhase = isIncorrect && gameState?.phase !== 'finished'
     && buzzerPhase !== 'join' && buzzerPhase !== 'closed'
-    ? 'incorrect' : buzzerPhase;
+    ? 'incorrect'
+    : gameState?.buzzedPlayerId === myId && hasPendingAnswer(gameState)
+      && gameState.phase !== 'finished' && buzzerPhase !== 'join' && buzzerPhase !== 'closed'
+      ? 'winner' : buzzerPhase;
 
   // Kept in sync with `phase`/`myId` state below so the socket-handler effect
   // can read the current values without needing them in its dependency
@@ -154,8 +158,17 @@ export default function Buzzer() {
   const isDDWagering = !!(gameState?.dailyDouble && gameState.dailyDouble.playerId === myId
     && gameState.dailyDouble.stage === 'wagering' && gameState.dailyDouble.hasDevice);
 
+  const showBuzzer = phase !== 'join' && phase !== 'finished' && phase !== 'closed'
+    && !gameState?.finalJeopardy && !isDDWagering;
+  const canBuzz = phase === 'open' || phase === 'armed';
+  const buttonLabel = {
+    open: 'BUZZ!', armed: 'Wait...', waiting: 'Waiting...', lobby: 'Waiting...',
+    winner: 'Answering', 'too-late': 'Too slow!', 'locked-out': 'Too early!', incorrect: 'Locked out',
+  }[phase as Exclude<BuzzerPhase, 'join' | 'closed' | 'finished'>];
+  const displayName = gameState?.players.find(player => player.id === myId)?.name ?? name;
+
   return (
-    <div className="min-h-screen bg-jeopardy-dark flex flex-col items-center justify-center p-4 select-none">
+    <div className={`min-h-screen bg-jeopardy-dark flex flex-col items-center justify-center p-4 select-none ${showBuzzer ? 'player-buzzer-screen' : ''}`}>
 
       {/* Room code display */}
       <div className="text-gray-500 text-sm mb-6 text-center">
@@ -208,7 +221,7 @@ export default function Buzzer() {
 
       {/* Inline name editor — lobby only, shown once regardless of sub-phase */}
       {phase !== 'join' && phase !== 'finished' && phase !== 'closed' && gameState?.phase === 'lobby' && myId && (
-        <div className="mb-4 w-full max-w-xs">
+        <div className={`player-name-editor w-full max-w-xs ${editingName ? 'player-name-editor--editing' : ''}`}>
           {editingName ? (
             <div className="flex flex-col gap-2">
               <input
@@ -236,104 +249,41 @@ export default function Buzzer() {
         </div>
       )}
 
-      {/* WAITING phase */}
-      {!gameState?.finalJeopardy && !isDDWagering && phase === 'waiting' && (
-        <div className="text-center">
-          <p className="text-3xl font-black text-white mb-2">{name}</p>
-          <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {formatScore(myScore)}
-          </p>
-          <div className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto">
-            <span className="text-gray-500 text-xl font-bold text-center px-4">Waiting...</span>
+      {showBuzzer && (
+        <>
+          <section className="player-buzzer-station">
+            <div className="player-buzzer-identity">
+              <p className="text-2xl font-black text-white break-words">{displayName}</p>
+              <p className="text-jeopardy-gold font-black text-2xl mt-2">{formatScore(myScore)}</p>
+            </div>
+            <button
+              className={`player-buzz-button ${phase === 'open' ? '' : 'player-buzz-button--inactive'} ${phase === 'locked-out' || phase === 'incorrect' ? 'player-buzz-button--locked' : ''}`}
+              style={{ touchAction: 'manipulation' }}
+              disabled={!canBuzz}
+              onClick={buzz}
+              onTouchStart={event => { event.preventDefault(); buzz(); }}
+            >
+              {buttonLabel}
+            </button>
+          </section>
+          <div className="player-buzzer-dock">
+            {gameState && (phase === 'open' || gameState.buzzedPlayerId === myId) ? (
+              <BuzzerStatus gameState={gameState} personal />
+            ) : (
+              <div className="player-buzzer-message" role="status">
+                <p className={`font-black text-xl ${phase === 'incorrect' || phase === 'locked-out' ? 'text-red-400' : 'text-gray-200'}`}>
+                  {phase === 'incorrect' ? 'Incorrect answer' : phase === 'locked-out' ? 'Too early!' : phase === 'too-late' ? 'Too slow!' : phase === 'armed' ? 'Get ready' : 'Waiting for the host'}
+                </p>
+                <p className="text-gray-400 text-sm mt-2">
+                  {phase === 'incorrect' ? 'Wait for the next question' : phase === 'too-late' ? `${winnerName} buzzed in first` : phase === 'locked-out' ? 'Wait for your buzzer to unlock' : 'Your buzzer will light up when it opens'}
+                </p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* ARMED phase — question is active but buzzer isn't open yet; pressing still reaches the server */}
-      {!gameState?.finalJeopardy && !isDDWagering && phase === 'armed' && (
-        <div className="text-center">
-          <p className="text-3xl font-black text-white mb-2">{name}</p>
-          <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {formatScore(myScore)}
-          </p>
-          <button
-            className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto cursor-pointer"
-            style={{ fontSize: '1.25rem', fontWeight: 900, color: '#6b7280', touchAction: 'manipulation' }}
-            onClick={buzz}
-            onTouchStart={e => { e.preventDefault(); buzz(); }}
-          >
-            Wait...
-          </button>
-          <p className="text-gray-500 font-bold mt-6">Get ready</p>
-        </div>
-      )}
-
-      {/* Wrong answer — ineligible for the rest of this question */}
-      {!gameState?.finalJeopardy && !isDDWagering && phase === 'incorrect' && (
-        <div className="text-center" role="status">
-          <h2 className="text-3xl font-black text-red-400 mb-2">Incorrect answer</h2>
-          <p className="text-gray-400 mb-6">Wait for the next question</p>
-          <button
-            disabled
-            className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 text-gray-500 text-xl font-bold cursor-not-allowed"
-          >
-            Locked out
-          </button>
-        </div>
-      )}
-
-      {/* LOCKED-OUT phase — pressed too early */}
-      {!gameState?.finalJeopardy && phase === 'locked-out' && (
-        <div className="text-center flip-in">
-          <div className="w-48 h-48 rounded-full bg-red-900 border-8 border-red-500 flex items-center justify-center mx-auto animate-pulse">
-            <span className="text-red-300 text-2xl font-black">Too early!</span>
-          </div>
-        </div>
-      )}
-
-      {/* OPEN phase — buzzer ready */}
-      {!gameState?.finalJeopardy && !isDDWagering && phase === 'open' && (
-        <div className="text-center">
-          <p className="text-3xl font-black text-white mb-2">{name}</p>
-          <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {formatScore(myScore)}
-          </p>
-          <button
-            className="w-56 h-56 rounded-full border-8 border-jeopardy-gold bg-jeopardy-blue flex items-center justify-center mx-auto buzzer-active cursor-pointer"
-            style={{ fontSize: '1.5rem', fontWeight: 900, color: '#FFD700', touchAction: 'manipulation' }}
-            onClick={buzz}
-            onTouchStart={e => { e.preventDefault(); buzz(); }}
-          >
-            BUZZ!
-          </button>
-          <p className="text-green-400 font-bold mt-6 animate-pulse">Buzzers are open!</p>
-        </div>
-      )}
-
-      {/* WINNER phase */}
-      {!gameState?.finalJeopardy && phase === 'winner' && (
-        <div className="text-center flip-in">
-          <div className="text-6xl mb-4">⚡</div>
-          <h2 className="text-4xl font-black text-jeopardy-gold mb-2" style={{ textShadow: '2px 2px 0 #000' }}>
-            YOU BUZZED IN!
-          </h2>
-          <p className="text-white text-xl">{name}</p>
-        </div>
-      )}
-
-      {/* TOO LATE phase */}
-      {!gameState?.finalJeopardy && phase === 'too-late' && (
-        <div className="text-center flip-in">
-          <div className="text-6xl mb-4">❌</div>
-          <h2 className="text-3xl font-black text-red-400 mb-2">Too slow!</h2>
-          <p className="text-gray-400">{winnerName} buzzed in first</p>
-        </div>
+        </>
       )}
 
       {/* Players list (compact) */}
-      {!gameState?.finalJeopardy && gameState && gameState.buzzedPlayerId === myId && phase !== 'closed' && phase !== 'finished' && (
-        <AnswerCountdown gameState={gameState} />
-      )}
       {!gameState?.finalJeopardy && gameState && gameState.players.length > 0 && phase !== 'join' && phase !== 'finished' && phase !== 'closed' && (
         <div className="mt-12 w-full max-w-sm">
           <h3 className="text-gray-500 text-xs uppercase tracking-widest mb-2 text-center">Scoreboard</h3>

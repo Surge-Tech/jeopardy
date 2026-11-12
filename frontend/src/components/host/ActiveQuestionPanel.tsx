@@ -79,10 +79,8 @@ export default function ActiveQuestionPanel({
           </button>
         )}
         {buzzerState === 'locked' && buzzWinner && (
-          <div className="bg-jeopardy-blue border-2 border-jeopardy-gold rounded p-3 text-center">
-            <div className="text-gray-300 text-sm">Buzzed In:</div>
-            <div className="text-jeopardy-gold font-black text-2xl">{buzzWinner}</div>
-            <div className="flex gap-2 mt-2">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+            <div className="flex gap-2">
               <button
                 className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded text-base"
                 onClick={() => {

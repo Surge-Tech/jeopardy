@@ -23,17 +23,36 @@ test('answer countdown uses server time, reaches time up, and disappears after j
   const root = createRoot(document.getElementById('root')!);
   const state = {
     buzzedPlayerId: 'first', buzzQueue: [{ playerId: 'first', attemptedAnswer: false }],
+    buzzTimestamp: 100000,
     answerTimer: { deadline: 110000, serverNow: 100000 },
   } as GameState;
   try {
     await act(async () => root.render(<AnswerCountdown gameState={state} />));
-    assert.equal(document.querySelector('[role=timer]')?.textContent, 'Answer: 10s');
-    now += 4000;
+    assert.equal(document.querySelector('.answer-clock__number')?.textContent, '10');
+    const progress = () => Number(document.querySelector('.answer-clock__progress')?.getAttribute('stroke-dashoffset'));
+    const initialProgress = progress();
+    now += 16;
     await act(async () => frame!(0));
-    assert.equal(document.querySelector('[role=timer]')?.textContent, 'Answer: 6s');
+    const nextProgress = progress();
+    assert.ok(nextProgress > initialProgress, 'the ring moves between whole-second ticks');
+    assert.equal(document.querySelector('.answer-clock__number')?.textContent, '10');
+    now += 16;
+    await act(async () => frame!(0));
+    assert.ok(progress() > nextProgress, 'the ring continues moving on each animation frame');
+    now += 3968;
+    await act(async () => frame!(0));
+    assert.equal(document.querySelector('.answer-clock__number')?.textContent, '6');
+    state.responseVisible = true;
+    await act(async () => root.render(<AnswerCountdown gameState={state} />));
+    assert.equal(document.querySelector('[role=timer]'), null);
+    assert.equal(frame, undefined, 'revealing the response cancels countdown updates');
+    // Exercise expiry separately with a fresh snapshot and the response hidden.
+    state.responseVisible = false;
+    state.answerTimer!.serverNow = 104000;
+    await act(async () => root.render(<AnswerCountdown gameState={state} />));
     now += 6000;
     await act(async () => frame!(0));
-    assert.equal(document.querySelector('[role=timer]')?.textContent, 'Time’s up!');
+    assert.match(document.querySelector('[role=timer]')?.textContent ?? '', /Time’s up!/);
     assert.equal(state.buzzQueue[0].attemptedAnswer, false);
     state.buzzQueue[0].attemptedAnswer = true;
     await act(async () => root.render(<AnswerCountdown gameState={state} />));

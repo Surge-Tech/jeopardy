@@ -30,6 +30,7 @@ export function showResponse(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
   session.responseVisible = true;
+  session.answerTimer = null;
   return true;
 }
 
@@ -77,7 +78,7 @@ export function lockBuzzer(roomCode: string): boolean {
 export type BuzzOutcome = 'won' | 'early' | 'locked-out' | 'ignored' | 'queued';
 
 function startAnswerTimer(session: GameState, now: number) {
-  session.answerTimer = session.settings.answerTimeS > 0
+  session.answerTimer = !session.responseVisible && session.settings.answerTimeS > 0
     ? { deadline: now + session.settings.answerTimeS * 1000, serverNow: now }
     : null;
 }

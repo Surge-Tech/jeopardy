@@ -57,7 +57,9 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
     phase: 'playing', players: [player], activeQuestionId: 'q1',
     buzzerState: 'open', buzzLockouts: {}, finalJeopardy: null, dailyDouble: null,
   } as unknown as GameState;
+  let stableBuzzer: Element | null = null;
   function assertLocked() {
+    assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
     assert.match(document.body.textContent!, /Incorrect answer/);
     assert.match(document.body.textContent!, /Wait for the next question/);
     assert.doesNotMatch(document.body.textContent!, /Too slow!|Too early!|YOU BUZZED IN!/);
@@ -74,9 +76,21 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
       </MemoryRouter>,
     ));
     await fire(E.PLAYER_JOINED, { player, state });
+    stableBuzzer = document.querySelector('.player-buzz-button');
+    assert.ok(stableBuzzer);
     await fire(E.BUZZER_OPEN);
+    assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
     assert.match(document.body.textContent!, /BUZZ!/);
     await fire(E.BUZZ_WINNER, { playerId: player.id, playerName: player.name });
+    await fire(E.GAME_STATE, {
+      ...state, buzzerState: 'locked', buzzedPlayerId: player.id, buzzedPlayerName: player.name,
+      buzzQueue: [{ playerId: player.id, attemptedAnswer: false }], answerTimer: null,
+    });
+    assert.match(document.body.textContent!, /You buzzed in/);
+    assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
+    await act(async () => timers.splice(0).forEach(callback => callback()));
+    assert.match(document.body.textContent!, /You buzzed in/);
+    assert.doesNotMatch(document.body.textContent!, /Get ready|Waiting\.\.\./);
     const lockedState = { ...state, buzzLockouts: { p1: PERMANENT_LOCKOUT } };
     // Same ordering as the server: reopen/winner event, followed by authoritative state.
     await fire(E.BUZZER_OPEN);
@@ -108,6 +122,7 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
     // Early-buzz feedback still works for eligible players.
     await fire(E.BUZZ_LOCKED_OUT, { until: Date.now() + 500 });
     assert.match(document.body.textContent!, /Too early!/);
+    assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
     await act(async () => timers.splice(0).forEach(callback => callback()));
     assert.match(document.body.textContent!, /Get ready/);
     await fire(E.GAME_STATE, lockedState);

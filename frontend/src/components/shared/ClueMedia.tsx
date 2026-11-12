@@ -71,14 +71,14 @@ export default function ClueMedia({ mediaType, mediaUrl, paused, hideVideo }: Pr
     return <audio ref={element => { mediaRef.current = element; }} src={mediaUrl} autoPlay={!paused} controls aria-label="Clue audio" className="mb-6 w-full max-w-2xl" />;
   }
   if (mediaType === 'video') {
-    return <video ref={element => { mediaRef.current = element; }} src={mediaUrl} autoPlay={!paused} playsInline controls hidden={hideVideo} aria-label="Clue video" className="max-h-[60dvh] object-contain mb-6 rounded w-full" />;
+    return <video ref={element => { mediaRef.current = element; }} src={mediaUrl} autoPlay={!paused} playsInline controls style={{ visibility: hideVideo ? 'hidden' : 'visible' }} aria-hidden={hideVideo} aria-label="Clue video" className="max-h-[60dvh] object-contain mb-6 rounded w-full" />;
   }
   if (mediaType === 'youtube') {
     const src = new URL(getYouTubeEmbedUrl(mediaUrl));
     src.searchParams.set('enablejsapi', '1');
     src.searchParams.set('autoplay', initiallyPaused.current ? '0' : '1');
     return (
-      <div hidden={hideVideo} className="mb-6 w-full aspect-video max-h-[60dvh]">
+      <div style={{ visibility: hideVideo ? 'hidden' : 'visible' }} aria-hidden={hideVideo} className="mb-6 w-full aspect-video max-h-[60dvh]">
         <iframe ref={youtubeRef} title="Clue video" className="w-full h-full rounded"
           src={src.toString()} allow="autoplay; fullscreen" allowFullScreen
           onLoad={() => {

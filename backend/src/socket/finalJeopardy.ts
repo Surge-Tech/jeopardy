@@ -453,6 +453,17 @@ export function registerFinalHandlers(
   socket: Socket,
   socketPlayers: Map<string, { roomCode: string; playerId: string; playerName: string }>,
 ) {
+  // A newly mounted host panel may have missed the initial private broadcast.
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_GET_STATE, ({ roomCode }: { roomCode: string }) => {
+    const secret = secrets.get(roomCode);
+    if (!secret) return;
+    socket.emit(SOCKET_EVENTS.FJ_HOST_STATE, {
+      wagers: Object.fromEntries(secret.wagers),
+      answers: Object.fromEntries(secret.answers),
+      drafts: Object.fromEntries(secret.drafts),
+    });
+  });
+
   onHost(socket, SOCKET_EVENTS.HOST_FJ_START, async ({ roomCode }: { roomCode: string }) => {
     const res = await startFinal(io, roomCode);
     if (!res.ok) socket.emit('error', { message: res.error });

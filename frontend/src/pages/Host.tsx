@@ -136,7 +136,7 @@ export default function Host() {
   }
 
   function openQuestion(q: Question) {
-    if (gameState && hasPendingAnswer(gameState)) return;
+    if (gameState && (hasPendingAnswer(gameState) || gameState.dailyDouble)) return;
     setBuzzWinner(null);
     setBuzzWinnerId(null);
     const boardHighValue = Math.max(...round.pointValues);
@@ -198,13 +198,7 @@ export default function Host() {
     } else {
       addLog({ type: 'wrong', msg: `${player?.name} answered wrong (-${value})`, player: player?.name });
     }
-    // Correct answers stay open until the host explicitly closes the question.
-    if (correct) return;
-
-    // Close incorrect Daily Doubles without double-logging.
-    setBuzzWinner(null);
-    setBuzzWinnerId(null);
-    socket.emit(SOCKET_EVENTS.HOST_CLOSE_QUESTION, { roomCode });
+    // Keep both Daily Double outcomes open for answer reveal and an explicit close.
   }
 
   function markWrongAndReopen(playerId: string) {
@@ -322,6 +316,14 @@ export default function Host() {
               Next Round →
             </button>
           )}
+          {gameState.phase !== 'finished' && board.finalJeopardy && !gameState.finalJeopardy && (
+            <button
+              className="bg-jeopardy-gold text-jeopardy-dark text-sm py-1 px-3 rounded font-bold hover:brightness-110 transition-all"
+              onClick={startFinalJeopardy}
+            >
+              ⚡ Start Final Jeopardy
+            </button>
+          )}
           <div className="bg-gray-800 rounded px-3 py-1 text-sm">
             Room: <span className="text-jeopardy-gold font-black tracking-widest text-lg">{roomCode}</span>
           </div>
@@ -385,16 +387,6 @@ export default function Host() {
             onOpenQuestion={openQuestion}
           />
 
-          {/* Final Jeopardy launcher */}
-          {board.finalJeopardy && !gameState.finalJeopardy && (
-            <button
-              className="mt-4 w-full bg-jeopardy-gold text-jeopardy-dark font-black py-3 rounded-lg hover:brightness-110 transition-all"
-              onClick={startFinalJeopardy}
-            >
-              ⚡ Start Final Jeopardy
-            </button>
-          )}
-
           {/* Share links */}
           <div className="mt-4 space-y-2">
             <ShareLink label="Board view (project this)" url={boardUrl} open />
@@ -408,11 +400,9 @@ export default function Host() {
 
           {/* Active question panel */}
           <div className="p-5 xl:p-6 border-b border-gray-700 flex-shrink-0">
-            <h2 className="text-base font-bold text-gray-400 uppercase mb-4">Active Question</h2>
-            <div className="mb-4"><BuzzerStatus gameState={gameState} /></div>
-            <BoardMediaControls board={board} gameState={gameState} roomCode={roomCode} />
             {gameState.finalJeopardy ? (
-              <HostFinalPanel roomCode={roomCode} gameState={gameState} board={board} />
+              <HostFinalPanel roomCode={roomCode} gameState={gameState} board={board}
+                mediaControls={<BoardMediaControls board={board} gameState={gameState} roomCode={roomCode} />} />
             ) : activeQ?.isDailyDouble && gameState.dailyDouble ? (
               <DDHostPanel
                 roomCode={roomCode}
@@ -420,10 +410,16 @@ export default function Host() {
                 activeQ={activeQ}
                 onAward={awardPoints}
                 onReveal={revealDD}
+                onShowAnswer={showAnswer}
                 onClose={closeQuestion}
+                category={getCatName(activeQ)}
+                mediaControls={<BoardMediaControls board={board} gameState={gameState} roomCode={roomCode} />}
               />
             ) : activeQ ? (
               <ActiveQuestionPanel
+                category={getCatName(activeQ)}
+                statusContent={(gameState.buzzerState === 'open' || hasPendingAnswer(gameState)) ? <BuzzerStatus gameState={gameState} /> : null}
+                mediaControls={<BoardMediaControls board={board} gameState={gameState} roomCode={roomCode} />}
                 activeQ={activeQ}
                 clueVisible={gameState.clueVisible}
                 onRevealClue={revealClue}
@@ -445,7 +441,16 @@ export default function Host() {
                 onClose={closeQuestion}
               />
             ) : (
-              <p className="text-gray-500 text-sm">Click a question on the board to open it.</p>
+              <div className="space-y-4">
+                <section aria-label="Question actions">
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Question actions</h2>
+                  <div className="rounded-lg bg-gray-800 px-4 py-3 text-center text-gray-400">Select a card on the board</div>
+                </section>
+                <section aria-label="Question status" role="status" className="rounded-xl border border-gray-700 bg-gray-950/50 p-4">
+                  <h2 className="font-bold text-jeopardy-gold">Ready for a question</h2>
+                  <p className="text-sm text-gray-300 mt-1">Select a card to preview its clue and answer.</p>
+                </section>
+              </div>
             )}
           </div>
 

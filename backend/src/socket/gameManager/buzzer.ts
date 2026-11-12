@@ -9,7 +9,7 @@ import { sessions, resetBuzzerFields, PERMANENT_LOCKOUT } from './state.js';
 export function openQuestion(roomCode: string, questionId: string, isDailyDouble: boolean): boolean {
   const session = sessions.get(roomCode);
   if (!session || session.phase === 'finished' || session.finalJeopardy) return false;
-  if (hasPendingAnswer(session)) return false;
+  if (hasPendingAnswer(session) || session.dailyDouble) return false;
   if (session.phase === 'lobby' && !startGame(roomCode)) return false;
   session.activeQuestionId = questionId;
   session.clueVisible = false;
@@ -32,6 +32,7 @@ export function revealClue(roomCode: string, mediaType?: Question['mediaType']):
 export function showResponse(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
+  if (session.dailyDouble && (!session.dailyDoubleRevealed || !session.dailyDouble.outcome)) return false;
   session.responseVisible = true;
   session.answerTimer = null;
   if (session.buzzerState === 'open') session.buzzerState = 'idle';
@@ -42,6 +43,7 @@ export function closeQuestion(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
   if (hasPendingAnswer(session)) return false;
+  if (session.dailyDouble && session.dailyDoubleRevealed && !session.dailyDouble.outcome) return false;
   if (session.activeQuestionId) {
     session.answeredQuestions.push(session.activeQuestionId);
   }
@@ -154,6 +156,10 @@ export function recordOutcome(roomCode: string, playerId: string, outcome: 'corr
   if (!session) return false;
   const player = session.players.find(p => p.id === playerId) ?? getCompetitor(session, playerId);
   if (!player) return false;
+  if (session.dailyDouble?.playerId === playerId) {
+    if (!validateScoreEligibility(roomCode, playerId, true)) return false;
+    session.dailyDouble.outcome = outcome;
+  }
   markBuzzAttempted(roomCode, playerId);
   if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
   if (outcome === 'correct') player.stats.correct += 1;
@@ -180,7 +186,8 @@ export function setLockoutMs(roomCode: string, ms: number): boolean {
 export function validateScoreEligibility(roomCode: string, playerId: string, isDailyDouble: boolean): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
-  if (isDailyDouble) return playerId === session.dailyDouble?.playerId;
+  if (isDailyDouble) return playerId === session.dailyDouble?.playerId &&
+    session.dailyDouble.stage === 'ready' && session.dailyDoubleRevealed && !session.dailyDouble.outcome;
   return playerId === session.buzzedPlayerId;
 }
 

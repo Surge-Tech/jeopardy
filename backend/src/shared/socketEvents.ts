@@ -73,6 +73,7 @@ export const SOCKET_EVENTS = {
 
   // Host Final Jeopardy controls
   HOST_FJ_START: 'host:fj-start',
+  HOST_FJ_GET_STATE: 'host:fj-get-state',
   HOST_FJ_REVEAL_CATEGORY: 'host:fj-reveal-category',
   HOST_FJ_START_TIMER: 'host:fj-start-timer',
   HOST_FJ_REVEAL_CLUE: 'host:fj-reveal-clue',

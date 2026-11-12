@@ -136,9 +136,9 @@ test('host team controls, shared standings and captain-only Final Jeopardy scree
     const picks: string[] = [];
     const ddState = { ...state, dailyDouble: { stage: 'ready', playerId: 'alice', maxWager: 1200, wager: 500, boardHighValue: 1000, hasDevice: true, submittedByPlayer: true }, dailyDoubleRevealed: true } as GameState;
     await render(<DDHostPanel gameState={ddState} roomCode="TEAM" activeQ={{ id: 'q', value: 200, clue: 'Clue', response: 'Answer' }}
-      onAward={(id: string) => picks.push(id)} onReveal={() => {}} onClose={() => {}} />);
+      onAward={(id: string) => picks.push(id)} onReveal={() => {}} onShowAnswer={() => {}} onClose={() => {}} />);
     assert.match(document.body.textContent!, /Blue/);
-    await act(async () => button('✓ Correct').click());
+    await act(async () => button('✓ Accept (Y)').click());
     assert.deepEqual(picks, ['alice']);
   } finally {
     await act(async () => root.unmount());

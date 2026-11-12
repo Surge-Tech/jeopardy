@@ -53,3 +53,13 @@ test('Space cannot close a response while the buzzed-in player is awaiting judgm
   state.buzzHistory[0].attemptedAnswer = true;
   assert.equal(getQuestionShortcut(space, state), 'close');
 });
+
+test('R cannot reveal the answer during judgment or buzz collection', () => {
+  const event = { code: 'KeyR', key: 'r' };
+  const state = { clueVisible: true, responseVisible: false, buzzerState: 'locked' as const,
+    buzzedPlayerId: 'player', buzzHistory: [{ playerId: 'player', playerName: 'Player', reactionMs: 50, attemptedAnswer: false }] };
+  assert.equal(getQuestionShortcut(event, state), null);
+  state.buzzHistory[0].attemptedAnswer = true;
+  assert.equal(getQuestionShortcut(event, state), 'response');
+  assert.equal(getQuestionShortcut(event, { ...state, buzzWindow: { deadline: Date.now() + 500, serverNow: Date.now() } }), null);
+});

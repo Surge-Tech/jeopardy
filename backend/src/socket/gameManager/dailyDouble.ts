@@ -6,7 +6,7 @@ import { sessions } from './state.js';
 
 export function revealDailyDouble(roomCode: string): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || session.phase === 'finished' || session.dailyDouble?.stage !== 'ready' || session.dailyDouble.wager == null || session.dailyDoubleRevealed) return false;
   session.dailyDoubleRevealed = true;
   return true;
 }
@@ -85,6 +85,7 @@ export function overrideDDWager(roomCode: string, amount: number): { ok: boolean
   const session = sessions.get(roomCode);
   const dd = session?.dailyDouble;
   if (!session || !dd || !dd.playerId) return { ok: false, error: 'No Daily Double contestant assigned' };
+  if (session.dailyDoubleRevealed) return { ok: false, error: 'The wager is locked after revealing the clue' };
   if (dd.hasDevice && !dd.submittedByPlayer) {
     return { ok: false, error: "Waiting for the player's own wager first" };
   }

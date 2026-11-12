@@ -117,6 +117,7 @@ export interface FinalPublicState {
 }
 
 export interface DailyDoubleState {
+  outcome?: 'correct' | 'wrong';
   stage: 'picking' | 'wagering' | 'ready';
   playerId: string | null;
   maxWager: number;

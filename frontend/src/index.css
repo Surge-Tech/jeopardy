@@ -131,6 +131,19 @@
   padding: 2rem;
 }
 .board-clue-content--solo { height: 100%; }
+.board-answer-overlay {
+  position: absolute;
+  z-index: 10;
+  left: 1rem;
+  right: 1rem;
+  bottom: 13rem;
+  width: calc(100% - 2rem);
+  margin: 0 auto;
+  max-height: calc(100% - 15rem);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.board-answer-overlay--solo { bottom: 2rem; max-height: calc(100% - 4rem); }
 .board-buzzer-dock {
   position: absolute;
   bottom: 1rem;
@@ -145,6 +158,8 @@
 .board-buzzer-dock__status { flex: 1; min-width: 0; max-width: 48rem; max-height: 10rem; overflow-y: auto; }
 .board-buzz-order { width: 16rem; flex-shrink: 0; max-height: 10rem; overflow-y: auto; }
 @media (max-width: 640px) {
+  .board-answer-overlay { bottom: 18rem; max-height: calc(100% - 20rem); }
+  .board-answer-overlay--solo { bottom: 2rem; max-height: calc(100% - 4rem); }
   .board-clue-content { height: calc(100% - 17rem); padding: 1.25rem; }
   .board-clue-content--solo { height: 100%; }
   .board-buzzer-dock { flex-direction: column; align-items: stretch; gap: 0.5rem; max-height: 15rem; }

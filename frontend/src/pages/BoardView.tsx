@@ -223,7 +223,7 @@ export default function BoardView() {
 
           {/* Answer — shown when host clicks "Show Answer" */}
           {gameState.responseVisible && (
-            <div className="mt-8 fade-up bg-black/60 border-2 border-jeopardy-gold rounded-xl px-8 py-4 text-center w-full max-w-3xl">
+            <div className={`mt-8 fade-up bg-black/90 border-2 border-jeopardy-gold rounded-xl px-8 py-4 text-center w-full max-w-3xl ${showQuestion.mediaType === 'image' ? `board-answer-overlay ${showQuestion.isDailyDouble ? 'board-answer-overlay--solo' : ''}` : ''}`}>
               <div className="text-gray-400 text-lg mb-1 uppercase tracking-widest">Answer</div>
               <div className="text-jeopardy-gold font-black text-3xl md:text-4xl" style={{ textShadow: '2px 2px 0 #000' }}>
                 {showQuestion.response}

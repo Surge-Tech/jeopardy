@@ -1,3 +1,4 @@
+import { getCompetitor, getCompetitors } from '@shared/competitors';
 import { useEffect, useMemo } from 'react';
 import type { GameState } from '@shared/types';
 import { playWinnerFanfare } from '../../utils/sounds';
@@ -26,7 +27,7 @@ export function buildRows(gameState: GameState): Row[] {
 
   const withScore: Row[] = fj
     ? fj.contestants.map(c => {
-        const player = gameState.players.find(p => p.id === c.playerId);
+        const player = getCompetitors(gameState).find(p => p.id === c.playerId);
         const revealed = fj.revealed[c.playerId];
         const change = revealed ? (revealed.correct ? revealed.wager : -revealed.wager) : 0;
         const correct = player?.stats?.correct ?? 0;
@@ -50,7 +51,7 @@ export function buildRows(gameState: GameState): Row[] {
           tied: false,
         };
       })
-    : gameState.players.map(p => {
+    : getCompetitors(gameState).map(p => {
         const correct = p.stats?.correct ?? 0;
         const wrong = p.stats?.wrong ?? 0;
         const total = correct + wrong;
@@ -88,6 +89,7 @@ export function buildRows(gameState: GameState): Row[] {
 }
 
 export default function Leaderboard({ gameState, compact, myId }: { gameState: GameState; compact?: boolean; myId?: string }) {
+  myId = myId ? getCompetitor(gameState, myId)?.id ?? myId : undefined;
   const rows = useMemo(() => buildRows(gameState), [gameState]);
   const hasFj = !!gameState.finalJeopardy;
 
@@ -176,7 +178,7 @@ export default function Leaderboard({ gameState, compact, myId }: { gameState: G
           <thead>
             <tr className="text-gray-400 text-xs uppercase border-b border-gray-700">
               <th className="p-2 text-left">Rank</th>
-              <th className="p-2 text-left">Player</th>
+              <th className="p-2 text-left">{gameState.mode === 'teams' ? 'Team' : 'Player'}</th>
               {hasFj && <th className="p-2 text-right">Pre-FJ</th>}
               {hasFj && <th className="p-2 text-right">Wager</th>}
               {hasFj && <th className="p-2 text-center">Result</th>}

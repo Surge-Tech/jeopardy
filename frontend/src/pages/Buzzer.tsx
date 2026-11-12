@@ -1,3 +1,4 @@
+import { getCompetitor, getCompetitors, getTeam, playerLabel } from '@shared/competitors';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
@@ -186,26 +187,28 @@ export default function Buzzer() {
     });
   }
 
-  const myScore = gameState?.players.find(p => p.id === myId)?.score ?? 0;
+  const myTeam = gameState ? getTeam(gameState, myId) : undefined;
+  const waitingForTeam = gameState?.mode === 'teams' && !myTeam;
+  const myScore = gameState ? getCompetitor(gameState, myId)?.score ?? 0 : 0;
   const isDDWagering = !!(gameState?.dailyDouble && gameState.dailyDouble.playerId === myId
     && gameState.dailyDouble.stage === 'wagering' && gameState.dailyDouble.hasDevice);
 
   const showBuzzer = phase !== 'join' && phase !== 'finished' && phase !== 'closed'
     && !gameState?.finalJeopardy && !isDDWagering;
-  const canBuzz = phase === 'open' || phase === 'armed';
+  const canBuzz = !waitingForTeam && (phase === 'open' || phase === 'armed');
   const buttonLabel = {
     open: 'BUZZ!', armed: 'Wait...', waiting: 'Waiting...', lobby: 'Waiting...',
     winner: 'Answering', 'too-late': 'Too slow!', 'locked-out': 'Too early!', incorrect: 'Locked out',
   }[phase as Exclude<BuzzerPhase, 'join' | 'closed' | 'finished'>];
-  const displayName = gameState?.players.find(player => player.id === myId)?.name ?? name;
+  const displayName = gameState ? playerLabel(gameState, myId) || name : name;
 
   const scoreboardRows = gameState && (
     <div className="space-y-1">
-      {[...gameState.players].sort((a, b) => b.score - a.score).map(p => (
+      {[...getCompetitors(gameState)].sort((a, b) => b.score - a.score).map(p => (
         <div key={p.id} className="flex justify-between items-center px-3 py-1 rounded bg-gray-900">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
-            <span className={`text-sm break-words min-w-0 ${p.id === myId ? 'text-white font-bold' : 'text-gray-400'}`}>{p.name}</span>
+            <span className={`text-sm break-words min-w-0 ${(p.id === myId || p.id === myTeam?.id) ? 'text-white font-bold' : 'text-gray-400'}`}>{p.name}</span>
           </div>
           <span className="font-bold text-sm shrink-0 ml-2" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
             {formatScore(p.score)}
@@ -305,6 +308,7 @@ export default function Buzzer() {
       {showBuzzer && (
         <>
           <section className="player-buzzer-station">
+            {waitingForTeam && <p role="status" className="player-team-notice">Waiting for the host to assign you to a team.</p>}
             <div className="player-buzzer-identity">
               <p className="text-2xl font-black text-white break-words" title={displayName}>{displayName}</p>
               <p className="text-jeopardy-gold font-black text-2xl mt-2">{formatScore(myScore)}</p>
@@ -317,7 +321,7 @@ export default function Buzzer() {
                 onClick={buzz}
                 onTouchStart={event => { event.preventDefault(); buzz(); }}
               >
-                {buttonLabel}
+                {waitingForTeam ? 'Awaiting team' : buttonLabel}
               </button>
             </div>
           </section>

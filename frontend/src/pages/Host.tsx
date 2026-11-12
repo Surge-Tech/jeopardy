@@ -1,3 +1,5 @@
+import TeamsPanel from '../components/host/TeamsPanel';
+import { getCompetitor, playerLabel } from '@shared/competitors';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
@@ -34,6 +36,7 @@ export default function Host() {
   const [renamingPlayerId, setRenamingPlayerId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [renameError, setRenameError] = useState('');
+  const [hostError, setHostError] = useState('');
   const [tab, setTab] = useState<'players' | 'log' | 'stats'>('players');
 
   useEffect(() => {
@@ -46,8 +49,10 @@ export default function Host() {
       socket.emit(SOCKET_EVENTS.HOST_CREATE, { boardId, roomCode: savedRoom ?? undefined });
     }
 
+    socket.on('error', ({ message }: { message: string }) => setHostError(message));
     socket.on(SOCKET_EVENTS.GAME_STATE, (state: GameState) => {
       setGameState(state);
+      setHostError('');
       setRoomCode(state.roomCode);
     });
     socket.on(SOCKET_EVENTS.BUZZ_WINNER, ({ playerName, playerId }: { playerName: string; playerId: string }) => {
@@ -78,6 +83,7 @@ export default function Host() {
 
     return () => {
       disposed = true;
+      socket.off('error');
       socket.off('connect', startSession);
       socket.off('game:state');
       socket.off('buzz:winner');
@@ -182,7 +188,7 @@ export default function Host() {
     const isDD = !!activeQ?.isDailyDouble && gameState!.dailyDouble?.stage === 'ready';
     const value = isDD ? (gameState!.dailyDouble!.wager ?? 0) : (activeQ?.value ?? 0);
     const delta = correct ? value : -value;
-    const player = gameState!.players.find(p => p.id === playerId);
+    const player = getCompetitor(gameState!, playerId);
     socket.emit(SOCKET_EVENTS.HOST_SCORE, { roomCode, playerId, delta, outcome: correct ? 'correct' : 'wrong', isDailyDouble: isDD });
     if (correct) {
       addLog({ type: 'correct', msg: `${player?.name} answered correctly (+${value})`, player: player?.name });
@@ -197,7 +203,7 @@ export default function Host() {
 
   function markWrongAndReopen(playerId: string) {
     const value = activeQ?.value ?? 0;
-    const player = gameState!.players.find(p => p.id === playerId);
+    const player = getCompetitor(gameState!, playerId);
     socket.emit(SOCKET_EVENTS.HOST_WRONG_REOPEN, { roomCode, playerId, delta: -value });
     addLog({ type: 'wrong', msg: `${player?.name ?? 'Player'} answered wrong (-${value})`, player: player?.name });
     setBuzzWinner(null);
@@ -205,7 +211,7 @@ export default function Host() {
   }
 
   function adjustScore(playerId: string, delta: number) {
-    const player = gameState!.players.find(p => p.id === playerId);
+    const player = getCompetitor(gameState!, playerId);
     socket.emit(SOCKET_EVENTS.HOST_SCORE, { roomCode, playerId, delta });
     addLog({ type: 'score', msg: `${player?.name} score adjusted ${delta > 0 ? '+' : ''}${delta}`, player: player?.name });
   }
@@ -278,6 +284,8 @@ export default function Host() {
   // Per-player stats come from the server (survives refresh, includes early buzzes)
   const playerStats = gameState.players.map(p => ({
     ...p,
+    name: playerLabel(gameState, p.id),
+    score: getCompetitor(gameState, p.id)?.score ?? 0,
     correct: p.stats?.correct ?? 0,
     wrong: p.stats?.wrong ?? 0,
     buzzes: p.stats?.buzzes ?? 0,
@@ -333,6 +341,7 @@ export default function Host() {
         </div>
       </div>
 
+      {hostError && <p role="alert" className="bg-red-950 text-red-300 px-4 py-2">{hostError}</p>}
       {/* Game-over banner */}
       {gameState.phase === 'finished' && (
         <div className="bg-jeopardy-gold text-jeopardy-dark px-4 py-2 flex items-center gap-4 flex-wrap font-bold">
@@ -452,7 +461,13 @@ export default function Host() {
 
             {/* Players tab */}
             {tab === 'players' && (
+              <>
+              <TeamsPanel gameState={gameState} roomCode={roomCode} />
               <PlayersTab
+                gameState={gameState}
+                roomCode={roomCode}
+                teamMode={gameState.mode === 'teams'}
+                membershipLocked={gameState.mode === 'teams' && gameState.phase !== 'lobby'}
                 players={gameState.players}
                 addPlayerName={addPlayerName}
                 onAddPlayerNameChange={setAddPlayerName}
@@ -467,6 +482,7 @@ export default function Host() {
                 onAdjustScore={adjustScore}
                 onRemovePlayer={removePlayer}
               />
+              </>
             )}
 
             {/* Log tab */}

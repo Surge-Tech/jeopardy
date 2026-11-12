@@ -10,3 +10,4 @@ export * from './gameManager/sessions.js';
 export * from './gameManager/buzzer.js';
 export * from './gameManager/dailyDouble.js';
 export * from './gameManager/rounds.js';
+export * from './gameManager/teams.js';

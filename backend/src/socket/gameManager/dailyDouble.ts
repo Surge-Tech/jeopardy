@@ -1,3 +1,4 @@
+import { getCompetitor, wagerPlayerId } from '../../shared/competitors.js';
 import type { DailyDoubleState } from '../../types.js';
 import { sessions } from './state.js';
 
@@ -22,7 +23,7 @@ export function startDailyDoubleWager(
   const session = sessions.get(roomCode);
   if (!session) return null;
 
-  if (!lastCorrectPlayerId || !session.players.some(p => p.id === lastCorrectPlayerId)) {
+  if (!lastCorrectPlayerId || !getCompetitor(session, lastCorrectPlayerId)) {
     session.dailyDouble = {
       stage: 'picking',
       playerId: null,
@@ -35,10 +36,10 @@ export function startDailyDoubleWager(
     return session.dailyDouble;
   }
 
-  const player = session.players.find(p => p.id === lastCorrectPlayerId)!;
+  const player = getCompetitor(session, lastCorrectPlayerId)!;
   session.dailyDouble = {
     stage: 'wagering',
-    playerId: player.id,
+    playerId: wagerPlayerId(session, player.id),
     maxWager: Math.max(player.score, boardHighValue),
     boardHighValue,
     wager: null,
@@ -51,10 +52,10 @@ export function startDailyDoubleWager(
 // Host's fallback pick when there's no tracked "last correct" player.
 export function pickDDContestant(roomCode: string, playerId: string, hasDevice: boolean): boolean {
   const session = sessions.get(roomCode);
-  if (!session || !session.dailyDouble) return false;
-  const player = session.players.find(p => p.id === playerId);
+  if (!session || session.dailyDouble?.stage !== 'picking') return false;
+  const player = getCompetitor(session, playerId);
   if (!player) return false;
-  session.dailyDouble.playerId = player.id;
+  session.dailyDouble.playerId = wagerPlayerId(session, player.id);
   session.dailyDouble.maxWager = Math.max(player.score, session.dailyDouble.boardHighValue);
   session.dailyDouble.hasDevice = hasDevice;
   session.dailyDouble.stage = 'wagering';

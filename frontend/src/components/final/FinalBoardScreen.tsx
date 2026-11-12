@@ -1,3 +1,4 @@
+import { getCompetitors } from '@shared/competitors';
 import ResponseMedia from '../shared/ResponseMedia';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '@shared/types';
@@ -173,7 +174,7 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
                 {revealed.correct ? '✓ CORRECT' : '✗ WRONG'}
               </div>
               <div className="count-pop mt-4 text-jeopardy-gold font-black text-3xl">
-                {gameState.players.find(p => p.id === contestant.playerId)?.score ?? 0}
+                {getCompetitors(gameState).find(p => p.id === contestant.playerId)?.score ?? 0}
               </div>
             </div>
           )}

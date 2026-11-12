@@ -58,7 +58,18 @@ export interface PlayerStats {
   earlyBuzzes: number;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  color: string;
+  score: number;
+  captainPlayerId: string | null;
+  // Team-level Final Jeopardy outcomes; ordinary clue stats remain on members.
+  stats?: PlayerStats;
+}
+
 export interface Player {
+  teamId?: string | null;
   id: string;
   name: string;
   score: number;
@@ -69,6 +80,7 @@ export interface Player {
 export type FinalStage = 'intro' | 'wagering' | 'clue' | 'answering' | 'locked' | 'reveal' | 'response' | 'final';
 export type FinalRevealStep = 'name' | 'wager' | 'answer' | 'judged';
 
+// playerId is the competitor ID: a player in individual mode, a team in team mode.
 export interface FinalContestant {
   playerId: string;
   playerName: string;
@@ -127,6 +139,8 @@ export interface BuzzEntry {
 export const PERMANENT_LOCKOUT = Number.MAX_SAFE_INTEGER;
 
 export interface GameState {
+  mode: 'individual' | 'teams';
+  teams: Team[];
   boardId: string;
   roomCode: string;
   players: Player[];

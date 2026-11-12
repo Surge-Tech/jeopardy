@@ -1,3 +1,5 @@
+import { getCompetitor, getTeam, playerLabel } from '../../shared/competitors.js';
+import { startGame } from './sessions.js';
 import { hasPendingAnswer } from '../../shared/questionFlow.js';
 import type { GameState, Question } from '../../types.js';
 import { sessions, resetBuzzerFields, PERMANENT_LOCKOUT } from './state.js';
@@ -6,8 +8,9 @@ import { sessions, resetBuzzerFields, PERMANENT_LOCKOUT } from './state.js';
 
 export function openQuestion(roomCode: string, questionId: string, isDailyDouble: boolean): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || session.phase === 'finished' || session.finalJeopardy) return false;
   if (hasPendingAnswer(session)) return false;
+  if (session.phase === 'lobby' && !startGame(roomCode)) return false;
   session.activeQuestionId = questionId;
   session.clueVisible = false;
   resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
@@ -101,6 +104,8 @@ export function recordBuzz(roomCode: string, playerId: string, playerName: strin
 
   const now = Date.now();
   const player = session.players.find(p => p.id === playerId);
+  if (!player || (session.mode === 'teams' && !getTeam(session, playerId)) || session.dailyDouble || session.finalJeopardy) return 'ignored';
+  playerName = playerLabel(session, playerId);
   if (session.buzzLockouts[playerId] === PERMANENT_LOCKOUT) return 'locked-out';
 
   if (session.buzzerState === 'idle') {
@@ -147,7 +152,7 @@ export function recordBuzz(roomCode: string, playerId: string, playerName: strin
 export function recordOutcome(roomCode: string, playerId: string, outcome: 'correct' | 'wrong'): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
-  const player = session.players.find(p => p.id === playerId);
+  const player = session.players.find(p => p.id === playerId) ?? getCompetitor(session, playerId);
   if (!player) return false;
   markBuzzAttempted(roomCode, playerId);
   if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
@@ -187,10 +192,13 @@ export function markWrongAndReopen(roomCode: string, playerId: string, delta: nu
   if (playerId !== session.buzzedPlayerId) return false;
   const player = session.players.find(p => p.id === playerId);
   if (!player) return false;
-  player.score += delta;
+  if (!updateScore(roomCode, playerId, delta)) return false;
   if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
   player.stats.wrong += 1;
-  session.buzzLockouts[playerId] = PERMANENT_LOCKOUT;
+  const team = getTeam(session, playerId);
+  for (const member of session.players) {
+    if (member.id === playerId || (team && member.teamId === team.id)) session.buzzLockouts[member.id] = PERMANENT_LOCKOUT;
+  }
   markBuzzAttempted(roomCode, playerId);
   resetBuzzerFields(session, { buzzerState: 'open' });
   return true;
@@ -218,8 +226,8 @@ export function finishBuzzCollection(roomCode: string, window: GameState['buzzWi
 export function updateScore(roomCode: string, playerId: string, delta: number): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
-  const player = session.players.find(p => p.id === playerId);
-  if (!player) return false;
+  const player = getCompetitor(session, playerId);
+  if (!player || !Number.isFinite(delta) || !Number.isInteger(delta)) return false;
   player.score += delta;
   return true;
 }
@@ -227,8 +235,8 @@ export function updateScore(roomCode: string, playerId: string, delta: number): 
 export function setScore(roomCode: string, playerId: string, score: number): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
-  const player = session.players.find(p => p.id === playerId);
-  if (!player) return false;
+  const player = getCompetitor(session, playerId);
+  if (!player || !Number.isFinite(score) || !Number.isInteger(score)) return false;
   player.score = score;
   return true;
 }

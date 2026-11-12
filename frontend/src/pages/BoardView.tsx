@@ -1,3 +1,4 @@
+import { getCompetitors } from '@shared/competitors';
 import ResponseMedia from '../components/shared/ResponseMedia';
 import ClueMedia from '../components/shared/ClueMedia';
 import BuzzerStatus from '../components/shared/BuzzerStatus';
@@ -268,7 +269,7 @@ export default function BoardView() {
 
       {/* Score bar */}
       <div className="bg-black border-t-4 border-jeopardy-gold flex">
-        {gameState.players.map(player => (
+        {getCompetitors(gameState).map(player => (
           <div
             key={player.id}
             className="flex-1 text-center py-2 border-r border-gray-700 last:border-0"

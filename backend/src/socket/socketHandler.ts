@@ -1,3 +1,4 @@
+import { wagerPlayerId } from '../shared/competitors.js';
 import type { Server, Socket } from 'socket.io';
 import * as gm from './gameManager.js';
 import * as boardStorage from '../storage/boardStorage.js';
@@ -57,8 +58,75 @@ function startIdleSessionReaper(io: Server) {
 export function registerSocketHandlers(io: Server) {
   startIdleSessionReaper(io);
 
+  function refreshDDDevice(roomCode: string) {
+    const session = gm.getSession(roomCode);
+    if (session?.dailyDouble) session.dailyDouble.hasDevice = [...socketPlayers.values()]
+      .some(v => v.roomCode === roomCode && v.playerId === session.dailyDouble?.playerId);
+  }
+
+  // Phones and host test buttons use the same state transitions and broadcasts.
+  function handleBuzz(socket: Socket, roomCode: string, playerId: string, playerName: string): gm.BuzzOutcome {
+    const outcome = gm.recordBuzz(roomCode, playerId, playerName, buzzOpenedAt.get(roomCode) ?? null);
+    const session = gm.getSession(roomCode);
+    if (outcome === 'won') {
+      io.to(roomCode).emit(SOCKET_EVENTS.BUZZ_WINNER, {
+        playerId,
+        playerName: session!.buzzedPlayerName,
+        timestamp: Date.now(),
+      });
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, session);
+      const window = session!.buzzWindow;
+      setTimeout(() => {
+        if (!gm.finishBuzzCollection(roomCode, window)) return;
+        io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+      }, gm.BUZZ_COLLECTION_MS);
+    } else if (outcome === 'early' || outcome === 'locked-out') {
+      const until = session?.buzzLockouts[playerId] ?? Date.now();
+      socket.emit(SOCKET_EVENTS.BUZZ_LOCKED_OUT, { until });
+      io.to(`hostpanel:${roomCode}`).emit(SOCKET_EVENTS.GAME_STATE, session);
+    } else if (outcome === 'recorded') {
+      socket.emit(SOCKET_EVENTS.BUZZ_RECORDED);
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    } else {
+      socket.emit(SOCKET_EVENTS.BUZZ_TOO_LATE);
+    }
+    return outcome;
+  }
+
   io.on('connection', (socket: Socket) => {
     registerFinalHandlers(io, socket, socketPlayers);
+
+    onHost(socket, SOCKET_EVENTS.HOST_SET_MODE, ({ roomCode, mode }: { roomCode: string; mode: 'individual' | 'teams' }, ack) => {
+      const res = gm.setMode(roomCode, mode);
+      ack?.(res);
+      if (res.ok) io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+    onHost(socket, SOCKET_EVENTS.HOST_SAVE_TEAM, ({ roomCode, id, name, color }: { roomCode: string; id?: string; name: string; color: string }, ack) => {
+      const res = gm.saveTeam(roomCode, id, name, color);
+      ack?.(res);
+      if (res.ok) io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+    onHost(socket, SOCKET_EVENTS.HOST_REMOVE_TEAM, ({ roomCode, teamId }: { roomCode: string; teamId: string }, ack) => {
+      const res = gm.removeTeam(roomCode, teamId);
+      ack?.(res);
+      if (res.ok) io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+    onHost(socket, SOCKET_EVENTS.HOST_ASSIGN_TEAM, ({ roomCode, playerId, teamId }: { roomCode: string; playerId: string; teamId: string | null }, ack) => {
+      const res = gm.assignTeam(roomCode, playerId, teamId);
+      ack?.(res);
+      if (res.ok) io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+    onHost(socket, SOCKET_EVENTS.HOST_AUTO_ASSIGN_TEAMS, ({ roomCode }: { roomCode: string }, ack) => {
+      const res = gm.autoAssignTeams(roomCode);
+      ack?.(res);
+      if (res.ok) io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+    onHost(socket, SOCKET_EVENTS.HOST_SET_CAPTAIN, ({ roomCode, teamId, playerId }: { roomCode: string; teamId: string; playerId: string }, ack) => {
+      const res = gm.setCaptain(roomCode, teamId, playerId);
+      refreshDDDevice(roomCode);
+      ack?.(res);
+      if (res.ok) io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
 
     // ── HOST: create a game session ──────────────────────────────────────
     socket.on(SOCKET_EVENTS.HOST_CREATE, ({ boardId, roomCode }: { boardId: string; roomCode?: string }) => {
@@ -85,6 +153,7 @@ export function registerSocketHandlers(io: Server) {
     socket.on(SOCKET_EVENTS.PLAYER_JOIN, ({ roomCode, name, color }: { roomCode: string; name: string; color: string }) => {
       const session = gm.getSession(roomCode);
       if (!session) return socket.emit('error', { message: 'Room not found' });
+      if (session.mode === 'teams' && session.phase !== 'lobby') return socket.emit('error', { message: 'Team games only accept new players in the lobby' });
       if (gm.isNameTaken(session, name)) return socket.emit('error', { message: 'That name is already taken in this game' });
       const player = gm.addPlayer(roomCode, name, color);
       if (!player) return socket.emit('error', { message: 'Could not join room' });
@@ -102,6 +171,7 @@ export function registerSocketHandlers(io: Server) {
     onHost(socket, SOCKET_EVENTS.HOST_ADD_PLAYER, ({ roomCode, name, color }: { roomCode: string; name: string; color: string }) => {
       const session = gm.getSession(roomCode);
       if (!session) return socket.emit('error', { message: 'Room not found' });
+      if (session.mode === 'teams' && session.phase !== 'lobby') return socket.emit('error', { message: 'Team games only accept new players in the lobby' });
       if (gm.isNameTaken(session, name)) return socket.emit('error', { message: 'That name is already taken in this game' });
       const player = gm.addPlayer(roomCode, name, color);
       if (!player) return socket.emit('error', { message: 'Could not add player' });
@@ -116,38 +186,28 @@ export function registerSocketHandlers(io: Server) {
       if (!player) return socket.emit('error', { message: 'Player no longer in this game' });
       socketPlayers.set(socket.id, { roomCode, playerId: player.id, playerName: player.name });
       socket.join(roomCode);
+      refreshDDDevice(roomCode);
       socket.emit(SOCKET_EVENTS.PLAYER_JOINED, { player, state: session });
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, session);
     });
 
     // ── PLAYER: buzz in ──────────────────────────────────────────────────
     socket.on(SOCKET_EVENTS.BUZZ, () => {
       const info = socketPlayers.get(socket.id);
-      if (!info) return;
-      if (isRateLimited(socket.id)) return;
-      const outcome = gm.recordBuzz(info.roomCode, info.playerId, info.playerName, buzzOpenedAt.get(info.roomCode) ?? null);
-      const session = gm.getSession(info.roomCode);
-      if (outcome === 'won') {
-        io.to(info.roomCode).emit(SOCKET_EVENTS.BUZZ_WINNER, {
-          playerId: info.playerId,
-          playerName: info.playerName,
-          timestamp: Date.now(),
-        });
-        io.to(info.roomCode).emit(SOCKET_EVENTS.GAME_STATE, session);
-        const window = session!.buzzWindow;
-        setTimeout(() => {
-          if (!gm.finishBuzzCollection(info.roomCode, window)) return;
-          io.to(info.roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(info.roomCode));
-        }, gm.BUZZ_COLLECTION_MS);
-      } else if (outcome === 'early' || outcome === 'locked-out') {
-        const until = session?.buzzLockouts[info.playerId] ?? Date.now();
-        socket.emit(SOCKET_EVENTS.BUZZ_LOCKED_OUT, { until });
-        io.to(`hostpanel:${info.roomCode}`).emit(SOCKET_EVENTS.GAME_STATE, session);
-      } else if (outcome === 'recorded') {
-        socket.emit(SOCKET_EVENTS.BUZZ_RECORDED);
-        io.to(info.roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(info.roomCode));
-      } else {
-        socket.emit(SOCKET_EVENTS.BUZZ_TOO_LATE);
-      }
+      if (!info || isRateLimited(socket.id)) return;
+      handleBuzz(socket, info.roomCode, info.playerId, info.playerName);
+    });
+
+    onHost(socket, SOCKET_EVENTS.HOST_BUZZ_PLAYER, ({ roomCode, playerId }: { roomCode: string; playerId: string }, ack) => {
+      const session = gm.getSession(roomCode);
+      const player = session?.players.find(p => p.id === playerId);
+      if (!player) return ack?.({ ok: false, error: 'Player not found in this room' });
+      if (isRateLimited(socket.id)) return ack?.({ ok: false, error: 'Too many buzz attempts; try again shortly' });
+      // Do not bind the host socket to the player: this is a simulated buzz,
+      // not a connected player device for wagering or reconnect purposes.
+      const outcome = handleBuzz(socket, roomCode, player.id, player.name);
+      const result = { ok: true, outcome };
+      ack?.(result);
     });
 
     // ── HOST: set buzzer lockout duration ──────────────────────────────────
@@ -186,12 +246,16 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: open a question ────────────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_OPEN_QUESTION, ({ roomCode, questionId, isDailyDouble, boardHighValue }: { roomCode: string; questionId: string; isDailyDouble: boolean; boardHighValue?: number }) => {
-      if (!gm.openQuestion(roomCode, questionId, isDailyDouble)) return;
+      if (!gm.openQuestion(roomCode, questionId, isDailyDouble)) {
+        if (gm.getSession(roomCode)?.phase === 'lobby') socket.emit('error', { message: 'Assign every player to a team and choose a captain for each team before starting' });
+        return;
+      }
       if (isDailyDouble) {
         const session = gm.getSession(roomCode);
         const lastCorrect = session?.lastCorrectPlayerId ?? null;
-        const hasDevice = lastCorrect
-          ? [...socketPlayers.values()].some(v => v.roomCode === roomCode && v.playerId === lastCorrect)
+        const submitter = session && lastCorrect ? wagerPlayerId(session, lastCorrect) : null;
+        const hasDevice = submitter
+          ? [...socketPlayers.values()].some(v => v.roomCode === roomCode && v.playerId === submitter)
           : false;
         gm.startDailyDoubleWager(roomCode, lastCorrect, boardHighValue ?? 0, hasDevice);
       }
@@ -200,7 +264,9 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: fallback pick of the Daily Double contestant ────────────────
     onHost(socket, SOCKET_EVENTS.HOST_DD_PICK_PLAYER, ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
-      const hasDevice = [...socketPlayers.values()].some(v => v.roomCode === roomCode && v.playerId === playerId);
+      const session = gm.getSession(roomCode);
+      const submitter = session ? wagerPlayerId(session, playerId) : null;
+      const hasDevice = [...socketPlayers.values()].some(v => v.roomCode === roomCode && v.playerId === submitter);
       gm.pickDDContestant(roomCode, playerId, hasDevice);
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
@@ -286,12 +352,13 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: award / deduct points ──────────────────────────────────────
-    onHost(socket, SOCKET_EVENTS.HOST_SCORE, ({ roomCode, playerId, delta, outcome, isDailyDouble }: { roomCode: string; playerId: string; delta: number; outcome?: 'correct' | 'wrong'; isDailyDouble?: boolean }) => {
+    onHost(socket, SOCKET_EVENTS.HOST_SCORE, ({ roomCode, playerId, delta, outcome, isDailyDouble }: { roomCode: string; playerId: string; delta: number; outcome?: 'correct' | 'wrong'; isDailyDouble?: boolean }, ack) => {
       // Only judged Correct/Wrong clicks (outcome present) are checked against
       // who's actually eligible right now; manual score adjustments (no
       // outcome) are a free-form host override and must not be blocked here.
       if (outcome && !gm.validateScoreEligibility(roomCode, playerId, !!isDailyDouble)) return;
-      gm.updateScore(roomCode, playerId, delta);
+      if (!gm.updateScore(roomCode, playerId, delta)) return ack?.({ ok: false, error: 'Invalid score or competitor' });
+      ack?.({ ok: true });
       if (outcome) {
         gm.recordOutcome(roomCode, playerId, outcome);
         if (outcome === 'correct' && !isDailyDouble) gm.setLastCorrectPlayer(roomCode, playerId);
@@ -345,8 +412,9 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: start game ─────────────────────────────────────────────────
-    onHost(socket, SOCKET_EVENTS.HOST_START, ({ roomCode }: { roomCode: string }) => {
-      gm.startGame(roomCode);
+    onHost(socket, SOCKET_EVENTS.HOST_START, ({ roomCode }: { roomCode: string }, ack) => {
+      if (!gm.startGame(roomCode)) return ack?.({ ok: false, error: 'Assign every player to a team and choose a captain for each team before starting' });
+      ack?.({ ok: true });
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
@@ -395,6 +463,7 @@ export function registerSocketHandlers(io: Server) {
       if (info) {
         socketPlayers.delete(socket.id);
         // Don't auto-remove player on disconnect so they can reconnect
+        refreshDDDevice(info.roomCode);
         const session = gm.getSession(info.roomCode);
         if (session) io.to(info.roomCode).emit(SOCKET_EVENTS.GAME_STATE, session);
       }

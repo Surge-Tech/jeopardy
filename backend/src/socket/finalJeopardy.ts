@@ -1,3 +1,4 @@
+import { getCompetitor, getCompetitors, getTeam } from '../shared/competitors.js';
 import type { Server, Socket } from 'socket.io';
 import * as gm from './gameManager.js';
 import * as boardStorage from '../storage/boardStorage.js';
@@ -63,8 +64,11 @@ export async function startFinal(io: Server, roomCode: string): Promise<{ ok: bo
     return { ok: false, error: 'This board has no Final Jeopardy clue configured' };
   }
 
+  if (session.phase === 'lobby' && !gm.startGame(roomCode)) return { ok: false, error: 'Finish team setup before starting' };
+
   // Snapshot reveal order: ascending score, ties broken by join order (index in players array).
-  const order = [...session.players]
+  const competitors = getCompetitors(session);
+  const order = [...competitors]
     .map((p, idx) => ({ p, idx }))
     .sort((a, b) => a.p.score - b.p.score || a.idx - b.idx)
     .map(({ p }) => p.id);
@@ -72,7 +76,7 @@ export async function startFinal(io: Server, roomCode: string): Promise<{ ok: bo
   const wagers = new Map<string, number>();
 
   const contestants: FinalContestant[] = order.map(playerId => {
-    const player = session.players.find(p => p.id === playerId)!;
+    const player = competitors.find(p => p.id === playerId)!;
     const maxWager = Math.max(player.score, 0);
     // Players at 0 or below have only one legal wager (0), so lock it in now
     // rather than making them submit — they can't be stuck waiting on the phone.
@@ -130,7 +134,18 @@ export function revealCategory(io: Server, roomCode: string) {
   hostLog(io, roomCode, `Category revealed: ${secret.board.category}`);
 }
 
+function submissionId(roomCode: string, playerId: string): string | null {
+  const session = gm.getSession(roomCode);
+  if (!session?.players.some(p => p.id === playerId)) return null;
+  if (session.mode !== 'teams') return playerId;
+  const team = getTeam(session, playerId);
+  return team?.captainPlayerId === playerId ? team.id : null;
+}
+
 export function submitWager(io: Server, roomCode: string, playerId: string, amount: number): { ok: boolean; error?: string } {
+  const competitorId = submissionId(roomCode, playerId);
+  if (!competitorId) return { ok: false, error: 'Only the current team captain can submit' };
+  playerId = competitorId;
   const fj = getFj(roomCode);
   const secret = secrets.get(roomCode);
   if (!fj || !secret) return { ok: false, error: 'No Final Jeopardy in progress' };
@@ -218,9 +233,13 @@ export function startTimer(io: Server, roomCode: string) {
 }
 
 export function saveDraft(io: Server, roomCode: string, playerId: string, text: string): { ok: boolean; error?: string } {
+  const competitorId = submissionId(roomCode, playerId);
+  if (!competitorId) return { ok: false, error: 'Only the current team captain can submit' };
+  playerId = competitorId;
   const fj = getFj(roomCode);
   const secret = secrets.get(roomCode);
   if (!fj || !secret) return { ok: false, error: 'No Final Jeopardy in progress' };
+  if (!fj.contestants.some(c => c.playerId === playerId)) return { ok: false, error: 'You are not in Final Jeopardy' };
   if (fj.stage !== 'answering') return { ok: false, error: 'Not accepting answers right now' };
   if (secret.answers.has(playerId)) return { ok: false, error: 'Answer already submitted' };
   secret.drafts.set(playerId, text.slice(0, LIMITS.ANSWER_MAX));
@@ -229,9 +248,13 @@ export function saveDraft(io: Server, roomCode: string, playerId: string, text: 
 }
 
 export function submitAnswer(io: Server, roomCode: string, playerId: string, text: string): { ok: boolean; error?: string } {
+  const competitorId = submissionId(roomCode, playerId);
+  if (!competitorId) return { ok: false, error: 'Only the current team captain can submit' };
+  playerId = competitorId;
   const fj = getFj(roomCode);
   const secret = secrets.get(roomCode);
   if (!fj || !secret) return { ok: false, error: 'No Final Jeopardy in progress' };
+  if (!fj.contestants.some(c => c.playerId === playerId)) return { ok: false, error: 'You are not in Final Jeopardy' };
   if (fj.stage !== 'answering') return { ok: false, error: 'Not accepting answers right now' };
   if (!fj.deadline || Date.now() > fj.deadline + 750) return { ok: false, error: 'Time is up' };
   if (secret.answers.has(playerId)) return { ok: false, error: 'Answer already submitted' };
@@ -329,6 +352,12 @@ export function judge(io: Server, roomCode: string, playerId: string, correct: b
   const answer = secret.answers.get(playerId) ?? '';
   const delta = correct ? wager : -wager;
   gm.updateScore(roomCode, playerId, delta);
+  const previous = fj.revealed[playerId];
+  const competitor = getCompetitor(gm.getSession(roomCode)!, playerId);
+  if (previous && competitor?.stats) {
+    const key = previous.correct ? 'correct' : 'wrong';
+    competitor.stats[key] = Math.max(0, competitor.stats[key] - 1);
+  }
   gm.recordOutcome(roomCode, playerId, correct ? 'correct' : 'wrong');
   secret.appliedDelta.set(playerId, delta);
 
@@ -355,7 +384,7 @@ export function undo(io: Server, roomCode: string) {
   if (entry) {
     // Revert the stats counter too.
     const session = gm.getSession(roomCode);
-    const player = session?.players.find(p => p.id === playerId);
+    const player = session ? getCompetitor(session, playerId) : undefined;
     if (player?.stats) {
       if (entry.correct) player.stats.correct = Math.max(0, player.stats.correct - 1);
       else player.stats.wrong = Math.max(0, player.stats.wrong - 1);

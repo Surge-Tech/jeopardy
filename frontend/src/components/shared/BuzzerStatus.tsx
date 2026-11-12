@@ -1,4 +1,5 @@
 import type { GameState } from '@shared/types';
+import { getCompetitor } from '@shared/competitors';
 import { hasPendingAnswer } from '@shared/questionFlow';
 import AnswerCountdown from './AnswerCountdown';
 
@@ -8,7 +9,7 @@ export default function BuzzerStatus({ gameState, display = false, personal = fa
   personal?: boolean;
 }) {
   const open = gameState.buzzerState === 'open';
-  const player = gameState.players.find(player => player.id === gameState.buzzedPlayerId);
+  const player = gameState.buzzedPlayerId ? getCompetitor(gameState, gameState.buzzedPlayerId) : undefined;
   const pending = hasPendingAnswer(gameState);
   if (!open && !gameState.buzzedPlayerId) return null;
   return (

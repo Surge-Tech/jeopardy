@@ -24,7 +24,7 @@ export default function WagerInput({ heading, subtitle, maxWager, locked, locked
       <div className="text-center">
         {heading && <h2 className="text-xl font-black text-jeopardy-gold mb-2">{heading}</h2>}
         <p className="text-white text-lg">
-          Wager locked: <span className="text-jeopardy-gold font-black">{lockedAmount ?? maxWager}</span>
+          Wager locked{lockedAmount !== undefined && <>: <span className="text-jeopardy-gold font-black">{lockedAmount}</span></>}
         </p>
         {waitingText && <p className="text-gray-500 text-sm mt-4 animate-pulse">{waitingText}</p>}
       </div>

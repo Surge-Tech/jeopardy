@@ -17,6 +17,8 @@ export function createSession(boardId: string): GameState {
     boardId,
     roomCode,
     players: [],
+    mode: 'individual',
+    teams: [],
     answeredQuestions: [],
     activeQuestionId: null,
     buzzerState: 'idle',
@@ -82,9 +84,9 @@ export function isNameTaken(session: GameState, name: string, excludePlayerId?: 
 
 export function addPlayer(roomCode: string, name: string, color: string): Player | null {
   const session = sessions.get(roomCode);
-  if (!session) return null;
+  if (!session || (session.mode === 'teams' && session.phase !== 'lobby')) return null;
   if (isNameTaken(session, name)) return null;
-  const player: Player = { id: uuidv4(), name, score: 0, color };
+  const player: Player = { id: uuidv4(), name, score: 0, color, teamId: null };
   session.players.push(player);
   return player;
 }
@@ -92,6 +94,8 @@ export function addPlayer(roomCode: string, name: string, color: string): Player
 export function removePlayer(roomCode: string, playerId: string) {
   const session = sessions.get(roomCode);
   if (!session) return;
+  if (session.mode === 'teams' && session.phase !== 'lobby') return;
+  for (const team of session.teams) if (team.captainPlayerId === playerId) team.captainPlayerId = null;
   session.players = session.players.filter(p => p.id !== playerId);
 }
 
@@ -108,6 +112,13 @@ export function renamePlayer(roomCode: string, playerId: string, newName: string
 export function startGame(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
+  if (session.mode === 'teams') {
+    const validCaptains = session.teams.every(team => session.players.some(
+      player => player.teamId === team.id && player.id === team.captainPlayerId,
+    ));
+    const allAssigned = session.players.every(player => session.teams.some(team => team.id === player.teamId));
+    if (!session.teams.length || !validCaptains || !allAssigned) return false;
+  }
   session.phase = 'playing';
   return true;
 }

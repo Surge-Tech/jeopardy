@@ -1,3 +1,4 @@
+import { getCompetitor, getCompetitors } from '@shared/competitors';
 import ResponseMedia from '../shared/ResponseMedia';
 import { useState } from 'react';
 import { socket } from '../../socket';
@@ -34,7 +35,7 @@ export default function DDHostPanel({
     });
   }
 
-  const player = dd.playerId ? gameState.players.find(p => p.id === dd.playerId) : null;
+  const player = dd.playerId ? getCompetitor(gameState, dd.playerId) : null;
   const overrideUnlocked = !dd.hasDevice || dd.submittedByPlayer;
 
   return (
@@ -47,7 +48,7 @@ export default function DDHostPanel({
           <div className="bg-yellow-900 border border-yellow-500 rounded p-3 text-sm text-yellow-200 text-center">
             No player has answered correctly yet — pick who's wagering.
           </div>
-          {gameState.players.map(p => (
+          {getCompetitors(gameState).map(p => (
             <button
               key={p.id}
               className="w-full flex justify-between items-center bg-gray-800 hover:bg-gray-700 rounded p-2 text-sm"
@@ -112,10 +113,10 @@ export default function DDHostPanel({
                 <ResponseMedia {...activeQ} />
               </div>
               <div className="flex gap-2">
-                <button className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded" onClick={() => onAward(player.id, true)}>
+                <button className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded" onClick={() => onAward(dd.playerId!, true)}>
                   ✓ Correct
                 </button>
-                <button className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded" onClick={() => onAward(player.id, false)}>
+                <button className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded" onClick={() => onAward(dd.playerId!, false)}>
                   ✗ Wrong
                 </button>
               </div>

@@ -6,6 +6,7 @@ A self-hosted, fully customizable Jeopardy game platform. Build your own boards,
 
 ## Features
 
+- **Team Mode** — Create named, colored teams in the host’s Players tab and assign players before starting. Everyone can buzz from their own phone; points go to the shared team score, and a wrong answer locks out the whole team for that clue. Captains submit Daily Double wagers and the team’s single Final Jeopardy wager and answer.
 - **Board Editor** — Create unlimited Jeopardy boards with up to 6 categories and 5 clues each per round. Supports text, images, video, and audio clues, with separate image/video/audio uploads or YouTube links for correct answers, including Final Jeopardy. Answer media appears on the board when the host reveals the answer. Audio uploads support MP3, WAV, Ogg, M4A, AAC, FLAC, and WebM, with playback controls in the editor and on the board.
 - **Multi-Round Boards** — A board can hold several rounds (Jeopardy!, Double Jeopardy!, and beyond). Players, scores, and stats all carry over when the host advances to the next round — no need to start a new game.
 - **Real-time Buzzer System** — Players connect on any device via a browser. First buzz wins, ties are impossible. A configurable lockout (250/500/1000ms, or off) penalizes buzzing before the host opens it, so mashing the button no longer beats reacting to it.
@@ -37,6 +38,10 @@ A self-hosted, fully customizable Jeopardy game platform. Build your own boards,
 ```
 
 The host runs the game from the Host Panel. The board display goes on the main screen (TV/projector). Players connect to the Buzzer page from their phones — no account, no install, just a URL and a name.
+
+For a team game, open the host’s **Players** tab, set **Game mode** to **Teams**, create teams, and assign every player. **Auto-assign players** shuffles all players into the existing teams with sizes differing by at most one and selects new captains. Create at least two teams with at least one player per team; click again to reshuffle, or adjust assignments manually. The first member assigned becomes captain; use the captain selector to change them. Each team needs at least one member and a captain. Click **Start game**, or open the first clue, to lock the setup. Team games accept new players only in the lobby; existing players can reconnect throughout the game. Captains can change between clues, during Daily Double wagering, and during Final Jeopardy to recover from a disconnected device. The host can enter a Daily Double wager when the captain has no connected device, and can enter Final Jeopardy wagers and answers through the existing override controls.
+
+To test players created in the host panel without using phones, enable **Show test buzzers** in the **Players** tab. Each player gets a test buzzer that follows the normal buzz rules, including early-buzz penalties, answer timers, team lockouts, and buzz history. Disabled buttons explain why buzzing is unavailable. Test buzzes affect game stats and normal judging/scoring; they do not connect a player device or replace phone latency testing.
 
 To project a join code, use **Player QR code (project this)** in the host's sharing links. **Open** displays `/qr/<roomCode>` on a separate screen; **Copy** shares that display URL. The page generates its QR locally and sends scanning phones directly to the normal `/buzz/<roomCode>` player page. It also shows the room code and a copyable player URL. For local games, open the host using its LAN address and connect phones to the same Wi-Fi; sharing a localhost address will not work on other devices. The QR display stays available when a game ends or a room closes, and opening it does not join the game.
 

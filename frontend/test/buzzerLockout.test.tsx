@@ -16,6 +16,7 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
   Object.assign(globalThis, {
     window: dom.window, document: dom.window.document,
     localStorage: dom.window.localStorage, IS_REACT_ACT_ENVIRONMENT: true,
+    requestAnimationFrame: () => 1, cancelAnimationFrame: () => {},
   });
   // Load React DOM after JSDOM so its input-event support detection uses the DOM.
   const { createRoot } = await import('react-dom/client');
@@ -58,12 +59,20 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
     buzzerState: 'open', buzzLockouts: {}, finalJeopardy: null, dailyDouble: null,
   } as unknown as GameState;
   let stableBuzzer: Element | null = null;
+  function assertFeedbackInCircle(text: RegExp) {
+    assert.match(document.querySelector('.player-buzz-button [role="status"]')!.textContent!, text);
+    assert.equal(document.querySelector('.player-buzzer-dock [role="status"]'), null);
+    assert.equal(document.querySelector('.player-buzzer-message, .player-team-notice'), null);
+    assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
+  }
   function assertLocked() {
+    assertFeedbackInCircle(/Incorrect answer.*Wait for the next question/);
     assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
     assert.match(document.body.textContent!, /Incorrect answer/);
     assert.match(document.body.textContent!, /Wait for the next question/);
     assert.doesNotMatch(document.body.textContent!, /Too slow!|Too early!|YOU BUZZED IN!/);
-    const button = [...document.querySelectorAll('button')].find(b => b.textContent === 'Locked out');
+    const button = document.querySelector<HTMLButtonElement>('.player-buzz-button');
+    assert.match(button!.textContent!, /Incorrect answer.*Wait for the next question/);
     assert.ok(button?.disabled);
     const buzzCount = emitted.filter(e => e === E.BUZZ).length;
     button.click();
@@ -86,11 +95,19 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
       ...state, buzzerState: 'locked', buzzedPlayerId: player.id, buzzedPlayerName: player.name,
       buzzHistory: [{ playerId: player.id, attemptedAnswer: false }], answerTimer: null,
     });
-    assert.match(document.body.textContent!, /You buzzed in/);
+    assertFeedbackInCircle(/You buzzed in.*Your turn to answer/);
     assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
     await act(async () => timers.splice(0).forEach(callback => callback()));
-    assert.match(document.body.textContent!, /You buzzed in/);
+    assertFeedbackInCircle(/You buzzed in.*Your turn to answer/);
     assert.doesNotMatch(document.body.textContent!, /Get ready|Waiting\.\.\./);
+    await fire(E.GAME_STATE, {
+      ...state, buzzerState: 'locked', buzzedPlayerId: player.id, buzzedPlayerName: player.name,
+      buzzHistory: [{ playerId: player.id, attemptedAnswer: false }],
+      answerTimer: { deadline: Date.now() + 10000, serverNow: Date.now() },
+    });
+    assertFeedbackInCircle(/You buzzed in.*Your turn to answer.*10s/);
+    assert.ok(stableBuzzer!.querySelector('[aria-label="Answer countdown"]'));
+
     const lockedState = { ...state, buzzLockouts: { p1: PERMANENT_LOCKOUT } };
     // Same ordering as the server: reopen/winner event, followed by authoritative state.
     await fire(E.BUZZER_OPEN);
@@ -121,7 +138,7 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
     assert.equal(emitted.filter(e => e === E.BUZZ).length, 1);
     // Early-buzz feedback still works for eligible players.
     await fire(E.BUZZ_LOCKED_OUT, { until: Date.now() + 500 });
-    assert.match(document.body.textContent!, /Too early!/);
+    assertFeedbackInCircle(/Too early!.*Wait for your buzzer to unlock/);
     assert.equal(document.querySelector('.player-buzz-button'), stableBuzzer);
     await act(async () => timers.splice(0).forEach(callback => callback()));
     assert.match(document.body.textContent!, /Get ready/);
@@ -147,10 +164,8 @@ test('wrong-answer lockout survives broadcasts, feedback timers and rejoin, then
     ] };
     await fire(E.GAME_STATE, results);
     assert.equal(lateBuzz.disabled, true);
-    const list = document.querySelector('[aria-label="Buzz order"]')!;
-    assert.match(list.textContent!, /BobFirst/);
-    assert.match(list.textContent!, /Alice \(you\)Too late/);
-    assert.equal(list.querySelectorAll('li').length, 2);
+    assertFeedbackInCircle(/Too slow!.*Bob buzzed in first/);
+    assert.equal(document.querySelector('[aria-label="Buzz order"]'), null);
     // Reopening clears the previous results and requires pressing again.
     await fire(E.BUZZER_OPEN);
     await fire(E.GAME_STATE, { ...state, buzzWindow: null, buzzHistory: [], buzzedPlayerId: null });

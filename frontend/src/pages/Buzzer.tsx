@@ -10,7 +10,7 @@ import { LIMITS } from '@shared/limits';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
-import BuzzerStatus from '../components/shared/BuzzerStatus';
+import { useCountdown } from '../components/final/useCountdown';
 import { hasPendingAnswer } from '@shared/questionFlow';
 import { randomPlayerColor } from '../utils/colors';
 import { formatScore } from '../utils/format';
@@ -201,6 +201,20 @@ export default function Buzzer() {
     winner: 'Answering', 'too-late': 'Too slow!', 'locked-out': 'Too early!', incorrect: 'Locked out',
   }[phase as Exclude<BuzzerPhase, 'join' | 'closed' | 'finished'>];
   const displayName = gameState ? playerLabel(gameState, myId) || name : name;
+  const answerTimer = phase === 'winner' && gameState && !gameState.responseVisible && hasPendingAnswer(gameState)
+    ? gameState.answerTimer : null;
+  const answerRemainingMs = useCountdown(answerTimer?.deadline ?? null, answerTimer?.serverNow ?? null, 'second');
+  const answerSeconds = answerRemainingMs == null ? null : Math.ceil(answerRemainingMs / 1000);
+  const statusTitle = waitingForTeam ? 'Awaiting team'
+    : phase === 'winner' ? 'You buzzed in'
+    : phase === 'incorrect' ? 'Incorrect answer'
+    : buttonLabel;
+  const statusHint = waitingForTeam ? 'Waiting for the host to assign you to a team.'
+    : phase === 'winner' ? 'Your turn to answer'
+    : phase === 'incorrect' ? 'Wait for the next question'
+    : phase === 'locked-out' ? 'Wait for your buzzer to unlock'
+    : phase === 'too-late' ? `${winnerName} buzzed in first`
+    : phase === 'armed' ? 'Get ready' : '';
 
   const scoreboardRows = gameState && (
     <div className="space-y-1">
@@ -308,7 +322,6 @@ export default function Buzzer() {
       {showBuzzer && (
         <>
           <section className="player-buzzer-station">
-            {waitingForTeam && <p role="status" className="player-team-notice">Waiting for the host to assign you to a team.</p>}
             <div className="player-buzzer-identity">
               <p className="text-2xl font-black text-white break-words" title={displayName}>{displayName}</p>
               <p className="text-jeopardy-gold font-black text-2xl mt-2">{formatScore(myScore)}</p>
@@ -321,23 +334,19 @@ export default function Buzzer() {
                 onClick={buzz}
                 onTouchStart={event => { event.preventDefault(); buzz(); }}
               >
-                {waitingForTeam ? 'Awaiting team' : buttonLabel}
+                <span className="player-buzz-feedback" role="status">
+                  <span>{statusTitle}</span>
+                  {statusHint && <span className="player-buzz-hint">{statusHint}</span>}
+                  {phase === 'winner' && answerTimer && answerSeconds != null && (
+                    <span role="timer" aria-label="Answer countdown" className={`player-buzz-timer ${answerSeconds <= 3 ? 'player-buzz-timer--urgent' : ''}`}>
+                      {answerSeconds === 0 ? 'Time’s up!' : `${answerSeconds}s`}
+                    </span>
+                  )}
+                </span>
               </button>
             </div>
           </section>
           <div className="player-buzzer-dock">
-            {gameState && gameState.buzzerState !== 'open' && gameState.buzzedPlayerId === myId ? (
-              <BuzzerStatus gameState={gameState} personal />
-            ) : (phase === 'incorrect' || phase === 'locked-out' || phase === 'too-late') && (
-              <div className="player-buzzer-message" role="status">
-                <p className={`font-black text-xl ${phase === 'incorrect' || phase === 'locked-out' ? 'text-red-400' : 'text-gray-200'}`}>
-                  {phase === 'incorrect' ? 'Incorrect answer' : phase === 'locked-out' ? 'Too early!' : 'Too slow!'}
-                </p>
-                <p className="text-gray-400 text-sm mt-2">
-                  {phase === 'incorrect' ? 'Wait for the next question' : phase === 'too-late' ? `${winnerName} buzzed in first` : 'Wait for your buzzer to unlock'}
-                </p>
-              </div>
-            )}
             {gameState && (
               <section className="player-scoreboard" aria-labelledby="player-scoreboard-title">
                 <h2 id="player-scoreboard-title" className="text-gray-400 text-xs uppercase tracking-widest text-center">Scoreboard</h2>

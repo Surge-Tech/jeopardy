@@ -238,7 +238,7 @@ export default function BoardView() {
           <div className="board-buzzer-dock">
             <div className="board-buzzer-dock__status"><BuzzerStatus gameState={gameState} display /></div>
 
-          {!gameState.buzzWindow && (
+          {!gameState.buzzWindow && gameState.buzzHistory?.length > 0 && (
             <div className="board-buzz-order">
               <BuzzResults entries={gameState.buzzHistory} winnerId={gameState.buzzedPlayerId} />
             </div>

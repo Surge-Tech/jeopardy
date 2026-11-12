@@ -95,7 +95,12 @@ export default function ActiveQuestionPanel({
                   if (buzzWinnerId) onMarkWrong(buzzWinnerId);
                 }}
               >✗ Wrong</button>
-              <button className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm" disabled={pendingAnswer} onClick={onResetBuzzer}>↺</button>
+              <button
+                className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm"
+                aria-label="Reset Buzzers"
+                title="Cancel the current buzz and clear the queue without changing scores, then reopen buzzers."
+                onClick={onResetBuzzer}
+              >↺</button>
             </div>
           </div>
         )}
@@ -144,7 +149,7 @@ export default function ActiveQuestionPanel({
       )}
 
       <button className="btn-danger text-sm w-full disabled:opacity-40 disabled:cursor-not-allowed" disabled={pendingAnswer} onClick={onClose}>Close Question{responseVisible && !pendingAnswer ? ' (Space)' : ''}</button>
-      {pendingAnswer && <p className="text-xs text-yellow-300">Mark the buzzed-in player correct or incorrect before closing.</p>}
+      {pendingAnswer && <p className="text-xs text-yellow-300">Judge the current answer or reset buzzers before closing.</p>}
     </div>
   );
 }

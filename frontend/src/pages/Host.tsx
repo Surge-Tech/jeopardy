@@ -176,7 +176,6 @@ export default function Host() {
   }
 
   function resetBuzzer() {
-    if (gameState && hasPendingAnswer(gameState)) return;
     setBuzzWinner(null);
     setBuzzWinnerId(null);
     socket.emit(SOCKET_EVENTS.HOST_RESET_BUZZER, { roomCode });

@@ -60,7 +60,7 @@ export function enableBuzzer(roomCode: string): boolean {
 export function resetBuzzer(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session?.activeQuestionId || session.phase === 'finished') return false;
-  if (session.dailyDouble || !session.clueVisible || hasPendingAnswer(session)) return false;
+  if (session.dailyDouble || !session.clueVisible) return false;
   resetBuzzerFields(session, { buzzerState: 'open' });
   return true;
 }

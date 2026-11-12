@@ -33,6 +33,7 @@ export function resetBuzzerFields(
   session.buzzedPlayerId = null;
   session.buzzedPlayerName = null;
   session.buzzTimestamp = null;
+  session.answerTimer = null;
   session.buzzQueue = [];
   if (opts.clearLockouts) session.buzzLockouts = {};
 }

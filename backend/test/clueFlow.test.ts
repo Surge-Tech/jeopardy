@@ -2,6 +2,30 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as gm from '../src/socket/gameManager.js';
 
+for (const mediaType of ['image', 'audio', 'video', 'youtube'] as const) {
+  test(`${mediaType} clues accept a buzz immediately on reveal`, () => {
+    const session = gm.createSession('test-board');
+    const room = session.roomCode;
+    const player = gm.addPlayer(room, 'First', '#ff0000')!;
+    try {
+      gm.openQuestion(room, 'media-clue', false);
+      assert.equal(session.buzzerState, 'idle');
+      assert.equal(gm.revealClue(room, mediaType), true);
+      assert.equal(session.buzzerState, 'open');
+      assert.equal(gm.recordBuzz(room, player.id, player.name, Date.now()), 'won');
+      assert.equal(session.buzzerState, 'locked');
+      assert.equal(gm.revealClue(room, mediaType), false);
+      assert.equal(session.buzzedPlayerId, player.id);
+      gm.markWrongAndReopen(room, player.id, -200);
+      assert.equal(gm.resetBuzzer(room), true);
+      assert.equal(session.buzzerState, 'open');
+      assert.equal(session.buzzedPlayerId, null);
+    } finally {
+      gm.deleteSession(room);
+    }
+  });
+}
+
 test('regular clues must be revealed before buzzers open, and selecting another hides them again', () => {
   const session = gm.createSession('test-board');
   const room = session.roomCode;

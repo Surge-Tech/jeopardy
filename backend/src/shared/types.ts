@@ -136,6 +136,7 @@ export interface GameState {
   buzzedPlayerId: string | null;
   buzzedPlayerName: string | null;
   buzzTimestamp: number | null;
+  answerTimer: { deadline: number; serverNow: number } | null;
   phase: 'lobby' | 'playing' | 'finished';
   clueVisible: boolean;  // regular clue explicitly revealed by host
   dailyDoubleRevealed: boolean;  // false until host clicks "Reveal Question"
@@ -147,8 +148,7 @@ export interface GameState {
   buzzQueue: BuzzEntry[];
   settings: {
     lockoutMs: number;
-    autoLockEnabled: boolean;
-    autoLockTimeoutS: number;
+    answerTimeS: number; // 0 disables the answer countdown
   };
   currentRoundIndex: number;
 }

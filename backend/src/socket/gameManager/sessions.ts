@@ -23,6 +23,7 @@ export function createSession(boardId: string): GameState {
     buzzedPlayerId: null,
     buzzedPlayerName: null,
     buzzTimestamp: null,
+    answerTimer: null,
     phase: 'lobby',
     clueVisible: false,
     dailyDoubleRevealed: false,
@@ -32,7 +33,7 @@ export function createSession(boardId: string): GameState {
     lastCorrectPlayerId: null,
     buzzLockouts: {},
     buzzQueue: [],
-    settings: { lockoutMs: 250, autoLockEnabled: true, autoLockTimeoutS: 7 },
+    settings: { lockoutMs: 250, answerTimeS: 10 },
     currentRoundIndex: 0,
   };
   sessions.set(roomCode, state);
@@ -42,7 +43,11 @@ export function createSession(boardId: string): GameState {
 
 export function getSession(roomCode: string): GameState | undefined {
   const session = sessions.get(roomCode);
-  if (session) lastActivityAt.set(roomCode, Date.now());
+  if (session) {
+    const now = Date.now();
+    lastActivityAt.set(roomCode, now);
+    if (session.answerTimer) session.answerTimer.serverNow = now;
+  }
   return session;
 }
 

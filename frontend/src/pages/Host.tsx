@@ -14,6 +14,8 @@ import { getQuestionShortcut } from '../utils/questionShortcuts';
 import ShareLink from '../components/host/ShareLink';
 import BoardGrid from '../components/host/BoardGrid';
 import ActiveQuestionPanel from '../components/host/ActiveQuestionPanel';
+import AnswerCountdown from '../components/shared/AnswerCountdown';
+import AnswerTimeSetting from '../components/host/AnswerTimeSetting';
 import PlayersTab from '../components/host/PlayersTab';
 import LogTab from '../components/host/LogTab';
 import StatsTab from '../components/host/StatsTab';
@@ -331,33 +333,8 @@ export default function Host() {
               <option value={1000}>1000ms</option>
             </select>
           </div>
-          <div className="flex items-center gap-2 bg-gray-800 rounded px-3 py-1 text-sm">
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={gameState.settings.autoLockEnabled}
-                onChange={e => socket.emit(SOCKET_EVENTS.HOST_SET_AUTO_LOCK, { roomCode, enabled: e.target.checked })}
-                className="accent-yellow-400"
-              />
-              <span className="text-gray-400 text-xs">Auto-lock</span>
-            </label>
-            {gameState.settings.autoLockEnabled && (
-              <>
-                <input
-                  type="number"
-                  min={5}
-                  max={10}
-                  value={gameState.settings.autoLockTimeoutS}
-                  onChange={e => {
-                    const s = Number(e.target.value);
-                    if (s >= 5 && s <= 10) socket.emit(SOCKET_EVENTS.HOST_SET_AUTO_LOCK_TIMEOUT, { roomCode, seconds: s });
-                  }}
-                  className="bg-gray-700 text-white text-xs w-10 rounded px-1 py-0.5 text-center"
-                />
-                <span className="text-gray-400 text-xs">s</span>
-              </>
-            )}
-          </div>
+          <AnswerTimeSetting seconds={gameState.settings.answerTimeS ?? 10}
+            onChange={seconds => socket.emit(SOCKET_EVENTS.HOST_SET_ANSWER_TIME, { roomCode, seconds })} />
           {gameState.phase !== 'finished' && (
             <button className="btn-danger text-sm py-1 px-3" onClick={endGame}>End Game</button>
           )}
@@ -425,6 +402,7 @@ export default function Host() {
           {/* Active question panel */}
           <div className="p-5 xl:p-6 border-b border-gray-700 flex-shrink-0">
             <h2 className="text-base font-bold text-gray-400 uppercase mb-4">Active Question</h2>
+            <AnswerCountdown gameState={gameState} />
             {gameState.finalJeopardy ? (
               <HostFinalPanel roomCode={roomCode} gameState={gameState} board={board} />
             ) : activeQ?.isDailyDouble && gameState.dailyDouble ? (

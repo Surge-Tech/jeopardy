@@ -1,4 +1,6 @@
 import ResponseMedia from '../components/shared/ResponseMedia';
+import ClueMedia from '../components/shared/ClueMedia';
+import AnswerCountdown from '../components/shared/AnswerCountdown';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
@@ -9,7 +11,6 @@ import { playDailyDouble, playBuzzerReady, playBuzzIn, playQuestionOpen, playCor
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';
 import { getRound, isRoundComplete } from '../utils/rounds';
-import { getYouTubeEmbedUrl } from '../utils/media';
 import { formatScore } from '../utils/format';
 
 const API = '/api';
@@ -190,24 +191,10 @@ export default function BoardView() {
           </div>
 
           {/* Media */}
-          {showQuestion.mediaType === 'image' && showQuestion.mediaUrl && (
-            <img src={showQuestion.mediaUrl} alt="clue" className="max-h-[60dvh] object-contain mb-6 rounded w-full" />
-          )}
-          {(!gameState.responseVisible || !showQuestion.responseMediaUrl) && showQuestion.mediaType === 'audio' && showQuestion.mediaUrl && (
-            <audio key={`${showQuestion.id}:${showQuestion.mediaUrl}`} src={showQuestion.mediaUrl} autoPlay controls aria-label="Clue audio" className="mb-6 w-full max-w-2xl" />
-          )}
-          {(!gameState.responseVisible || !showQuestion.responseMediaUrl) && showQuestion.mediaType === 'video' && showQuestion.mediaUrl && (
-            <video src={showQuestion.mediaUrl} autoPlay controls className="max-h-[60dvh] object-contain mb-6 rounded w-full" />
-          )}
-          {(!gameState.responseVisible || !showQuestion.responseMediaUrl) && showQuestion.mediaType === 'youtube' && showQuestion.mediaUrl && (
-            <div className="mb-6 w-full aspect-video max-h-[60dvh]">
-              <iframe
-                className="w-full h-full rounded"
-                src={getYouTubeEmbedUrl(showQuestion.mediaUrl)}
-                allow="autoplay; fullscreen"
-                allowFullScreen
-              />
-            </div>
+          {(!gameState.responseVisible || !showQuestion.responseMediaUrl || showQuestion.mediaType === 'image') && (
+            <ClueMedia key={`${showQuestion.id}:${showQuestion.mediaUrl}`} {...showQuestion}
+              paused={!!gameState.buzzedPlayerId || gameState.responseVisible}
+              hideVideo={!!gameState.buzzedPlayerId && !gameState.responseVisible} />
           )}
 
           {/* Clue text */}
@@ -228,6 +215,7 @@ export default function BoardView() {
           )}
 
           {/* Buzzer state indicator */}
+          <AnswerCountdown gameState={gameState} />
           <div className="mt-6">
             {gameState.buzzerState === 'open' && (
               <div className="text-green-400 text-2xl font-bold animate-pulse">🔔 BUZZERS OPEN</div>

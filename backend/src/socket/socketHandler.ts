@@ -15,7 +15,6 @@ const BUZZ_RATE_WINDOW_MS = 1000;
 const buzzTimestamps = new Map<string, number[]>();
 
 const buzzOpenedAt = new Map<string, number>(); // roomCode -> timestamp
-const autoLockTimers = new Map<string, NodeJS.Timeout>(); // roomCode -> timer
 
 function isRateLimited(socketId: string): boolean {
   const now = Date.now();
@@ -25,33 +24,8 @@ function isRateLimited(socketId: string): boolean {
   return timestamps.length > BUZZ_RATE_LIMIT;
 }
 
-function cancelAutoLockTimer(roomCode: string) {
-  const t = autoLockTimers.get(roomCode);
-  if (t) { clearTimeout(t); autoLockTimers.delete(roomCode); }
-}
-
-function startAutoLockTimer(io: Server, roomCode: string) {
-  cancelAutoLockTimer(roomCode);
-  const session = gm.getSession(roomCode);
-  if (!session?.settings.autoLockEnabled) return;
-  const ms = (session.settings.autoLockTimeoutS ?? 7) * 1000;
-  const t = setTimeout(() => {
-    autoLockTimers.delete(roomCode);
-    gm.lockBuzzer(roomCode);
-    const s = gm.getSession(roomCode);
-    io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, s);
-    io.to(`hostpanel:${roomCode}`).emit(SOCKET_EVENTS.BUZZ_QUEUE_LOCKED, { auto: true });
-  }, ms);
-  autoLockTimers.set(roomCode, t);
-}
-
-// Full teardown for a room: cancels its auto-lock timer, drops its
-// buzzOpenedAt entry, cleans up any Final Jeopardy secret state, deletes the
-// session itself, and notifies any client still connected. Used by both the
-// explicit "host:end" handler and the idle-session reaper below so the two
-// paths can never drift out of sync.
+// Tear down a room and notify connected clients.
 function endRoom(io: Server, roomCode: string) {
-  cancelAutoLockTimer(roomCode);
   buzzOpenedAt.delete(roomCode);
   io.to(roomCode).emit(SOCKET_EVENTS.GAME_ENDED);
   cleanupFinal(roomCode);
@@ -60,7 +34,7 @@ function endRoom(io: Server, roomCode: string) {
 
 // Idle-session reaper: a host who simply closes their browser tab without
 // clicking "End Game" would otherwise leak that room's session (plus its
-// autoLockTimers entry and finalJeopardy secrets) for the lifetime of the
+// Final Jeopardy secrets) for the lifetime of the
 // server process. Sweeping every 15 minutes against a 6-hour idle threshold
 // bounds that growth to "rooms idle for over 6 hours" while being generous
 // enough to never interrupt a real game, even one paused for a long break —
@@ -153,7 +127,6 @@ export function registerSocketHandlers(io: Server) {
       const outcome = gm.recordBuzz(info.roomCode, info.playerId, info.playerName, buzzOpenedAt.get(info.roomCode) ?? null);
       const session = gm.getSession(info.roomCode);
       if (outcome === 'won') {
-        cancelAutoLockTimer(info.roomCode);
         io.to(info.roomCode).emit(SOCKET_EVENTS.BUZZ_WINNER, {
           playerId: info.playerId,
           playerName: info.playerName,
@@ -178,11 +151,15 @@ export function registerSocketHandlers(io: Server) {
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
+    onHost(socket, SOCKET_EVENTS.HOST_SET_ANSWER_TIME, ({ roomCode, seconds }: { roomCode: string; seconds: number }) => {
+      if (!gm.setAnswerTime(roomCode, seconds)) return;
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+
     // ── HOST: open buzzer ────────────────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_ENABLE_BUZZER, ({ roomCode }: { roomCode: string }) => {
       if (!gm.enableBuzzer(roomCode)) return;
       buzzOpenedAt.set(roomCode, Date.now());
-      startAutoLockTimer(io, roomCode);
       io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
@@ -191,14 +168,12 @@ export function registerSocketHandlers(io: Server) {
     onHost(socket, SOCKET_EVENTS.HOST_RESET_BUZZER, ({ roomCode }: { roomCode: string }) => {
       if (!gm.resetBuzzer(roomCode)) return;
       buzzOpenedAt.set(roomCode, Date.now());
-      startAutoLockTimer(io, roomCode);
       io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
     // ── HOST: lock buzzer ────────────────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_LOCK_BUZZER, ({ roomCode }: { roomCode: string }) => {
-      cancelAutoLockTimer(roomCode);
       gm.lockBuzzer(roomCode);
       io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_LOCKED);
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
@@ -247,8 +222,20 @@ export function registerSocketHandlers(io: Server) {
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
-    onHost(socket, SOCKET_EVENTS.HOST_REVEAL_CLUE, ({ roomCode }: { roomCode: string }) => {
-      if (!gm.revealClue(roomCode)) return;
+    onHost(socket, SOCKET_EVENTS.HOST_REVEAL_CLUE, async ({ roomCode }: { roomCode: string }) => {
+      const session = gm.getSession(roomCode);
+      if (!session?.activeQuestionId) return;
+      const questionId = session.activeQuestionId;
+      const board = await boardStorage.getBoard(session.boardId);
+      // The host may have closed or replaced the clue while the board loaded.
+      if (gm.getSession(roomCode) !== session || session.activeQuestionId !== questionId) return;
+      const question = board?.rounds[session.currentRoundIndex]?.categories
+        .flatMap(category => category.questions).find(question => question.id === questionId);
+      if (!gm.revealClue(roomCode, question?.mediaUrl ? question.mediaType : undefined)) return;
+      if (session.buzzerState === 'open') {
+        buzzOpenedAt.set(roomCode, Date.now());
+        io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
+      }
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
@@ -264,7 +251,6 @@ export function registerSocketHandlers(io: Server) {
     // FJ, or on an earlier round, the host is prompted client-side instead.
     onHost(socket, SOCKET_EVENTS.HOST_CLOSE_QUESTION, async ({ roomCode }: { roomCode: string }) => {
       if (!gm.closeQuestion(roomCode)) return;
-      cancelAutoLockTimer(roomCode);
       buzzOpenedAt.delete(roomCode);
       const session = gm.getSession(roomCode);
       if (session && session.phase !== 'finished') {
@@ -408,27 +394,12 @@ export function registerSocketHandlers(io: Server) {
           playerId: next.playerId,
           playerName: next.playerName,
         });
-        startAutoLockTimer(io, roomCode);
       } else {
         if (!gm.resetBuzzer(roomCode)) return;
         buzzOpenedAt.set(roomCode, Date.now());
         io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
         io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
-        startAutoLockTimer(io, roomCode);
       }
-    });
-
-    // ── HOST: toggle auto-lock ────────────────────────────────────────────
-    onHost(socket, SOCKET_EVENTS.HOST_SET_AUTO_LOCK, ({ roomCode, enabled }: { roomCode: string; enabled: boolean }) => {
-      gm.setAutoLock(roomCode, enabled);
-      if (!enabled) cancelAutoLockTimer(roomCode);
-      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
-    });
-
-    // ── HOST: set auto-lock timeout ────────────────────────────────────────
-    onHost(socket, SOCKET_EVENTS.HOST_SET_AUTO_LOCK_TIMEOUT, ({ roomCode, seconds }: { roomCode: string; seconds: number }) => {
-      const ok = gm.setAutoLockTimeout(roomCode, seconds);
-      if (ok) io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
     // ── REQUEST state (any client) ───────────────────────────────────────

@@ -1,5 +1,5 @@
 import { hasPendingAnswer } from '../../shared/questionFlow.js';
-import type { BuzzEntry } from '../../types.js';
+import type { BuzzEntry, GameState, Question } from '../../types.js';
 import { sessions, resetBuzzerFields, PERMANENT_LOCKOUT } from './state.js';
 
 // ── Question lifecycle (buzzer-adjacent) ────────────────────────────────────
@@ -16,10 +16,13 @@ export function openQuestion(roomCode: string, questionId: string, isDailyDouble
   return true;
 }
 
-export function revealClue(roomCode: string): boolean {
+export function revealClue(roomCode: string, mediaType?: Question['mediaType']): boolean {
   const session = sessions.get(roomCode);
-  if (!session?.activeQuestionId || session.dailyDouble || session.phase === 'finished') return false;
+  if (!session?.activeQuestionId || session.clueVisible || session.dailyDouble || session.phase === 'finished') return false;
   session.clueVisible = true;
+  if (mediaType === 'image' || mediaType === 'audio' || mediaType === 'video' || mediaType === 'youtube') {
+    resetBuzzerFields(session, { buzzerState: 'open' });
+  }
   return true;
 }
 
@@ -73,6 +76,20 @@ export function lockBuzzer(roomCode: string): boolean {
 
 export type BuzzOutcome = 'won' | 'early' | 'locked-out' | 'ignored' | 'queued';
 
+function startAnswerTimer(session: GameState, now: number) {
+  session.answerTimer = session.settings.answerTimeS > 0
+    ? { deadline: now + session.settings.answerTimeS * 1000, serverNow: now }
+    : null;
+}
+
+export function setAnswerTime(roomCode: string, seconds: number): boolean {
+  const session = sessions.get(roomCode);
+  if (!session || !Number.isInteger(seconds) || seconds < 0 || seconds > 120) return false;
+  // Changes apply to the next contestant, preserving any answer in progress.
+  session.settings.answerTimeS = seconds;
+  return true;
+}
+
 export function recordBuzz(roomCode: string, playerId: string, playerName: string, buzzOpenedAt: number | null): BuzzOutcome {
   const session = sessions.get(roomCode);
   if (!session) return 'ignored';
@@ -115,6 +132,7 @@ export function recordBuzz(roomCode: string, playerId: string, playerName: strin
   session.buzzedPlayerId = playerId;
   session.buzzedPlayerName = playerName;
   session.buzzTimestamp = now;
+  startAnswerTimer(session, now);
   session.buzzQueue.unshift({ playerId, playerName, reactionMs, attemptedAnswer: false });
   if (player) {
     if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };
@@ -181,6 +199,7 @@ export function markBuzzAttempted(roomCode: string, playerId: string): boolean {
   if (!session) return false;
   const entry = session.buzzQueue.find(e => e.playerId === playerId);
   if (entry) entry.attemptedAnswer = true;
+  if (session.buzzedPlayerId === playerId) session.answerTimer = null;
   return true;
 }
 
@@ -197,21 +216,7 @@ export function advanceToBuzzEntry(roomCode: string, entry: BuzzEntry): boolean 
   session.buzzedPlayerId = entry.playerId;
   session.buzzedPlayerName = entry.playerName;
   session.buzzTimestamp = Date.now();
-  return true;
-}
-
-export function setAutoLock(roomCode: string, enabled: boolean): boolean {
-  const session = sessions.get(roomCode);
-  if (!session) return false;
-  session.settings.autoLockEnabled = enabled;
-  return true;
-}
-
-export function setAutoLockTimeout(roomCode: string, seconds: number): boolean {
-  const session = sessions.get(roomCode);
-  if (!session) return false;
-  if (!Number.isInteger(seconds) || seconds < 5 || seconds > 10) return false;
-  session.settings.autoLockTimeoutS = seconds;
+  startAnswerTimer(session, session.buzzTimestamp);
   return true;
 }
 

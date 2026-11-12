@@ -9,6 +9,7 @@ import { LIMITS } from '@shared/limits';
 import PlayerFinal from '../components/final/PlayerFinal';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
+import AnswerCountdown from '../components/shared/AnswerCountdown';
 import { randomPlayerColor } from '../utils/colors';
 import { formatScore } from '../utils/format';
 
@@ -330,6 +331,9 @@ export default function Buzzer() {
       )}
 
       {/* Players list (compact) */}
+      {!gameState?.finalJeopardy && gameState && gameState.buzzedPlayerId === myId && phase !== 'closed' && phase !== 'finished' && (
+        <AnswerCountdown gameState={gameState} />
+      )}
       {!gameState?.finalJeopardy && gameState && gameState.players.length > 0 && phase !== 'join' && phase !== 'finished' && phase !== 'closed' && (
         <div className="mt-12 w-full max-w-sm">
           <h3 className="text-gray-500 text-xs uppercase tracking-widest mb-2 text-center">Scoreboard</h3>

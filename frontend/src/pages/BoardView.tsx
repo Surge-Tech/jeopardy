@@ -29,6 +29,22 @@ export default function BoardView() {
   const prevBuzzerState = useRef<string>('idle');
   const prevActiveId = useRef<string | null>(null);
 
+  useEffect(() => {
+    function relay(command: import('@shared/mediaControls').MediaCommand) {
+      window.dispatchEvent(new CustomEvent('board-media-command', { detail: command }));
+    }
+    function report(event: Event) {
+      if (!roomCode) return;
+      socket.emit(SOCKET_EVENTS.HOST_MEDIA_STATUS, { roomCode, ...(event as CustomEvent<import('@shared/mediaControls').MediaPlaybackStatus>).detail });
+    }
+    socket.on(SOCKET_EVENTS.BOARD_MEDIA_COMMAND, relay);
+    window.addEventListener('board-media-status', report);
+    return () => {
+      socket.off(SOCKET_EVENTS.BOARD_MEDIA_COMMAND, relay);
+      window.removeEventListener('board-media-status', report);
+    };
+  }, [roomCode]);
+
   // Re-join the host:<roomCode> room after a socket reconnect (WiFi blip,
   // browser sleep, backend restart) so this board keeps receiving host-only state.
   useEffect(() => {
@@ -193,9 +209,9 @@ export default function BoardView() {
           </div>
 
           {/* Media */}
-          {(!gameState.responseVisible || !showQuestion.responseMediaUrl || showQuestion.mediaType === 'image') && (
-            <ClueMedia key={`${showQuestion.id}:${showQuestion.mediaUrl}`} {...showQuestion}
-              paused={!!gameState.buzzedPlayerId || gameState.responseVisible}
+          {(!gameState.responseVisible || !showQuestion.responseMediaUrl || !['audio', 'video', 'youtube'].includes(showQuestion.responseMediaType ?? '') || showQuestion.mediaType === 'image') && (
+            <ClueMedia controlId={`${showQuestion.id}:clue`} key={`${showQuestion.id}:${showQuestion.mediaUrl}`} {...showQuestion}
+              paused={!gameState.responseVisible && !!gameState.buzzedPlayerId}
               hideVideo={!!gameState.buzzedPlayerId && !gameState.responseVisible} />
           )}
 
@@ -212,7 +228,7 @@ export default function BoardView() {
               <div className="text-jeopardy-gold font-black text-3xl md:text-4xl" style={{ textShadow: '2px 2px 0 #000' }}>
                 {showQuestion.response}
               </div>
-              <ResponseMedia {...showQuestion} autoPlay />
+              <ResponseMedia {...showQuestion} autoPlay controlId={`${showQuestion.id}:response`} />
             </div>
           )}
 

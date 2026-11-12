@@ -1,8 +1,12 @@
+import ClueMedia from './ClueMedia';
 import type { Question } from '@shared/types';
 import { getYouTubeEmbedUrl } from '../../utils/media';
 
-export default function ResponseMedia({ responseMediaType, responseMediaUrl, autoPlay = false }: Pick<Question, 'responseMediaType' | 'responseMediaUrl'> & { autoPlay?: boolean }) {
+export default function ResponseMedia({ responseMediaType, responseMediaUrl, autoPlay = false, controlId }: Pick<Question, 'responseMediaType' | 'responseMediaUrl'> & { autoPlay?: boolean; controlId?: string }) {
   if (!responseMediaType || !responseMediaUrl) return null;
+  if (controlId && responseMediaType !== 'image') {
+    return <div className="mt-3"><ClueMedia mediaType={responseMediaType} mediaUrl={responseMediaUrl} paused={!autoPlay} hideVideo={false} controlId={controlId} /></div>;
+  }
   if (responseMediaType === 'image') {
     return <img src={responseMediaUrl} alt="Correct answer" className="max-h-[50dvh] max-w-full object-contain rounded mx-auto mt-3" />;
   }

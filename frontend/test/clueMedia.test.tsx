@@ -66,3 +66,95 @@ for (const mediaType of ['audio', 'video', 'youtube'] as const) {
     }
   });
 }
+
+for (const mediaType of ['audio', 'video', 'youtube'] as const) {
+  test(`remote ${mediaType} controls target the board player and respect answer pauses`, async () => {
+    const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
+    const old = { window: globalThis.window, document: globalThis.document };
+    Object.assign(globalThis, { window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true });
+    let plays = 0;
+    let pauses = 0;
+    dom.window.HTMLMediaElement.prototype.play = async () => { plays++; };
+    dom.window.HTMLMediaElement.prototype.pause = () => { pauses++; };
+    const root = createRoot(document.getElementById('root')!);
+    const render = (paused = false) => act(async () => root.render(<ClueMedia controlId="q:clue" mediaType={mediaType}
+      mediaUrl={mediaType === 'youtube' ? 'https://youtu.be/dQw4w9WgXcQ' : '/media'} paused={paused} hideVideo={paused} />));
+    const commands: Array<{ func: string; args: unknown[] }> = [];
+    async function send(action: string, value?: number, mediaId = 'q:clue') {
+      await act(async () => window.dispatchEvent(new dom.window.CustomEvent('board-media-command', { detail: { mediaId, action, value } })));
+    }
+    try {
+      await render();
+      const media = document.querySelector<HTMLMediaElement>('audio,video');
+      const frame = document.querySelector('iframe');
+      if (frame) frame.contentWindow!.postMessage = (message: string) => { commands.push(JSON.parse(message)); };
+      const statuses: Array<{ mediaId: string; playing: boolean }> = [];
+      window.addEventListener('board-media-status', event => statuses.push((event as CustomEvent).detail));
+      if (media) {
+        Object.defineProperty(media, 'paused', { value: false, configurable: true });
+        media.dispatchEvent(new dom.window.Event('playing'));
+      } else {
+        window.dispatchEvent(new dom.window.MessageEvent('message', {
+          origin: 'https://www.youtube.com', source: frame!.contentWindow,
+          data: JSON.stringify({ event: 'infoDelivery', info: { playerState: 1 } }),
+        }));
+      }
+      assert.deepEqual(statuses.at(-1), { mediaId: 'q:clue', playing: true });
+      if (media) {
+        Object.defineProperty(media, 'paused', { value: true, configurable: true });
+        media.dispatchEvent(new dom.window.Event('ended'));
+      } else {
+        window.dispatchEvent(new dom.window.MessageEvent('message', {
+          origin: 'https://www.youtube.com', source: frame!.contentWindow,
+          data: JSON.stringify({ event: 'onStateChange', info: 0 }),
+        }));
+      }
+      assert.deepEqual(statuses.at(-1), { mediaId: 'q:clue', playing: false });
+      await send('status');
+      assert.deepEqual(statuses.at(-1), { mediaId: 'q:clue', playing: false });
+      const initialPlays = plays;
+      await send('pause', undefined, 'other:clue');
+      assert.equal(pauses, 0);
+      assert.equal(commands.length, 0);
+      await send('pause');
+      assert.ok(media ? pauses > 0 : commands.at(-1)?.func === 'pauseVideo');
+      // A buzz and reopen must not override the host's manual pause.
+      await render(true);
+      await render(false);
+      assert.equal(plays, initialPlays);
+      await send('play');
+      assert.ok(media ? plays > initialPlays : commands.at(-1)?.func === 'playVideo');
+      if (media) {
+        media.currentTime = 12;
+        Object.defineProperty(media, 'duration', { value: 25 });
+      } else {
+        window.dispatchEvent(new dom.window.MessageEvent('message', {
+          origin: 'https://www.youtube.com', source: frame!.contentWindow,
+          data: JSON.stringify({ event: 'infoDelivery', info: { currentTime: 12, duration: 25 } }),
+        }));
+      }
+      await send('seek', -10);
+      assert.ok(media ? media.currentTime === 2 : commands.at(-1)?.func === 'seekTo' && commands.at(-1)?.args[0] === 2);
+      await send('seek', -10);
+      assert.ok(media ? media.currentTime === 0 : commands.at(-1)?.args[0] === 0);
+      await send('seek', 10);
+      assert.ok(media ? media.currentTime === 10 : commands.at(-1)?.args[0] === 10);
+      await send('seek', 60);
+      assert.ok(media ? media.currentTime === 25 : commands.at(-1)?.args[0] === 25);
+      await render(true);
+      const beforePlay = plays;
+      const beforeCommands = commands.length;
+      await send('play');
+      assert.equal(plays, beforePlay);
+      assert.equal(commands.length, beforeCommands);
+      await act(async () => root.unmount());
+      const beforeUnmountCommand = commands.length;
+      await send('play');
+      assert.equal(commands.length, beforeUnmountCommand);
+    } finally {
+      await act(async () => root.unmount());
+      dom.window.close();
+      Object.assign(globalThis, old);
+    }
+  });
+}

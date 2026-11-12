@@ -31,6 +31,11 @@ export const SOCKET_EVENTS = {
   ROUND_CHANGED: 'round:changed',
   SCORE_RESULT: 'score:result',
 
+  BOARD_MEDIA_STATUS: 'board:media-status',
+  HOST_MEDIA_STATUS: 'host:media-status',
+  BOARD_MEDIA_COMMAND: 'board:media-command',
+  HOST_MEDIA_COMMAND: 'host:media-command',
+
   // Host actions
   HOST_CREATE: 'host:create',
   HOST_CREATED: 'host:created',

@@ -1,3 +1,4 @@
+import BoardMediaControls from '../components/host/BoardMediaControls';
 import TeamsPanel from '../components/host/TeamsPanel';
 import { getCompetitor, playerLabel } from '@shared/competitors';
 import { useEffect, useState } from 'react';
@@ -409,6 +410,7 @@ export default function Host() {
           <div className="p-5 xl:p-6 border-b border-gray-700 flex-shrink-0">
             <h2 className="text-base font-bold text-gray-400 uppercase mb-4">Active Question</h2>
             <div className="mb-4"><BuzzerStatus gameState={gameState} /></div>
+            <BoardMediaControls board={board} gameState={gameState} roomCode={roomCode} />
             {gameState.finalJeopardy ? (
               <HostFinalPanel roomCode={roomCode} gameState={gameState} board={board} />
             ) : activeQ?.isDailyDouble && gameState.dailyDouble ? (

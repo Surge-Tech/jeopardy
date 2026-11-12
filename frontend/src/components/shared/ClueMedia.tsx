@@ -1,20 +1,36 @@
-import { useEffect, useRef } from 'react';
+import type { MediaCommand } from '@shared/mediaControls';
+import { useEffect, useRef, useState } from 'react';
 import type { Question } from '@shared/types';
 import { getYouTubeEmbedUrl } from '../../utils/media';
 
 type Props = Pick<Question, 'mediaType' | 'mediaUrl'> & {
+  controlId?: string;
   paused: boolean;
   hideVideo: boolean;
 };
 
 // Keep players mounted during an answer so reopening the buzzers resumes
 // the clue from where it paused rather than replaying it from the start.
-export default function ClueMedia({ mediaType, mediaUrl, paused, hideVideo }: Props) {
+export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hideVideo, controlId }: Props) {
+  const [manuallyPaused, setManuallyPaused] = useState(false);
+  const paused = gamePaused || manuallyPaused;
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const youtubeRef = useRef<HTMLIFrameElement | null>(null);
+  const youtubePlaying = useRef(false);
+  const youtubeTime = useRef(0);
+  const youtubeDuration = useRef<number | undefined>();
   const initiallyPaused = useRef(paused);
   const youtubePaused = useRef(paused);
   youtubePaused.current = paused;
+
+  function reportPlayback() {
+    if (!controlId) return;
+    const media = mediaRef.current;
+    window.dispatchEvent(new window.CustomEvent('board-media-status', { detail: {
+      mediaId: controlId,
+      playing: media ? !media.paused && !media.ended : youtubePlaying.current,
+    } }));
+  }
 
   function syncYouTube() {
     youtubeRef.current?.contentWindow?.postMessage(JSON.stringify({
@@ -50,7 +66,15 @@ export default function ClueMedia({ mediaType, mediaUrl, paused, hideVideo }: Pr
     function onMessage(event: MessageEvent) {
       if (event.origin !== 'https://www.youtube.com' || event.source !== youtubeRef.current?.contentWindow) return;
       try {
-        if (['onReady', 'initialDelivery'].includes(JSON.parse(event.data).event)) {
+        const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        const playerState = message.event === 'onStateChange' ? message.info : message.info?.playerState;
+        if (typeof playerState === 'number') {
+          youtubePlaying.current = playerState === 1 || playerState === 3;
+          reportPlayback();
+        }
+        if (typeof message.info?.currentTime === 'number') youtubeTime.current = message.info.currentTime;
+        if (typeof message.info?.duration === 'number') youtubeDuration.current = message.info.duration;
+        if (['onReady', 'initialDelivery'].includes(message.event)) {
           window.clearInterval(readyTimer);
           syncYouTube();
         }
@@ -61,7 +85,51 @@ export default function ClueMedia({ mediaType, mediaUrl, paused, hideVideo }: Pr
       window.clearInterval(readyTimer);
       window.removeEventListener('message', onMessage);
     };
-  }, [mediaType, mediaUrl]);
+  }, [mediaType, mediaUrl, controlId]);
+
+  useEffect(() => {
+    if (!controlId) return;
+    function command(event: Event) {
+      const { mediaId, action, value } = (event as CustomEvent<MediaCommand>).detail;
+      if (mediaId !== controlId) return;
+      const media = mediaRef.current;
+      const youtube = (func: string, args: unknown[] = []) => youtubeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func, args }), 'https://www.youtube.com');
+      if (action === 'status') {
+        reportPlayback();
+      } else if (action === 'pause') {
+        setManuallyPaused(true);
+        media?.pause();
+        youtube('pauseVideo');
+      } else if (action === 'play') {
+        if (!gamePaused) {
+          setManuallyPaused(false);
+          if (media) void media.play().catch(() => {});
+          youtube('playVideo');
+        }
+      } else if (action === 'seek' && typeof value === 'number' && Number.isFinite(value)) {
+        const currentTime = media ? media.currentTime : youtubeTime.current;
+        const duration = media ? media.duration : youtubeDuration.current;
+        const target = Math.max(0, Math.min(currentTime + value, duration && Number.isFinite(duration) ? duration : Infinity));
+        if (media) media.currentTime = target;
+        else {
+          youtubeTime.current = target;
+          youtube('seekTo', [target, true]);
+        }
+      }
+    }
+    window.addEventListener('board-media-command', command);
+    return () => window.removeEventListener('board-media-command', command);
+  }, [controlId, gamePaused]);
+
+  useEffect(() => {
+    const media = mediaRef.current;
+    if (!media || !controlId) return;
+    const events = ['playing', 'pause', 'ended', 'loadedmetadata', 'error'];
+    for (const event of events) media.addEventListener(event, reportPlayback);
+    reportPlayback();
+    return () => { for (const event of events) media.removeEventListener(event, reportPlayback); };
+  }, [controlId, mediaType, mediaUrl]);
 
   if (!mediaUrl) return null;
   if (mediaType === 'image') {

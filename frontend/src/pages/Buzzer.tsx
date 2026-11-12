@@ -240,6 +240,11 @@ export default function Buzzer() {
           Room: <span className="text-jeopardy-gold font-bold tracking-widest">{roomCode}</span>
         </div>
         <div className="player-header__actions">
+          {phase !== 'join' && phase !== 'closed' && myTeam?.captainPlayerId === myId && (
+            <span className="rounded-full border border-jeopardy-gold/20 bg-jeopardy-gold/5 px-2 py-0.5 text-xs text-jeopardy-gold/80" title="You are the team captain">
+              Captain
+            </span>
+          )}
           {/* Name editor — lobby only */}
           {phase !== 'join' && phase !== 'finished' && phase !== 'closed' && gameState?.phase === 'lobby' && myId && (
             <div className={`player-name-editor ${editingName ? 'player-name-editor--editing' : ''}`}>

@@ -2,6 +2,26 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getQuestionShortcut } from '../src/utils/questionShortcuts';
 
+test('N marks only a pending, locked buzz wrong', () => {
+  const state = { clueVisible: true, responseVisible: false, buzzerState: 'locked' as 'idle' | 'open' | 'locked',
+    buzzedPlayerId: 'player' as string | null, buzzHistory: [{ playerId: 'player', playerName: 'Player', reactionMs: 50, attemptedAnswer: false }] };
+  const n = { code: 'KeyN', key: 'n' };
+  assert.equal(getQuestionShortcut(n, state), 'wrong');
+  assert.equal(getQuestionShortcut({ code: 'KeyN', key: 'N' }, state), 'wrong');
+  state.responseVisible = true;
+  assert.equal(getQuestionShortcut(n, state), 'wrong');
+  state.buzzHistory[0].attemptedAnswer = true;
+  assert.equal(getQuestionShortcut(n, state), null);
+  state.buzzHistory[0].attemptedAnswer = false;
+  state.buzzerState = 'open';
+  assert.equal(getQuestionShortcut(n, state), null);
+  state.buzzerState = 'idle';
+  assert.equal(getQuestionShortcut(n, state), null);
+  state.buzzerState = 'locked';
+  state.buzzedPlayerId = null;
+  assert.equal(getQuestionShortcut(n, state), null);
+});
+
 test('Space reveals, opens buzzers, then closes only after the response is shown', () => {
   const space = { code: 'Space', key: ' ' };
   const state = { buzzedPlayerId: null, buzzHistory: [], clueVisible: false, responseVisible: false, buzzerState: 'idle' as 'idle' | 'open' | 'locked' };

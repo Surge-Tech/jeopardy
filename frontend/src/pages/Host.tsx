@@ -114,6 +114,7 @@ export default function Host() {
       else if (action === 'open') enableBuzzer();
       else if (action === 'response') showAnswer();
       else if (action === 'close') closeQuestion();
+      else if (action === 'wrong' && gameState.buzzedPlayerId) markWrongAndReopen(gameState.buzzedPlayerId);
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

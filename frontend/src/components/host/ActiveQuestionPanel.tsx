@@ -95,7 +95,7 @@ export default function ActiveQuestionPanel({
                 onClick={() => {
                   if (buzzWinnerId) onMarkWrong(buzzWinnerId);
                 }}
-              >✗ Wrong</button>
+              >✗ Wrong (N)</button>
               <button
                 className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-2 rounded text-sm"
                 aria-label="Reset Buzzers"

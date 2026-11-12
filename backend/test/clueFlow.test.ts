@@ -53,6 +53,25 @@ test('regular clues must be revealed before buzzers open, and selecting another 
   }
 });
 
+test('revealing the answer stops open buzzers', () => {
+  const session = gm.createSession('test-board');
+  const room = session.roomCode;
+  const player = gm.addPlayer(room, 'First', '#ff0000')!;
+  try {
+    gm.openQuestion(room, 'clue', false);
+    gm.revealClue(room);
+    gm.enableBuzzer(room);
+    assert.equal(session.buzzerState, 'open');
+    assert.equal(gm.showResponse(room), true);
+    assert.equal(session.responseVisible, true);
+    assert.equal(session.buzzerState, 'idle');
+    assert.equal(gm.recordBuzz(room, player.id, player.name, Date.now()), 'early');
+    assert.equal(session.buzzedPlayerId, null);
+  } finally {
+    gm.deleteSession(room);
+  }
+});
+
 test('an unresolved buzz blocks closing or replacing the question until judged', () => {
   const session = gm.createSession('test-board');
   const room = session.roomCode;
@@ -65,6 +84,8 @@ test('an unresolved buzz blocks closing or replacing the question until judged',
     assert.equal(gm.recordBuzz(room, first.id, first.name, Date.now()), 'won');
     assert.equal(gm.recordBuzz(room, second.id, second.name, Date.now()), 'recorded');
     gm.showResponse(room);
+    assert.equal(session.buzzerState, 'locked');
+    assert.equal(session.buzzedPlayerId, first.id);
     assert.equal(gm.closeQuestion(room), false);
     assert.equal(gm.openQuestion(room, 'other', false), false);
     assert.equal(gm.enableBuzzer(room), false);

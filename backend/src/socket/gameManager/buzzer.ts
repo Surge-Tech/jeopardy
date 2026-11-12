@@ -31,6 +31,7 @@ export function showResponse(roomCode: string): boolean {
   if (!session) return false;
   session.responseVisible = true;
   session.answerTimer = null;
+  if (session.buzzerState === 'open') session.buzzerState = 'idle';
   return true;
 }
 

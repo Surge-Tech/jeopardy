@@ -35,12 +35,6 @@ export default function Dashboard() {
     navigate(`/editor/${board.id}`);
   }
 
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    await hostFetch(`${API}/boards/${id}`, { method: 'DELETE' });
-    setBoards(prev => prev.filter(b => b.id !== id));
-  }
-
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -125,7 +119,6 @@ export default function Dashboard() {
                 onEdit={() => navigate(`/editor/${board.id}`)}
                 onHost={() => navigate(`/host/${board.id}`)}
                 onExport={() => handleExport(board.id, board.name)}
-                onDelete={() => handleDelete(board.id, board.name)}
               />
             ))}
           </div>
@@ -136,13 +129,12 @@ export default function Dashboard() {
 }
 
 function BoardCard({
-  board, onEdit, onHost, onExport, onDelete
+  board, onEdit, onHost, onExport
 }: {
   board: BoardSummary;
   onEdit: () => void;
   onHost: () => void;
   onExport: () => void;
-  onDelete: () => void;
 }) {
   const updated = new Date(board.updatedAt).toLocaleDateString();
   return (
@@ -156,7 +148,6 @@ function BoardCard({
         <button className="btn-primary text-sm py-1 px-3" onClick={onHost}>▶ Host</button>
         <button className="btn-ghost text-sm py-1 px-3" onClick={onEdit}>✏ Edit</button>
         <button className="btn-ghost text-sm py-1 px-3" onClick={onExport}>↓ Export</button>
-        <button className="btn-danger text-sm py-1 px-3" onClick={onDelete}>✕</button>
       </div>
     </div>
   );

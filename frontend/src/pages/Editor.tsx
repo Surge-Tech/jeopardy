@@ -43,6 +43,8 @@ export default function Editor() {
   const [roundIdx, setRoundIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<{ catIdx: number; qIdx: number } | null>(null);
   const [editingFinal, setEditingFinal] = useState(false);
 
@@ -171,6 +173,23 @@ export default function Editor() {
     save(b);
   }
 
+  async function deleteBoard() {
+    if (!board || saving || deleting) return;
+    if (!window.confirm(`Delete "${board.name}"? This will permanently delete the entire board and cannot be undone.`)) return;
+
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await hostFetch(`${API}/boards/${board.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      navigate('/');
+    } catch {
+      setDeleteError('Could not delete the board. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const activeQ = editingQuestion != null
     ? round.categories[editingQuestion.catIdx]?.questions[editingQuestion.qIdx]
     : null;
@@ -194,7 +213,7 @@ export default function Editor() {
           >
             ⚡ Final Jeopardy{board.finalJeopardy ? ' ✓' : ''}
           </button>
-          <button className="btn-primary" onClick={() => save(board)} disabled={saving}>
+          <button className="btn-primary" onClick={() => save(board)} disabled={saving || deleting}>
             {saving ? 'Saving...' : 'Save'}
           </button>
           <button className="btn-ghost" onClick={() => navigate(`/host/${board.id}`)}>▶ Host Game</button>
@@ -229,8 +248,14 @@ export default function Editor() {
             onClick={removeRound}
             disabled={board.rounds.length <= 1}
           >Remove round</button>
+          <button
+            className="text-xs text-red-400 hover:text-red-200 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={deleteBoard}
+            disabled={saving || deleting}
+          >{deleting ? 'Deleting...' : 'Delete board'}</button>
         </div>
       </div>
+      {deleteError && <p role="alert" className="px-4 py-2 text-sm text-red-400">{deleteError}</p>}
 
       {/* Point values row */}
       <div className="px-4 py-2 bg-gray-900 border-b border-gray-800 flex gap-2 items-center">

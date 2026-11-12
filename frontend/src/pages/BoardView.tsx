@@ -7,9 +7,10 @@ import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
-import { playDailyDouble, playBuzzerReady, playBuzzIn, playQuestionOpen, playCorrect, playWrong } from '../utils/sounds';
+import { playDailyDouble, playBuzzerReady, playBuzzIn, playCorrect, playWrong } from '../utils/sounds';
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';
+import SoundControl from '../components/shared/SoundControl';
 import { getRound, isRoundComplete } from '../utils/rounds';
 import { formatScore } from '../utils/format';
 
@@ -82,7 +83,6 @@ export default function BoardView() {
     const q = round.categories.flatMap(c => c.questions).find(q => q.id === gameState.activeQuestionId);
     setShowQuestion(q ?? null);
     if (q?.isDailyDouble) playDailyDouble();
-    else if (q) playQuestionOpen();
   }, [gameState?.activeQuestionId, board, gameState?.currentRoundIndex]);
 
   if (roomClosed) {
@@ -99,6 +99,7 @@ export default function BoardView() {
   if (!gameState || !board) {
     return (
       <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center">
+        <SoundControl />
         <div className="text-center">
           <h1 className="text-4xl font-black text-jeopardy-gold mb-4">Connecting...</h1>
           <p className="text-gray-400">Room: {roomCode}</p>
@@ -110,6 +111,7 @@ export default function BoardView() {
   if (gameState.phase === 'finished') {
     return (
       <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center py-12" style={{ fontFamily: 'Arial Black, Impact, sans-serif' }}>
+        <SoundControl />
         <Leaderboard gameState={gameState} />
       </div>
     );
@@ -125,6 +127,7 @@ export default function BoardView() {
 
   return (
     <div className="min-h-screen bg-jeopardy-dark flex flex-col overflow-hidden" style={{ fontFamily: 'Arial Black, Impact, sans-serif' }}>
+      <SoundControl />
 
       {/* Final Jeopardy takes over the whole screen once it starts */}
       {gameState.finalJeopardy && <FinalBoardScreen gameState={gameState} />}

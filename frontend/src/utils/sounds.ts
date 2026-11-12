@@ -1,109 +1,128 @@
 let ctx: AudioContext | null = null;
+let output: GainNode | null = null;
 
 function getCtx(): AudioContext {
-  if (!ctx) ctx = new AudioContext();
-  if (ctx.state === 'suspended') ctx.resume();
+  if (!ctx) {
+    ctx = new AudioContext();
+    output = ctx.createGain();
+    // Keep every cue at a restrained, consistent listening level.
+    output.gain.value = 0.85;
+    output.connect(ctx.destination);
+  }
   return ctx;
+}
+
+// Call directly from a board interaction so browsers can unlock audio playback.
+export async function enableSounds(): Promise<void> {
+  const c = getCtx();
+  if (c.state !== 'running') await c.resume();
+  if (c.state !== 'running') throw new Error('Audio is not running');
 }
 
 function tone(
   freq: number,
   duration: number,
-  type: OscillatorType = 'sine',
-  gain = 0.3,
+  gain = 0.16,
   delay = 0,
   endFreq?: number,
+  attack = 0.012,
 ) {
   const c = getCtx();
+  // Drop blocked cues instead of replaying a backlog after audio is enabled.
+  if (c.state !== 'running') {
+    void c.resume().catch(() => {});
+    return;
+  }
   const osc = c.createOscillator();
-  const g = c.createGain();
-  osc.connect(g);
-  g.connect(c.destination);
-  osc.type = type;
+  const envelope = c.createGain();
+  osc.connect(envelope);
+  envelope.connect(output!);
+  osc.type = 'sine';
   const t = c.currentTime + delay;
   osc.frequency.setValueAtTime(freq, t);
   if (endFreq !== undefined) osc.frequency.linearRampToValueAtTime(endFreq, t + duration);
-  g.gain.setValueAtTime(gain, t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  // Ease into each note and fade all the way to silence to avoid clicks.
+  envelope.gain.setValueAtTime(0, t);
+  envelope.gain.linearRampToValueAtTime(gain, t + attack);
+  envelope.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  envelope.gain.linearRampToValueAtTime(0, t + duration + 0.025);
+  osc.onended = () => {
+    osc.disconnect();
+    envelope.disconnect();
+  };
   osc.start(t);
-  osc.stop(t + duration + 0.05);
+  osc.stop(t + duration + 0.03);
 }
 
-// Jeopardy Daily Double fanfare — ascending arpeggio with a held top note
+// A short, rounded arpeggio for a Daily Double.
 export function playDailyDouble() {
-  const notes = [261.63, 329.63, 392, 523.25, 659.25];
-  notes.forEach((f, i) => tone(f, i < 4 ? 0.18 : 0.6, 'sine', 0.45, i * 0.13));
+  [392, 523.25, 659.25, 783.99].forEach((freq, i) => {
+    tone(freq, i === 3 ? 0.5 : 0.25, 0.17, i * 0.11);
+  });
 }
 
-// Short clear ding when buzzers open
+// A single light chime when buzzers become available.
 export function playBuzzerReady() {
-  tone(880, 0.25, 'sine', 0.4);
-  tone(1108, 0.25, 'sine', 0.25, 0.05);
+  tone(659.25, 0.2, 0.13);
 }
 
-// Electronic buzz on press
+// A low, rounded tap acknowledges the first buzz.
 export function playBuzzIn() {
-  tone(110, 0.08, 'sawtooth', 0.5);
-  tone(165, 0.08, 'sawtooth', 0.35, 0.06);
-  tone(110, 0.1,  'sawtooth', 0.3, 0.12);
+  tone(293.66, 0.16, 0.21, 0, 261.63, 0.006);
 }
 
-// Three ascending chime notes — correct answer
+// A gentle rising pair with a quiet supporting fifth.
 export function playCorrect() {
-  tone(523.25, 0.2, 'sine', 0.4, 0);
-  tone(659.25, 0.2, 'sine', 0.4, 0.12);
-  tone(783.99, 0.4, 'sine', 0.5, 0.24);
+  tone(523.25, 0.24, 0.16);
+  tone(659.25, 0.42, 0.18, 0.12);
+  tone(392, 0.38, 0.07, 0.12);
 }
 
-// Descending "wah wah" — wrong answer
+// A soft descending pair for an incorrect answer.
 export function playWrong() {
-  tone(320, 0.28, 'sawtooth', 0.35, 0,    200);
-  tone(240, 0.35, 'sawtooth', 0.3,  0.28, 160);
+  tone(329.63, 0.22, 0.16);
+  tone(261.63, 0.3, 0.16, 0.14);
 }
 
-// Subtle whoosh when a regular question opens
-export function playQuestionOpen() {
-  tone(660, 0.12, 'sine', 0.2, 0, 880);
-}
-
-// Low brass-like swell announcing Final Jeopardy
+// A warm, slowly unfolding chord introduces Final Jeopardy.
 export function playFinalJeopardy() {
-  tone(98, 1.6, 'sawtooth', 0.25, 0, 130.81);
-  tone(65.41, 1.8, 'triangle', 0.3, 0.1, 98);
-  tone(196, 1.4, 'sine', 0.15, 0.3, 261.63);
+  tone(261.63, 1.1, 0.12, 0, undefined, 0.09);
+  tone(392, 1, 0.09, 0.14, undefined, 0.09);
+  tone(523.25, 0.9, 0.1, 0.28, undefined, 0.09);
 }
 
-// A single soft tick, used for the last 5 seconds of the Final Jeopardy timer
+// A muted tick for the last five seconds of the final timer.
 export function playTick() {
-  tone(1200, 0.06, 'square', 0.15);
+  tone(784, 0.055, 0.07, 0, undefined, 0.004);
 }
 
-// Buzzer-style stamp when time runs out
+// A brief, low falling tone marks the end of the timer.
 export function playTimesUp() {
-  tone(180, 0.5, 'sawtooth', 0.4, 0, 60);
+  tone(293.66, 0.38, 0.19, 0, 196, 0.02);
 }
 
-// Bright, quick reveal chime used per-contestant during the reveal sequence
+// A small upward chime accompanies each reveal.
 export function playReveal() {
-  tone(440, 0.15, 'sine', 0.3, 0);
-  tone(660, 0.2, 'sine', 0.3, 0.1);
+  tone(392, 0.18, 0.11);
+  tone(523.25, 0.26, 0.12, 0.09);
 }
 
-// Triumphant ascending fanfare for the final scoreboard winner
+// A restrained celebratory phrase for the final scoreboard.
 export function playWinnerFanfare() {
-  const notes = [392, 523.25, 659.25, 783.99, 1046.5];
-  notes.forEach((f, i) => tone(f, i < 4 ? 0.16 : 0.7, 'sine', 0.4, i * 0.11));
+  [392, 493.88, 587.33, 783.99].forEach((freq, i) => {
+    tone(freq, i === 3 ? 0.65 : 0.28, 0.17, i * 0.15);
+  });
+  tone(392, 0.6, 0.07, 0.45);
+  tone(493.88, 0.6, 0.06, 0.45);
 }
 
-// Quiet, original ambient "thinking" pulse — NOT the copyrighted "Think!" melody.
-// A soft repeating low pulse to fill the silence during the countdown; call
-// stopThinkingPulse() at time-up.
+// A barely-there, original ambient pulse during the final countdown.
 let thinkingInterval: number | null = null;
 export function playThinkingPulse() {
   if (thinkingInterval !== null) return;
-  const beat = () => tone(220, 0.2, 'sine', 0.08, 0, 196);
+  const beat = () => tone(196, 0.38, 0.035, 0, undefined, 0.06);
   beat();
-  thinkingInterval = window.setInterval(beat, 900);
+  thinkingInterval = window.setInterval(beat, 1200);
 }
 export function stopThinkingPulse() {
   if (thinkingInterval !== null) {

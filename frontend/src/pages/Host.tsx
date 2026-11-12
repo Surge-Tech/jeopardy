@@ -114,6 +114,7 @@ export default function Host() {
       else if (action === 'open') enableBuzzer();
       else if (action === 'response') showAnswer();
       else if (action === 'close') closeQuestion();
+      else if (action === 'correct' && gameState.buzzedPlayerId) awardPoints(gameState.buzzedPlayerId, true);
       else if (action === 'wrong' && gameState.buzzedPlayerId) markWrongAndReopen(gameState.buzzedPlayerId);
     }
     window.addEventListener('keydown', onKeyDown);
@@ -157,7 +158,7 @@ export default function Host() {
     setBuzzWinnerId(null);
     const label = activeQ ? `${activeQ.value} — ${getCatName(activeQ)}` : 'question';
     socket.emit(SOCKET_EVENTS.HOST_CLOSE_QUESTION, { roomCode });
-    addLog({ type: 'close', msg: `Closed ${label} (no score)` });
+    addLog({ type: 'close', msg: `Closed ${label}` });
   }
 
   function revealClue() {
@@ -196,7 +197,10 @@ export default function Host() {
     } else {
       addLog({ type: 'wrong', msg: `${player?.name} answered wrong (-${value})`, player: player?.name });
     }
-    // close without double-logging
+    // Correct answers stay open until the host explicitly closes the question.
+    if (correct) return;
+
+    // Close incorrect Daily Doubles without double-logging.
     setBuzzWinner(null);
     setBuzzWinnerId(null);
     socket.emit(SOCKET_EVENTS.HOST_CLOSE_QUESTION, { roomCode });

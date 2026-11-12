@@ -81,7 +81,7 @@ export default function ActiveQuestionPanel({
             🔒 Lock Buzzers
           </button>
         )}
-        {buzzerState === 'locked' && buzzWinner && (
+        {buzzerState === 'locked' && buzzWinner && pendingAnswer && (
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
             <div className="flex gap-2">
               <button
@@ -89,7 +89,7 @@ export default function ActiveQuestionPanel({
                 onClick={() => {
                   if (buzzWinnerId) onAward(buzzWinnerId, true);
                 }}
-              >✓ Correct</button>
+              >✓ Correct (Y)</button>
               <button
                 className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded text-base"
                 onClick={() => {

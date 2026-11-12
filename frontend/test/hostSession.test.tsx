@@ -31,7 +31,7 @@ test('host remembers its room across remounts, reconnects, and clears it when cl
   };
   (globalThis as any).__hostSocket = socket;
   globalThis.fetch = async () => new Response(JSON.stringify({
-    id: 'board', name: 'Test board', rounds: [{ id: 'round', pointValues: [200], categories: [] }],
+    id: 'board', name: 'Test board', rounds: [{ id: 'round', pointValues: [200], categories: [{ id: 'category', name: 'Category', questions: [{ id: 'clue', value: 200, clue: 'Test clue', response: 'Test answer' }] }] }],
   }));
   let root = createRoot(document.getElementById('root')!);
   const state = gm.createSession('board');
@@ -63,6 +63,29 @@ test('host remembers its room across remounts, reconnects, and clears it when cl
     assert.deepEqual(emitted.at(-1), { event: E.HOST_CREATE, payload: { boardId: 'board', roomCode: undefined } });
     await act(async () => handlers.get(E.HOST_CREATED)!({ roomCode: state.roomCode, state, resumed: false }));
     assert.equal(window.sessionStorage.getItem('jeopardy:host-room:board'), state.roomCode);
+
+    // Correct awards points but leaves the clue open for a separate close action.
+    const player = gm.addPlayer(state.roomCode, 'Player', '#ff0000')!;
+    gm.openQuestion(state.roomCode, 'clue', false);
+    gm.revealClue(state.roomCode);
+    gm.enableBuzzer(state.roomCode);
+    gm.setAnswerTime(state.roomCode, 0);
+    gm.recordBuzz(state.roomCode, player.id, player.name, Date.now());
+    await act(async () => handlers.get(E.GAME_STATE)!(structuredClone(state)));
+    const beforeCorrect = emitted.length;
+    await act(async () => document.body.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyY', key: 'y', bubbles: true })));
+    assert.deepEqual(emitted.slice(beforeCorrect), [{ event: E.HOST_SCORE, payload: {
+      roomCode: state.roomCode, playerId: player.id, delta: 200, outcome: 'correct', isDailyDouble: false,
+    } }]);
+    gm.recordOutcome(state.roomCode, player.id, 'correct');
+    await act(async () => handlers.get(E.GAME_STATE)!(structuredClone(state)));
+    assert.ok(document.body.textContent?.includes('Test clue'));
+    assert.equal([...document.querySelectorAll('button')].some(b => b.textContent === '✓ Correct (Y)'), false);
+    const close = [...document.querySelectorAll('button')].find(b => b.textContent?.startsWith('Close Question'))!;
+    assert.equal(close.disabled, false);
+    await act(async () => close.click());
+    assert.deepEqual(emitted.at(-1), { event: E.HOST_CLOSE_QUESTION, payload: { roomCode: state.roomCode } });
+    gm.closeQuestion(state.roomCode);
 
     await act(async () => root.unmount());
     root = createRoot(document.getElementById('root')!);

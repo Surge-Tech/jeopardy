@@ -23,9 +23,9 @@ export default function BuzzerStatus({ gameState, display = false, personal = fa
           </span>
         )}
         <div className="min-w-0">
-          {!open && <div className="buzzer-status__eyebrow">{pending ? personal ? 'You buzzed in' : 'Buzzed in' : 'Answer recorded'}</div>}
+          {!open && pending && <div className="buzzer-status__eyebrow">{personal ? 'You buzzed in' : 'Buzzed in'}</div>}
           <div className="buzzer-status__title">{open ? 'Buzzers open' : gameState.buzzedPlayerName}</div>
-          {!open && (!pending || personal) && <div className="buzzer-status__hint">{pending ? 'Your turn to answer' : 'Waiting for the host'}</div>}
+          {!open && pending && personal && <div className="buzzer-status__hint">Your turn to answer</div>}
         </div>
       </div>
       {!open && <AnswerCountdown gameState={gameState} />}

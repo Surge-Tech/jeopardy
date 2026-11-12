@@ -1,6 +1,6 @@
 import { getCompetitor, getCompetitors } from '@shared/competitors';
 import ResponseMedia from '../shared/ResponseMedia';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { socket } from '../../socket';
 import type { GameState, Question } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
@@ -22,6 +22,9 @@ export default function DDHostPanel({
 }) {
   const dd = gameState.dailyDouble!;
   const [overrideAmount, setOverrideAmount] = useState('');
+  const [judged, setJudged] = useState(false);
+
+  useEffect(() => setJudged(false), [activeQ.id]);
 
   function pick(playerId: string) {
     socket.emit(SOCKET_EVENTS.HOST_DD_PICK_PLAYER, { roomCode, playerId });
@@ -112,14 +115,14 @@ export default function DDHostPanel({
                 {activeQ.response}
                 <ResponseMedia {...activeQ} />
               </div>
-              <div className="flex gap-2">
-                <button className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded" onClick={() => onAward(dd.playerId!, true)}>
+              {!judged && <div className="flex gap-2">
+                <button className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded" onClick={() => { setJudged(true); onAward(dd.playerId!, true); }}>
                   ✓ Correct
                 </button>
-                <button className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded" onClick={() => onAward(dd.playerId!, false)}>
+                <button className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded" onClick={() => { setJudged(true); onAward(dd.playerId!, false); }}>
                   ✗ Wrong
                 </button>
-              </div>
+              </div>}
             </>
           )}
         </div>

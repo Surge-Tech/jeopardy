@@ -44,7 +44,7 @@ test('audio unlocks before playback, all cues reach the output, and envelopes fa
   const context = new FakeContext();
   Object.defineProperty(globalThis, 'AudioContext', { configurable: true, value: class { constructor() { return context; } } });
   try {
-    sounds.playCorrect();
+    sounds.playWrong();
     assert.equal(context.oscillators.length, 0, 'blocked events must not queue stale sounds');
     await assert.rejects(sounds.enableSounds(), /Audio is not running/);
     context.allowResume = true;
@@ -52,7 +52,7 @@ test('audio unlocks before playback, all cues reach the output, and envelopes fa
     assert.equal(context.state, 'running');
 
     for (const play of [sounds.playDailyDouble, sounds.playBuzzerReady, sounds.playBuzzIn,
-      sounds.playCorrect, sounds.playWrong, sounds.playFinalJeopardy, sounds.playTick,
+      sounds.playWrong, sounds.playFinalJeopardy, sounds.playTick,
       sounds.playTimesUp, sounds.playReveal, sounds.playWinnerFanfare]) {
       const count = context.oscillators.length;
       play();

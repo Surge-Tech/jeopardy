@@ -9,7 +9,7 @@ import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
-import { playDailyDouble, playBuzzerReady, playBuzzIn, playCorrect, playWrong } from '../utils/sounds';
+import { playDailyDouble, playBuzzerReady, playBuzzIn, playWrong } from '../utils/sounds';
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';
 import SoundControl from '../components/shared/SoundControl';
@@ -58,7 +58,7 @@ export default function BoardView() {
       setTimeout(() => setBuzzWinner(null), 1500);
     });
     socket.on(SOCKET_EVENTS.SCORE_RESULT, ({ correct }: { correct: boolean }) => {
-      correct ? playCorrect() : playWrong();
+      if (!correct) playWrong();
     });
     socket.on(SOCKET_EVENTS.ROUND_CHANGED, ({ index, name }: { index: number; name: string | null }) => {
       setRoundSplash({ index, name });

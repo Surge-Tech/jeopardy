@@ -71,13 +71,6 @@ export function playBuzzIn() {
   tone(293.66, 0.16, 0.21, 0, 261.63, 0.006);
 }
 
-// A gentle rising pair with a quiet supporting fifth.
-export function playCorrect() {
-  tone(523.25, 0.24, 0.16);
-  tone(659.25, 0.42, 0.18, 0.12);
-  tone(392, 0.38, 0.07, 0.12);
-}
-
 // A soft descending pair for an incorrect answer.
 export function playWrong() {
   tone(329.63, 0.22, 0.16);

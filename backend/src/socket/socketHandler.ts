@@ -344,7 +344,7 @@ export function registerSocketHandlers(io: Server) {
       if (gm.getSession(roomCode) !== session || session.activeQuestionId !== questionId) return;
       const question = board?.rounds[session.currentRoundIndex]?.categories
         .flatMap(category => category.questions).find(question => question.id === questionId);
-      if (!gm.revealClue(roomCode, question?.mediaUrl ? question.mediaType : undefined, !!question?.clueAudioUrl)) return;
+      if (!gm.revealClue(roomCode, question?.mediaUrl ? question.mediaType : undefined, !!question?.clueAudioUrl, question?.clue)) return;
       if (session.buzzerState === 'open') {
         buzzOpenedAt.set(roomCode, Date.now());
         io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);

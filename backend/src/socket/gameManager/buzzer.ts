@@ -18,13 +18,13 @@ export function openQuestion(roomCode: string, questionId: string, isDailyDouble
   return true;
 }
 
-export function revealClue(roomCode: string, mediaType?: Question['mediaType'], hasRecording = false): boolean {
+export function revealClue(roomCode: string, mediaType?: Question['mediaType'], hasRecording = false, clueText = ''): boolean {
   const session = sessions.get(roomCode);
   if (!session?.activeQuestionId || session.clueVisible || session.dailyDouble || session.phase === 'finished') return false;
   session.clueVisible = true;
   if (hasRecording) {
     session.clueRecordingId = randomUUID();
-  } else if (mediaType === 'image' || mediaType === 'audio' || mediaType === 'video' || mediaType === 'youtube') {
+  } else if ((mediaType === 'image' && !clueText.trim()) || mediaType === 'audio' || mediaType === 'video' || mediaType === 'youtube') {
     resetBuzzerFields(session, { buzzerState: 'open' });
   }
   return true;

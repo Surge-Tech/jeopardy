@@ -36,6 +36,8 @@ test('all buzzers stay open until manually closed, including after reopening', {
     const board = await storage.createBoard({ rounds: [{ id: 'round', pointValues: [200], categories: [{
       id: 'category', name: 'Test', questions: [
         ...(['image', 'audio', 'video', 'youtube'] as const).map(mediaType => ({ id: mediaType, value: 200, clue: 'Clue', response: 'Answer', mediaType, mediaUrl: '/media' })),
+        { id: 'image-only', value: 200, clue: '', response: 'Answer', mediaType: 'image', mediaUrl: '/image' },
+        { id: 'image-whitespace', value: 200, clue: '  \n ', response: 'Answer', mediaType: 'image', mediaUrl: '/image' },
         { id: 'text', value: 200, clue: 'Text clue', response: 'Answer' },
       ],
     }] }] });
@@ -47,11 +49,11 @@ test('all buzzers stay open until manually closed, including after reopening', {
     assert.equal(session.settings.answerTimeS, 20);
     const player = gm.addPlayer(room, 'First', '#ff0000')!;
     const second = gm.addPlayer(room, 'Second', '#00ff00')!;
-    for (const questionId of ['image', 'audio', 'video', 'youtube', 'text']) {
+    for (const questionId of ['image', 'image-only', 'image-whitespace', 'audio', 'video', 'youtube', 'text']) {
       gm.startGame(room);
       await dispatch(E.HOST_OPEN_QUESTION, { roomCode: room, questionId, isDailyDouble: false });
       await dispatch(E.HOST_REVEAL_CLUE, { roomCode: room });
-      if (questionId === 'text') {
+      if (questionId === 'text' || questionId === 'image') {
         assert.equal(session.buzzerState, 'idle');
         await dispatch(E.HOST_ENABLE_BUZZER, { roomCode: room });
       }

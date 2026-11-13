@@ -204,7 +204,7 @@ export default function BoardView() {
       {showQuestion && !isDDSplash && (showQuestion.isDailyDouble || gameState.clueVisible) && (
         <div className="fixed inset-0 bg-jeopardy-blue z-40 overflow-hidden flip-in">
           <div className={`board-clue-content ${showQuestion.isDailyDouble ? 'board-clue-content--solo' : ''}`}>
-          <div className={`my-auto flex w-full shrink-0 flex-col items-center ${gameState.responseVisible ? 'board-clue-content--answered' : ''}`}>
+          <div className={`my-auto flex w-full shrink-0 flex-col items-center ${showQuestion.mediaType === 'image' ? 'board-clue-with-image' : ''} ${gameState.responseVisible ? 'board-clue-content--answered' : ''}`}>
           <div className="text-jeopardy-gold font-black text-2xl mb-4 tracking-widest">
             {showQuestion.value}
             {showQuestion.isDailyDouble && (

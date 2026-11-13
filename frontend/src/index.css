@@ -131,6 +131,18 @@
   padding: 2rem;
 }
 .board-clue-content--solo { height: 100%; }
+.board-clue-with-image {
+  min-height: 0;
+  max-height: 100%;
+  flex-shrink: 1;
+}
+/* Reserve room for the value and full clue text before sizing the image. */
+.board-clue-with-image > * { flex-shrink: 0; }
+.board-clue-with-image > img {
+  min-height: 0;
+  flex-shrink: 1;
+  object-fit: contain;
+}
 .board-clue-content--answered {
   max-height: 100%;
   flex-shrink: 1;

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import * as gm from '../src/socket/gameManager.js';
 
 for (const mediaType of ['image', 'audio', 'video', 'youtube'] as const) {
-  test(`${mediaType} clues accept a buzz immediately on reveal`, () => {
+  test(`${mediaType} clues without text accept a buzz immediately on reveal`, () => {
     const session = gm.createSession('test-board');
     gm.setMode(session.roomCode, 'individual');
     const room = session.roomCode;
@@ -27,6 +27,44 @@ for (const mediaType of ['image', 'audio', 'video', 'youtube'] as const) {
     }
   });
 }
+
+test('image clues with text wait for the host to finish reading before accepting buzzes', () => {
+  const session = gm.createSession('test-board');
+  const room = session.roomCode;
+  try {
+    gm.setMode(room, 'individual');
+    const player = gm.addPlayer(room, 'Player', '#ffffff')!;
+    gm.startGame(room);
+    gm.setLockoutMs(room, 0);
+    gm.openQuestion(room, 'image-with-text', false);
+    assert.equal(gm.revealClue(room, 'image', false, 'Read this clue aloud.'), true);
+    assert.equal(session.clueVisible, true);
+    assert.equal(session.buzzerState, 'idle');
+    assert.equal(gm.recordBuzz(room, player.id, player.name, null), 'early');
+    assert.equal(gm.enableBuzzer(room), true);
+    assert.equal(gm.recordBuzz(room, player.id, player.name, Date.now()), 'won');
+  } finally {
+    gm.deleteSession(room);
+  }
+});
+
+test('image clues with text and a recording open buzzers when the reading finishes', () => {
+  const session = gm.createSession('test-board');
+  const room = session.roomCode;
+  try {
+    gm.setMode(room, 'individual');
+    gm.addPlayer(room, 'Player', '#ffffff');
+    gm.startGame(room);
+    gm.openQuestion(room, 'recorded-image', false);
+    assert.equal(gm.revealClue(room, 'image', true, 'Read this clue aloud.'), true);
+    assert.equal(session.buzzerState, 'idle');
+    assert.ok(session.clueRecordingId);
+    assert.equal(gm.finishClueRecording(room, 'recorded-image', session.clueRecordingId), true);
+    assert.equal(session.buzzerState, 'open');
+  } finally {
+    gm.deleteSession(room);
+  }
+});
 
 test('regular clues must be revealed before buzzers open, and selecting another hides them again', () => {
   const session = gm.createSession('test-board');

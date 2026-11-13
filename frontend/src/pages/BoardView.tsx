@@ -1,3 +1,4 @@
+import { THEME_MEDIA_ID } from '@shared/mediaControls';
 import { getCompetitors } from '@shared/competitors';
 import ResponseMedia from '../components/shared/ResponseMedia';
 import QuestionClueMedia from '../components/shared/QuestionClueMedia';
@@ -8,7 +9,7 @@ import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
-import { playDailyDouble, playBuzzerReady, playBuzzIn, playWrong } from '../utils/sounds';
+import { playDailyDouble, playBuzzerReady, playBuzzIn, playWrong, preloadGameIntro, playGameIntro } from '../utils/sounds';
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
 import LobbyBoardScreen from '../components/shared/LobbyBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';
@@ -28,9 +29,17 @@ export default function BoardView() {
   const [roomClosed, setRoomClosed] = useState(false);
   const prevBuzzerState = useRef<string>('idle');
   const prevActiveId = useRef<string | null>(null);
+  const stopIntro = useRef<(() => void) | undefined>();
 
   useEffect(() => {
     function relay(command: import('@shared/mediaControls').MediaCommand) {
+      if (command.mediaId === THEME_MEDIA_ID) {
+        if (command.action === 'play') {
+          stopIntro.current?.();
+          stopIntro.current = playGameIntro();
+        }
+        return;
+      }
       window.dispatchEvent(new CustomEvent('board-media-command', { detail: command }));
     }
     function report(event: Event) {
@@ -56,8 +65,19 @@ export default function BoardView() {
 
   useEffect(() => {
     if (!roomCode) return;
+    let previousPhase: GameState['phase'] | null = null;
     socket.emit(SOCKET_EVENTS.HOST_JOIN, { roomCode });
     socket.on(SOCKET_EVENTS.GAME_STATE, (state: GameState) => {
+      if (state.phase === 'lobby') void preloadGameIntro().catch(() => {});
+      if (previousPhase === 'lobby' && state.phase === 'playing' && !state.activeQuestionId) {
+        stopIntro.current?.();
+        stopIntro.current = playGameIntro();
+      }
+      if (state.phase === 'finished' || state.activeQuestionId || state.finalJeopardy) {
+        stopIntro.current?.();
+        stopIntro.current = undefined;
+      }
+      previousPhase = state.phase;
       setGameState(state);
       if (!board && state.boardId) {
         fetch(`${API}/boards/${state.boardId}`).then(r => r.json()).then(setBoard);
@@ -80,9 +100,10 @@ export default function BoardView() {
       setRoundSplash({ index, name });
       setTimeout(() => setRoundSplash(null), 3000);
     });
-    socket.on(SOCKET_EVENTS.GAME_ENDED, () => setRoomClosed(true));
+    socket.on(SOCKET_EVENTS.GAME_ENDED, () => { stopIntro.current?.(); setRoomClosed(true); });
     socket.emit(SOCKET_EVENTS.GET_STATE, { roomCode });
     return () => {
+      stopIntro.current?.();
       socket.off('game:state');
       socket.off('buzz:winner');
       socket.off('score:result');

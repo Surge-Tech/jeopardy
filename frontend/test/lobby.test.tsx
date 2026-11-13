@@ -50,6 +50,8 @@ test('board lobby, host readiness and phones follow the explicit start transitio
     } }),
   };
   (globalThis as any).__lobbySocket = socket;
+  const intro = { plays: 0, stops: 0 };
+  (globalThis as any).__lobbyIntro = intro;
   const root = createRoot(document.getElementById('root')!);
   try {
     await build({
@@ -59,7 +61,12 @@ test('board lobby, host readiness and phones follow the explicit start transitio
         builder.onResolve({ filter: /\/utils\/sounds$/ }, () => ({ path: 'sounds', namespace: 'test-sounds' }));
         builder.onLoad({ filter: /.*/, namespace: 'test-sounds' }, () => ({
           contents: ['enableSounds', 'playDailyDouble', 'playBuzzerReady', 'playBuzzIn', 'playWrong', 'playFinalJeopardy', 'playTick', 'playTimesUp', 'playReveal', 'playWinnerFanfare', 'playThinkingPulse', 'stopThinkingPulse']
-            .map(name => `export function ${name}() {}`).join('\n'), loader: 'js',
+            .map(name => `export function ${name}() {}`).join('\n') + `
+              export const preloadGameIntro = async () => {};
+              export function playGameIntro() {
+                globalThis.__lobbyIntro.plays++;
+                return () => { globalThis.__lobbyIntro.stops++; };
+              }`, loader: 'js',
         }));
         builder.onResolve({ filter: /\/socket$/ }, () => ({ path: 'socket', namespace: 'test' }));
         builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const socket = globalThis.__lobbySocket;', loader: 'js' }));
@@ -113,6 +120,10 @@ test('board lobby, host readiness and phones follow the explicit start transitio
     await mount('/host/board', '/host/:boardId', <Host />);
     await act(async () => handlers.get(E.HOST_CREATED)!({ roomCode: room, state: structuredClone(state) }));
     const control = (text: string) => [...document.querySelectorAll('button')].find(button => button.textContent === text)!;
+    assert.equal(control('Play theme').disabled, false, 'theme is available without an open clue');
+    assert.equal(control('Play theme').previousElementSibling?.textContent, '📺 Board View');
+    await act(async () => control('Play theme').click());
+    assert.equal(emitted.at(-1), E.HOST_MEDIA_COMMAND);
     await act(async () => control('Open buzzers').click());
     assert.equal(state.phase, 'lobby');
     assert.equal(control('Open buzzers').disabled, true);
@@ -140,6 +151,20 @@ test('board lobby, host readiness and phones follow the explicit start transitio
     await broadcast();
     assert.match(document.body.textContent!, /Test category/);
     assert.equal(document.querySelector('[aria-label="Join game"]'), null);
+    assert.equal(intro.plays, 0, 'joining an ongoing game does not play the intro');
+    await act(async () => handlers.get(E.GAME_STATE)!(lobby));
+    await broadcast();
+    assert.equal(intro.plays, 1, 'the live lobby-to-game transition plays the intro');
+    await broadcast();
+    await act(async () => handlers.get('connect')!());
+    await broadcast();
+    assert.equal(intro.plays, 1, 'state updates and reconnects do not replay music');
+    await act(async () => handlers.get(E.BOARD_MEDIA_COMMAND)!({ mediaId: 'game:theme', action: 'play' }));
+    assert.equal(intro.plays, 2, 'the theme command replays the music');
+    assert.equal(intro.stops, 1, 'replaying stops the previous theme');
+    gm.openQuestion(room, 'clue', false);
+    await broadcast();
+    assert.equal(intro.stops, 2, 'selecting the first clue stops the intro');
     await mount(`/buzz/${room}`, '/buzz/:roomCode', <Buzzer />);
     await act(async () => handlers.get(E.PLAYER_JOINED)!({ player: alice, state: lobby }));
     assert.match(document.body.textContent!, /Waiting for the host to start the game/);
@@ -173,5 +198,6 @@ test('board lobby, host readiness and phones follow the explicit start transitio
     dom.window.close();
     await rm(tempDir, { recursive: true, force: true });
     delete (globalThis as any).__lobbySocket;
+    delete (globalThis as any).__lobbyIntro;
   }
 });

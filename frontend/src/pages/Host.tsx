@@ -1,3 +1,4 @@
+import { THEME_MEDIA_ID } from '@shared/mediaControls';
 import BoardMediaControls from '../components/host/BoardMediaControls';
 import TeamsPanel from '../components/host/TeamsPanel';
 import LobbyBuzzerTest from '../components/shared/LobbyBuzzerTest';
@@ -341,7 +342,13 @@ export default function Host() {
           <div className="bg-gray-800 rounded px-3 py-1 text-sm">
             Room: <span className="text-jeopardy-gold font-black tracking-widest text-lg">{roomCode}</span>
           </div>
-          <a href={boardUrl} target="_blank" rel="noopener" className="btn-ghost text-sm py-1 px-3">📺 Board View</a>
+          <div className="flex items-center gap-3">
+            <a href={boardUrl} target="_blank" rel="noopener" className="btn-ghost text-sm py-1 px-3">📺 Board View</a>
+            <button className="bg-jeopardy-gold text-jeopardy-dark text-sm py-2 px-4 rounded font-bold hover:brightness-110"
+              onClick={() => socket.emit(SOCKET_EVENTS.HOST_MEDIA_COMMAND, { roomCode, mediaId: THEME_MEDIA_ID, action: 'play' })}>
+              Play theme
+            </button>
+          </div>
           <div className="bg-gray-800 rounded px-3 py-1 text-sm flex items-center gap-2">
             <span className="text-gray-400">Lockout:</span>
             <select

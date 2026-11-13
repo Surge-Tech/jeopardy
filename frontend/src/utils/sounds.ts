@@ -1,6 +1,44 @@
 let ctx: AudioContext | null = null;
 let output: GainNode | null = null;
 
+let introBuffer: Promise<AudioBuffer> | null = null;
+
+// Fetch in the lobby so starting the game doesn't wait for the recording.
+export function preloadGameIntro(): Promise<AudioBuffer> {
+  if (!introBuffer) {
+    introBuffer = fetch('/audio/jeopardy-intro-da.mp3')
+      .then(response => {
+        if (!response.ok) throw new Error('Intro audio could not be loaded');
+        return response.arrayBuffer();
+      })
+      .then(data => getCtx().decodeAudioData(data))
+      .catch(error => { introBuffer = null; throw error; });
+  }
+  return introBuffer;
+}
+
+// Return cancellation immediately, including while loading is still pending.
+export function playGameIntro(): () => void {
+  let cancelled = false;
+  let source: AudioBufferSourceNode | null = null;
+  void (async () => {
+    const c = getCtx();
+    if (c.state !== 'running') return; // Don't queue music behind browser audio unlock.
+    const buffer = await preloadGameIntro();
+    if (cancelled || c.state !== 'running') return;
+    source = c.createBufferSource();
+    source.buffer = buffer;
+    source.connect(output!);
+    source.onended = () => source?.disconnect();
+    source.start();
+  })().catch(() => {}); // Missing audio must never prevent a game from starting.
+  return () => {
+    cancelled = true;
+    source?.stop();
+    source?.disconnect();
+  };
+}
+
 function getCtx(): AudioContext {
   if (!ctx) {
     ctx = new AudioContext();

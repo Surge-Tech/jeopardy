@@ -27,8 +27,10 @@ test('host test buzzes share phone timing, history, team eligibility and scoring
     return { send: (event: string, ...args: any[]) => handlers.get(event)?.(...args) };
   }
   const session = gm.createSession('board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   const otherRoom = gm.createSession('other');
+  gm.setMode(otherRoom.roomCode, 'individual');
   const host = client('test-buzz-host');
   const phone = client('test-buzz-phone');
   const stranger = client('test-buzz-stranger');
@@ -57,6 +59,7 @@ test('host test buzzes share phone timing, history, team eligibility and scoring
     assert.equal(result.ok, false);
     assert.deepEqual(session, before);
 
+    host.send(E.HOST_START, { roomCode: room });
     host.send(E.HOST_OPEN_QUESTION, { roomCode: room, questionId: 'q1', isDailyDouble: false });
     host.send(E.HOST_BUZZ_PLAYER, { roomCode: room, playerId: alice.id }, ack);
     assert.equal(result.outcome, 'early');
@@ -120,11 +123,13 @@ test('host test buzzes are rate-limited and a host socket never acts as a player
     on: (event: string, handler: (...args: any[]) => void) => handlers.set(event, handler),
   } as unknown as Socket);
   const session = gm.createSession('board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   const player = gm.addPlayer(room, 'Admin player', '#ffffff')!;
   let result: any;
   try {
     handlers.get(E.HOST_JOIN)!({ roomCode: room });
+    gm.startGame(room);
     gm.openQuestion(room, 'q', false);
     handlers.get(E.BUZZ)!();
     assert.equal(player.stats, undefined);

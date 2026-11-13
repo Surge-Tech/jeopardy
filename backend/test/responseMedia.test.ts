@@ -19,7 +19,10 @@ test('answer media persists independently and Final Jeopardy publishes it only o
     const board = await storage.createBoard({ name: 'Test', rounds: [{ id: 'round', pointValues: [200], categories: [{ id: 'category', name: 'Test', questions: [question] }] }], finalJeopardy: { category: 'Final', clue: 'Final clue', response: 'Final answer', mediaType: 'audio', mediaUrl: '/media/final-clue.mp3', responseMediaType: 'audio', responseMediaUrl: '/media/final-answer.wav' } });
     assert.deepEqual((await storage.getBoard(board.id))?.rounds[0].categories[0].questions[0], question);
     const session = gm.createSession(board.id);
+    gm.setMode(session.roomCode, 'individual');
     room = session.roomCode;
+    gm.addPlayer(room, 'Player', '#ffffff');
+    gm.startGame(room);
     assert.deepEqual(await final.startFinal(io, room), { ok: true });
     assert.equal(session.finalJeopardy?.responseMediaUrl, undefined);
     final.revealCategory(io, room);
@@ -38,7 +41,10 @@ test('answer media persists independently and Final Jeopardy publishes it only o
     final.cleanup(room);
     gm.deleteSession(room);
     const legacySession = gm.createSession(legacy.id);
+    gm.setMode(legacySession.roomCode, 'individual');
     room = legacySession.roomCode;
+    gm.addPlayer(room, 'Player', '#ffffff');
+    gm.startGame(room);
     await final.startFinal(io, room);
     final.showResponse(io, room);
     assert.equal(legacySession.finalJeopardy?.response, 'Answer');

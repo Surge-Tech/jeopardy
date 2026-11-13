@@ -1,8 +1,7 @@
 import { getCompetitors } from '@shared/competitors';
 import ResponseMedia from '../components/shared/ResponseMedia';
 import ClueMedia from '../components/shared/ClueMedia';
-import BuzzerStatus from '../components/shared/BuzzerStatus';
-import BuzzResults from '../components/shared/BuzzResults';
+import BoardBuzzerDock from '../components/shared/BoardBuzzerDock';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
@@ -11,6 +10,7 @@ import type { Board, GameState, Question } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
 import { playDailyDouble, playBuzzerReady, playBuzzIn, playWrong } from '../utils/sounds';
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
+import LobbyBoardScreen from '../components/shared/LobbyBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';
 import SoundControl from '../components/shared/SoundControl';
 import { getRound, isRoundComplete } from '../utils/rounds';
@@ -126,6 +126,10 @@ export default function BoardView() {
     );
   }
 
+  if (gameState.phase === 'lobby') {
+    return <><SoundControl /><LobbyBoardScreen gameState={gameState} boardName={board.name} /></>;
+  }
+
   if (gameState.phase === 'finished') {
     return (
       <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center py-12" style={{ fontFamily: 'Arial Black, Impact, sans-serif' }}>
@@ -239,15 +243,7 @@ export default function BoardView() {
           </div>
           </div>
 
-          <div className="board-buzzer-dock">
-            <div className="board-buzzer-dock__status"><BuzzerStatus gameState={gameState} display /></div>
-
-          {!gameState.buzzWindow && gameState.buzzHistory?.length > 0 && (
-            <div className="board-buzz-order">
-              <BuzzResults entries={gameState.buzzHistory} winnerId={gameState.buzzedPlayerId} />
-            </div>
-          )}
-          </div>
+          <BoardBuzzerDock gameState={gameState} />
         </div>
       )}
 

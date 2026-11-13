@@ -21,6 +21,9 @@ test('host team controls, shared standings and captain-only Final Jeopardy scree
   const emitted: Array<{ event: string; payload: any }> = [];
   (globalThis as any).__teamSocket = {
     on: () => {}, off: () => {},
+    timeout: () => ({ emit: (event: string, payload: any, ack: (...args: any[]) => void) => {
+      emitted.push({ event, payload }); ack(null, { ok: true });
+    } }),
     emit: (event: string, payload: any, ack?: (r: any) => void) => {
       emitted.push({ event, payload });
       ack?.({ ok: true });
@@ -72,6 +75,25 @@ test('host team controls, shared standings and captain-only Final Jeopardy scree
   try {
     await render(<TeamsPanel gameState={state} roomCode="TEAM" />);
     assert.match(document.body.textContent!, /Setup locks when play starts/);
+    const newName = document.querySelector<HTMLInputElement>('[aria-label="Team name"]')!;
+    const newColor = document.querySelector<HTMLInputElement>('[aria-label="Team color"]')!;
+    await act(async () => button('Edit').click());
+    const editForm = document.querySelector<HTMLFormElement>('[aria-label="Edit Blue"]')!;
+    assert.ok(editForm, 'edit fields appear inside the existing team card');
+    assert.equal(editForm.closest('.bg-gray-800')?.contains(document.querySelector('[aria-label="Captain for Blue"]')), true);
+    assert.equal(newName.value, '');
+    assert.equal(newColor.value, '#60a5fa');
+    assert.equal(document.querySelector<HTMLInputElement>('[aria-label="Name for Blue"]')!.value, 'Blue');
+    assert.equal(document.querySelector<HTMLInputElement>('[aria-label="Color for Blue"]')!.value, '#0000ff');
+    await act(async () => button('Save team').click());
+    assert.deepEqual(emitted.at(-1), { event: E.HOST_SAVE_TEAM, payload: { roomCode: 'TEAM', id: 'blue', name: 'Blue', color: '#0000ff' } });
+    assert.equal(document.querySelector('[aria-label="Edit Blue"]'), null);
+    await act(async () => button('Edit').click());
+    const beforeCancel = emitted.length;
+    await act(async () => button('Cancel').click());
+    assert.equal(emitted.length, beforeCancel);
+    assert.equal(document.querySelector('[aria-label="Edit Blue"]'), null);
+    assert.equal(newName.value, '');
     assert.equal(button('Auto-assign players').disabled, false);
     await act(async () => button('Auto-assign players').click());
     assert.deepEqual(emitted.at(-1), { event: E.HOST_AUTO_ASSIGN_TEAMS, payload: { roomCode: 'TEAM' } });

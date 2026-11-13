@@ -19,6 +19,7 @@ test('records late buzzes for exactly 500 ms, publishes results, and requires a 
   } as unknown as Server;
   registerSocketHandlers(io);
   const session = gm.createSession('board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   function client(id: string) {
     const handlers = new Map<string, (payload?: any) => void>();
@@ -40,6 +41,7 @@ test('records late buzzes for exactly 500 ms, publishes results, and requires a 
   }
   const [p1, p2, p3] = session.players;
   try {
+    gm.startGame(room);
     gm.openQuestion(room, 'clue', false);
     gm.revealClue(room, 'image');
     first.send(E.BUZZ);

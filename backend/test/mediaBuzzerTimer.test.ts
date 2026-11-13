@@ -40,6 +40,7 @@ test('all buzzers stay open until manually closed, including after reopening', {
       ],
     }] }] });
     const session = gm.createSession(board.id);
+    gm.setMode(session.roomCode, 'individual');
     room = session.roomCode;
     rooms.add(`host:${room}`);
     await dispatch(E.HOST_SET_ANSWER_TIME, { roomCode: room, seconds: 20 });
@@ -47,6 +48,7 @@ test('all buzzers stay open until manually closed, including after reopening', {
     const player = gm.addPlayer(room, 'First', '#ff0000')!;
     const second = gm.addPlayer(room, 'Second', '#00ff00')!;
     for (const questionId of ['image', 'audio', 'video', 'youtube', 'text']) {
+      gm.startGame(room);
       await dispatch(E.HOST_OPEN_QUESTION, { roomCode: room, questionId, isDailyDouble: false });
       await dispatch(E.HOST_REVEAL_CLUE, { roomCode: room });
       if (questionId === 'text') {

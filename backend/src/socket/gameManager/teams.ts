@@ -77,7 +77,7 @@ export function setCaptain(roomCode: string, teamId: string, playerId: string): 
   const session = sessions.get(roomCode);
   if (!session || session.phase === 'finished') return fail('Game is not available');
   // Wagering and Final Jeopardy allow a disconnected captain to be replaced.
-  if (hasPendingAnswer(session) || (session.activeQuestionId && session.dailyDouble?.stage !== 'wagering')) return fail('Change captains between clues');
+  if (session.phase !== 'lobby' && (hasPendingAnswer(session) || (session.activeQuestionId && session.dailyDouble?.stage !== 'wagering'))) return fail('Change captains between clues');
   const team = session.teams.find(t => t.id === teamId);
   if (!team || !session.players.some(p => p.id === playerId && p.teamId === teamId)) return fail('Captain must be a team member');
   team.captainPlayerId = playerId;

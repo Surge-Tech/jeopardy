@@ -35,6 +35,7 @@ test('host remembers its room across browser closures, reconnects, and clears it
   }));
   let root = createRoot(document.getElementById('root')!);
   const state = gm.createSession('board');
+  gm.setMode(state.roomCode, 'individual');
   try {
     await build({
       entryPoints: [join(testDir, '../src/pages/Host.tsx')],
@@ -68,6 +69,7 @@ test('host remembers its room across browser closures, reconnects, and clears it
     // Correct awards points but leaves the clue open for a separate close action.
     const player = gm.addPlayer(state.roomCode, 'Player', '#ff0000')!;
     document.querySelector('select')!.focus();
+    gm.startGame(state.roomCode);
     gm.openQuestion(state.roomCode, 'clue', false);
     await act(async () => handlers.get(E.GAME_STATE)!(structuredClone(state)));
     const revealButton = [...document.querySelectorAll('button')].find(button => button.textContent === 'Show Clue (Space)')!;

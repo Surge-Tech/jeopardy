@@ -66,7 +66,7 @@ export default function PlayersTab({
           <input type="checkbox" checked={showTestBuzzers} onChange={e => setShowTestBuzzers(e.target.checked)} />
           Show test buzzers
         </label>
-        {showTestBuzzers && <p className="text-xs text-gray-400">Simulate player buzzes here. Results affect normal game stats and scoring.</p>}
+        {showTestBuzzers && <p className="text-xs text-gray-400">{gameState.phase === 'lobby' ? 'Simulate phone presses for the lobby buzzer test.' : 'Simulate player buzzes here. Results affect normal game stats and scoring.'}</p>}
       </div>}
       {players.length === 0 && (
         <p className="text-gray-600 text-sm">No players. Add some above or share the buzzer URL.</p>
@@ -102,13 +102,13 @@ export default function PlayersTab({
                   >✎</button>
                 </div>
               )}
-              {!teamMode && <div className="font-black" style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}>
+              {!teamMode && gameState?.phase !== 'lobby' && <div className="font-black" style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}>
                 {formatScore(player.score)}
               </div>}
             </div>
             <div className="flex gap-1 flex-shrink-0">
-              {!teamMode && <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => onAdjustScore(player.id, 100)}>+100</button>}
-              {!teamMode && <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => onAdjustScore(player.id, -100)}>-100</button>}
+              {!teamMode && gameState?.phase !== 'lobby' && <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => onAdjustScore(player.id, 100)}>+100</button>}
+              {!teamMode && gameState?.phase !== 'lobby' && <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" onClick={() => onAdjustScore(player.id, -100)}>-100</button>}
               {!membershipLocked && <button className="text-xs text-red-400 hover:text-red-200 px-1" onClick={() => onRemovePlayer(player.id)}>✕</button>}
             </div>
           </div>

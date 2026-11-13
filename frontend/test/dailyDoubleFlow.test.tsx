@@ -27,6 +27,7 @@ for (const correct of [true, false]) {
     const { default: Panel } = await import(pathToFileURL(join(tempDir, 'panel.mjs')).href);
     let root = createRoot(document.getElementById('root')!);
     const state = gm.createSession('board');
+    gm.setMode(state.roomCode, 'individual');
     const room = state.roomCode;
     const player = gm.addPlayer(room, 'Per', '#ffffff')!;
     gm.startGame(room);

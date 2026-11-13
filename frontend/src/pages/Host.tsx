@@ -1,5 +1,6 @@
 import BoardMediaControls from '../components/host/BoardMediaControls';
 import TeamsPanel from '../components/host/TeamsPanel';
+import LobbyBuzzerTest from '../components/shared/LobbyBuzzerTest';
 import { getCompetitor, playerLabel } from '@shared/competitors';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -309,7 +310,7 @@ export default function Host() {
           {round.name ? ` — ${round.name}` : ''}
         </div>
         <div className="ml-auto flex gap-3 items-center flex-wrap">
-          {!isLastRound && (
+          {gameState.phase === 'playing' && !isLastRound && (
             <button
               className={`text-sm py-1 px-3 rounded font-bold ${roundComplete ? 'bg-jeopardy-gold text-jeopardy-dark' : 'btn-ghost'}`}
               disabled={!!gameState.activeQuestionId}
@@ -318,7 +319,7 @@ export default function Host() {
               Next Round →
             </button>
           )}
-          {gameState.phase !== 'finished' && board.finalJeopardy && !gameState.finalJeopardy && (
+          {gameState.phase === 'playing' && board.finalJeopardy && !gameState.finalJeopardy && (
             <button
               className="bg-jeopardy-gold text-jeopardy-dark text-sm py-1 px-3 rounded font-bold hover:brightness-110 transition-all"
               onClick={startFinalJeopardy}
@@ -347,7 +348,7 @@ export default function Host() {
             onChange={seconds => socket.emit(SOCKET_EVENTS.HOST_SET_ANSWER_TIME, { roomCode, seconds })} />
           <AnswerTimeSetting label="Daily Double time" max={300} seconds={gameState.settings.dailyDoubleTimeS ?? 15}
             onChange={seconds => socket.emit(SOCKET_EVENTS.HOST_SET_DD_TIME, { roomCode, seconds })} />
-          {gameState.phase !== 'finished' && (
+          {gameState.phase === 'playing' && (
             <button className="btn-danger text-sm py-1 px-3" onClick={endGame}>End Game</button>
           )}
         </div>
@@ -367,7 +368,7 @@ export default function Host() {
       )}
 
       {/* Prompt when the last round is complete and the board has Final Jeopardy */}
-      {gameState.phase !== 'finished' && isLastRound && roundComplete && !gameState.activeQuestionId && board.finalJeopardy && !gameState.finalJeopardy && (
+      {gameState.phase === 'playing' && isLastRound && roundComplete && !gameState.activeQuestionId && board.finalJeopardy && !gameState.finalJeopardy && (
         <div className="bg-jeopardy-blue px-4 py-2 flex items-center gap-4 flex-wrap font-bold text-white">
           <span>⚡ Last round complete — start Final Jeopardy or end the game.</span>
           <div className="ml-auto flex gap-2">
@@ -385,12 +386,18 @@ export default function Host() {
       <div className="flex-1 flex flex-col lg:flex-row gap-0 overflow-hidden">
         {/* Left: Board grid */}
         <div className="flex-1 min-w-0 overflow-auto p-3">
-          <BoardGrid
+          {gameState.phase === 'lobby' ? (
+            <section className="mx-auto max-w-2xl space-y-6 p-3" aria-label="Lobby setup">
+              <div><h2 className="text-3xl font-black text-jeopardy-gold">Game lobby</h2>
+                <p className="text-gray-300 mt-2">Choose a mode, let players join, then press Start game. The board view displays the QR code and live roster.</p></div>
+              <TeamsPanel gameState={gameState} roomCode={roomCode} />
+            </section>
+          ) : <BoardGrid
             round={round}
             answered={answered}
             activeQuestionId={gameState.activeQuestionId}
             onOpenQuestion={openQuestion}
-          />
+          />}
 
           {/* Share links */}
           <div className="mt-4 space-y-2">
@@ -405,7 +412,16 @@ export default function Host() {
 
           {/* Active question panel */}
           <div className="p-5 xl:p-6 border-b border-gray-700 flex-shrink-0">
-            {gameState.finalJeopardy ? (
+            {gameState.phase === 'lobby' ? (
+              <div className="space-y-4">
+              <LobbyBuzzerTest gameState={gameState} onAction={action => {
+                socket.emit(SOCKET_EVENTS.HOST_LOBBY_BUZZER, { roomCode, action }, (res: { ok: boolean; error?: string }) => {
+                  setHostError(res.ok ? '' : res.error ?? 'Could not update buzzer test');
+                });
+              }} />
+              <div><h2 className="text-xl font-bold text-jeopardy-gold">Players & teams</h2><p className="text-sm text-gray-300 mt-2">Manage the roster below. Gameplay begins when you press Start game.</p></div>
+              </div>
+            ) : gameState.finalJeopardy ? (
               <HostFinalPanel roomCode={roomCode} gameState={gameState} board={board}
                 mediaControls={<BoardMediaControls board={board} gameState={gameState} roomCode={roomCode} />} />
             ) : activeQ?.isDailyDouble && gameState.dailyDouble ? (
@@ -482,7 +498,7 @@ export default function Host() {
             {/* Players tab */}
             {tab === 'players' && (
               <>
-              <TeamsPanel gameState={gameState} roomCode={roomCode} />
+              {gameState.phase !== 'lobby' && <TeamsPanel gameState={gameState} roomCode={roomCode} />}
               <PlayersTab
                 gameState={gameState}
                 roomCode={roomCode}

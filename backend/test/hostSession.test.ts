@@ -33,8 +33,11 @@ test('host refresh resumes the full session; stale and different-board rooms cre
   try {
     const first = open('board');
     assert.equal(first.resumed, false);
+    assert.equal(first.state.mode, 'teams');
+    gm.setMode(first.roomCode, 'individual');
     const player = gm.addPlayer(first.roomCode, 'Alice', '#fff')!;
     gm.updateScore(first.roomCode, player.id, 600);
+    gm.startGame(first.roomCode);
     gm.openQuestion(first.roomCode, 'question', false);
     first.state.answeredQuestions.push('previous-question');
     const before = structuredClone(first.state);

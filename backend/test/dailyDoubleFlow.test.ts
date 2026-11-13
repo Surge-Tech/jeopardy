@@ -20,6 +20,7 @@ for (const outcome of ['correct', 'wrong'] as const) {
     } as unknown as Server;
     registerSocketHandlers(io);
     const session = gm.createSession('board');
+    gm.setMode(session.roomCode, 'individual');
     const roomCode = session.roomCode;
     const send = (event: string, payload: object = {}) => handlers.get(event)!({ roomCode, ...payload });
     try {
@@ -91,6 +92,7 @@ for (const outcome of ['correct', 'wrong'] as const) {
 
 test('Daily Double timer uses configured duration and supports disabling', () => {
   const state = gm.createSession('board');
+  gm.setMode(state.roomCode, 'individual');
   const room = state.roomCode;
   try {
     const player = gm.addPlayer(room, 'Per', '#ffffff')!;

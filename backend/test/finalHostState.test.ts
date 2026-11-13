@@ -16,12 +16,14 @@ test('Final Jeopardy private previews can be restored only by an authorized room
   const broadcasts: { room: string; event: string; payload: any }[] = [];
   const io = { to: (room: string) => ({ emit: (event: string, payload: unknown) => broadcasts.push({ room, event, payload: structuredClone(payload) }) }) } as unknown as Server;
   const session = gm.createSession('board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   try {
     const board = await storage.createBoard({ name: 'Final test', finalJeopardy: { category: 'Final', clue: 'Clue', response: 'Answer' } });
     session.boardId = board.id;
     const player = gm.addPlayer(room, 'Per', '#ffffff')!;
     gm.setScore(room, player.id, 1000);
+    gm.startGame(room);
     await final.startFinal(io, room);
     final.revealCategory(io, room);
     final.submitWager(io, room, player.id, 500);

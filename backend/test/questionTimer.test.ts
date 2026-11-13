@@ -6,6 +6,7 @@ test('question countdown counts only open buzzer time and survives refresh and r
   let now = 100000;
   t.mock.method(Date, 'now', () => now);
   const session = gm.createSession('board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   const first = gm.addPlayer(room, 'First', '#ff0000')!;
   const second = gm.addPlayer(room, 'Second', '#00ff00')!;

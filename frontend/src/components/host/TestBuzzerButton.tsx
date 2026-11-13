@@ -6,6 +6,12 @@ import { socket } from '../../socket';
 
 function disabledReason(state: GameState, player: Player, now: number): string | null {
   if (state.phase === 'finished') return 'Game finished';
+  if (state.phase === 'lobby') {
+    if (state.buzzerState === 'idle') return 'Open the lobby buzzer test';
+    if (state.buzzHistory.some(entry => entry.playerId === player.id)) return 'Already buzzed';
+    if (state.buzzerState === 'locked' && (!state.buzzWindow || now >= state.buzzWindow.deadline)) return 'Buzz window closed';
+    return null;
+  }
   if (state.finalJeopardy) return 'Buzzers are off during Final Jeopardy';
   if (state.dailyDouble) return 'Buzzers are off during Daily Doubles';
   if (!state.activeQuestionId) return 'Open a clue to test buzzing';

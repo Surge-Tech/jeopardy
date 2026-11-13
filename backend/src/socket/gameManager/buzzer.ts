@@ -1,5 +1,4 @@
 import { getCompetitor, getTeam, playerLabel } from '../../shared/competitors.js';
-import { startGame } from './sessions.js';
 import { hasPendingAnswer } from '../../shared/questionFlow.js';
 import type { GameState, Question } from '../../types.js';
 import { sessions, resetBuzzerFields, pauseQuestionTimer, PERMANENT_LOCKOUT } from './state.js';
@@ -8,9 +7,8 @@ import { sessions, resetBuzzerFields, pauseQuestionTimer, PERMANENT_LOCKOUT } fr
 
 export function openQuestion(roomCode: string, questionId: string, isDailyDouble: boolean): boolean {
   const session = sessions.get(roomCode);
-  if (!session || session.phase === 'finished' || session.finalJeopardy) return false;
+  if (!session || session.phase !== 'playing' || session.finalJeopardy) return false;
   if (hasPendingAnswer(session) || session.dailyDouble) return false;
-  if (session.phase === 'lobby' && !startGame(roomCode)) return false;
   session.activeQuestionId = questionId;
   session.clueVisible = false;
   resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
@@ -87,6 +85,32 @@ export const BUZZ_COLLECTION_MS = 500;
 
 export type BuzzOutcome = 'won' | 'early' | 'locked-out' | 'ignored' | 'recorded';
 
+export function setLobbyBuzzer(roomCode: string, action: 'open' | 'reset'): boolean {
+  const session = sessions.get(roomCode);
+  if (!session || session.phase !== 'lobby' || (action !== 'open' && action !== 'reset')) return false;
+  resetBuzzerFields(session, { buzzerState: action === 'open' ? 'open' : 'idle', clearLockouts: true });
+  return true;
+}
+
+// Practice uses the regular first-buzz collection window, without a clue,
+// answer timer, team eligibility requirements, scoring, or player statistics.
+function recordLobbyBuzz(session: GameState, playerId: string, openedAt: number | null): BuzzOutcome {
+  if (session.buzzerState === 'idle') return 'ignored';
+  const now = Date.now();
+  if (session.buzzHistory.some(entry => entry.playerId === playerId)) return 'ignored';
+  if (session.buzzerState === 'locked' && (!session.buzzWindow || now >= session.buzzWindow.deadline)) return 'ignored';
+  const playerName = playerLabel(session, playerId);
+  const entry = { playerId, playerName, reactionMs: openedAt === null ? 0 : Math.max(0, now - openedAt), attemptedAnswer: false };
+  session.buzzHistory.push(entry);
+  if (session.buzzerState === 'locked') return 'recorded';
+  session.buzzerState = 'locked';
+  session.buzzedPlayerId = playerId;
+  session.buzzedPlayerName = playerName;
+  session.buzzTimestamp = now;
+  session.buzzWindow = { deadline: now + BUZZ_COLLECTION_MS, serverNow: now };
+  return 'won';
+}
+
 function startAnswerTimer(session: GameState, now: number) {
   session.answerTimer = !session.responseVisible && session.settings.answerTimeS > 0
     ? { deadline: now + session.settings.answerTimeS * 1000, serverNow: now }
@@ -104,6 +128,10 @@ export function setAnswerTime(roomCode: string, seconds: number): boolean {
 export function recordBuzz(roomCode: string, playerId: string, playerName: string, buzzOpenedAt: number | null): BuzzOutcome {
   const session = sessions.get(roomCode);
   if (!session) return 'ignored';
+  if (session.phase === 'lobby') {
+    if (!session.players.some(player => player.id === playerId)) return 'ignored';
+    return recordLobbyBuzz(session, playerId, buzzOpenedAt);
+  }
   if (!session.activeQuestionId || session.phase === 'finished') return 'ignored';
 
   const now = Date.now();
@@ -189,7 +217,7 @@ export function setLockoutMs(roomCode: string, ms: number): boolean {
 // invoke it when an `outcome` is present.
 export function validateScoreEligibility(roomCode: string, playerId: string, isDailyDouble: boolean): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || session.phase !== 'playing') return false;
   if (isDailyDouble) return playerId === session.dailyDouble?.playerId &&
     session.dailyDouble.stage === 'ready' && session.dailyDoubleRevealed && !session.dailyDouble.outcome;
   return playerId === session.buzzedPlayerId;
@@ -197,7 +225,7 @@ export function validateScoreEligibility(roomCode: string, playerId: string, isD
 
 export function markWrongAndReopen(roomCode: string, playerId: string, delta: number): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || session.phase !== 'playing') return false;
   // Reject stale/duplicate/mismatched emits: only the currently-buzzed-in
   // player can be marked wrong. Does not mutate state on mismatch.
   if (playerId !== session.buzzedPlayerId) return false;

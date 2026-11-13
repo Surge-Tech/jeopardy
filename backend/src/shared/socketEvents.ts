@@ -41,6 +41,7 @@ export const SOCKET_EVENTS = {
   HOST_CREATED: 'host:created',
   HOST_JOIN: 'host:join',
   HOST_START: 'host:start',
+  HOST_LOBBY_BUZZER: 'host:lobby-buzzer',
   HOST_SET_MODE: 'host:set-mode',
   HOST_SAVE_TEAM: 'host:save-team',
   HOST_REMOVE_TEAM: 'host:remove-team',

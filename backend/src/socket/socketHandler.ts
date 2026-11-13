@@ -6,6 +6,7 @@ import * as boardStorage from '../storage/boardStorage.js';
 import { registerFinalHandlers, cleanup as cleanupFinal } from './finalJeopardy.js';
 import { onHost } from './hostAuth.js';
 import { SOCKET_EVENTS } from '../shared/socketEvents.js';
+import { getStartGameError } from '../shared/lobby.js';
 import { LIMITS } from '../shared/limits.js';
 
 // Track which socket owns which player in which room
@@ -249,6 +250,14 @@ export function registerSocketHandlers(io: Server) {
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
+    onHost(socket, SOCKET_EVENTS.HOST_LOBBY_BUZZER, ({ roomCode, action }: { roomCode: string; action: 'open' | 'reset' }, ack) => {
+      if (!gm.setLobbyBuzzer(roomCode, action)) return ack?.({ ok: false, error: 'Buzzer practice is only available in the lobby' });
+      if (action === 'open') buzzOpenedAt.set(roomCode, Date.now());
+      else buzzOpenedAt.delete(roomCode);
+      ack?.({ ok: true });
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+
     // ── HOST: open buzzer ────────────────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_ENABLE_BUZZER, ({ roomCode }: { roomCode: string }) => {
       if (!gm.enableBuzzer(roomCode)) return;
@@ -275,7 +284,7 @@ export function registerSocketHandlers(io: Server) {
     // ── HOST: open a question ────────────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_OPEN_QUESTION, ({ roomCode, questionId, isDailyDouble, boardHighValue }: { roomCode: string; questionId: string; isDailyDouble: boolean; boardHighValue?: number }) => {
       if (!gm.openQuestion(roomCode, questionId, isDailyDouble)) {
-        if (gm.getSession(roomCode)?.phase === 'lobby') socket.emit('error', { message: 'Assign every player to a team and choose a captain for each team before starting' });
+        if (gm.getSession(roomCode)?.phase === 'lobby') socket.emit('error', { message: 'Press Start game before selecting a question' });
         return;
       }
       if (isDailyDouble) {
@@ -441,7 +450,10 @@ export function registerSocketHandlers(io: Server) {
 
     // ── HOST: start game ─────────────────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_START, ({ roomCode }: { roomCode: string }, ack) => {
-      if (!gm.startGame(roomCode)) return ack?.({ ok: false, error: 'Assign every player to a team and choose a captain for each team before starting' });
+      const session = gm.getSession(roomCode);
+      const error = session ? getStartGameError(session) : 'Room not found';
+      if (error) return ack?.({ ok: false, error });
+      if (!gm.startGame(roomCode)) return ack?.({ ok: false, error: 'Could not start game' });
       ack?.({ ok: true });
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });

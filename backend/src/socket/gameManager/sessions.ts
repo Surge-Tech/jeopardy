@@ -1,5 +1,6 @@
 import { randomUUID as uuidv4 } from 'crypto';
 import type { GameState, Player } from '../../types.js';
+import { getStartGameError } from '../../shared/lobby.js';
 import { LIMITS } from '../../shared/limits.js';
 import { sessions, lastActivityAt, resetBuzzerFields } from './state.js';
 
@@ -17,7 +18,7 @@ export function createSession(boardId: string): GameState {
     boardId,
     roomCode,
     players: [],
-    mode: 'individual',
+    mode: 'teams',
     teams: [],
     answeredQuestions: [],
     activeQuestionId: null,
@@ -114,21 +115,15 @@ export function renamePlayer(roomCode: string, playerId: string, newName: string
 
 export function startGame(roomCode: string): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
-  if (session.mode === 'teams') {
-    const validCaptains = session.teams.every(team => session.players.some(
-      player => player.teamId === team.id && player.id === team.captainPlayerId,
-    ));
-    const allAssigned = session.players.every(player => session.teams.some(team => team.id === player.teamId));
-    if (!session.teams.length || !validCaptains || !allAssigned) return false;
-  }
+  if (!session || getStartGameError(session)) return false;
+  resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
   session.phase = 'playing';
   return true;
 }
 
 export function endGame(roomCode: string): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || session.phase !== 'playing') return false;
   session.phase = 'finished';
   session.activeQuestionId = null;
   resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
@@ -138,7 +133,7 @@ export function endGame(roomCode: string): boolean {
 
 export function resumeGame(roomCode: string): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || session.phase !== 'finished') return false;
   session.phase = 'playing';
   return true;
 }

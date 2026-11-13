@@ -6,11 +6,13 @@ test('answer countdown starts on winning buzz, resets for the next contestant, a
   let now = 100000;
   t.mock.method(Date, 'now', () => now);
   const session = gm.createSession('board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   const first = gm.addPlayer(room, 'First', '#ff0000')!;
   const second = gm.addPlayer(room, 'Second', '#00ff00')!;
   try {
     assert.equal(session.settings.answerTimeS, 10);
+    gm.startGame(room);
     gm.openQuestion(room, 'question', false);
     gm.revealClue(room, 'video');
     assert.equal(session.answerTimer, null);
@@ -52,10 +54,12 @@ test('answer countdown starts on winning buzz, resets for the next contestant, a
 
 test('revealing the response stops the countdown and keeps it stopped for later buzzes on that clue', () => {
   const session = gm.createSession('board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   const first = gm.addPlayer(room, 'First', '#ff0000')!;
   const second = gm.addPlayer(room, 'Second', '#00ff00')!;
   try {
+    gm.startGame(room);
     gm.openQuestion(room, 'question', false);
     gm.revealClue(room, 'video');
     gm.recordBuzz(room, first.id, first.name, Date.now());
@@ -86,6 +90,7 @@ test('revealing the response stops the countdown and keeps it stopped for later 
 
 test('answer time accepts only whole seconds from 0 through 120', () => {
   const session = gm.createSession('board');
+  gm.setMode(session.roomCode, 'individual');
   try {
     for (const value of [-1, 121, 1.5, NaN, Infinity, '5', null]) {
       assert.equal(gm.setAnswerTime(session.roomCode, value as number), false);

@@ -5,9 +5,11 @@ import * as gm from '../src/socket/gameManager.js';
 for (const mediaType of ['image', 'audio', 'video', 'youtube'] as const) {
   test(`${mediaType} clues accept a buzz immediately on reveal`, () => {
     const session = gm.createSession('test-board');
+    gm.setMode(session.roomCode, 'individual');
     const room = session.roomCode;
     const player = gm.addPlayer(room, 'First', '#ff0000')!;
     try {
+      gm.startGame(room);
       gm.openQuestion(room, 'media-clue', false);
       assert.equal(session.buzzerState, 'idle');
       assert.equal(gm.revealClue(room, mediaType), true);
@@ -28,8 +30,11 @@ for (const mediaType of ['image', 'audio', 'video', 'youtube'] as const) {
 
 test('regular clues must be revealed before buzzers open, and selecting another hides them again', () => {
   const session = gm.createSession('test-board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   try {
+    gm.addPlayer(room, 'Player', '#ffffff');
+    gm.startGame(room);
     gm.openQuestion(room, 'first', false);
     assert.equal(session.clueVisible, false);
     assert.equal(session.buzzerState, 'idle');
@@ -55,9 +60,11 @@ test('regular clues must be revealed before buzzers open, and selecting another 
 
 test('revealing the answer stops open buzzers', () => {
   const session = gm.createSession('test-board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   const player = gm.addPlayer(room, 'First', '#ff0000')!;
   try {
+    gm.startGame(room);
     gm.openQuestion(room, 'clue', false);
     gm.revealClue(room);
     gm.enableBuzzer(room);
@@ -74,10 +81,12 @@ test('revealing the answer stops open buzzers', () => {
 
 test('an unresolved buzz blocks closing or replacing the question until judged', () => {
   const session = gm.createSession('test-board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   const first = gm.addPlayer(room, 'First', '#ff0000')!;
   const second = gm.addPlayer(room, 'Second', '#00ff00')!;
   try {
+    gm.startGame(room);
     gm.openQuestion(room, 'clue', false);
     gm.revealClue(room);
     gm.enableBuzzer(room);
@@ -107,10 +116,12 @@ test('an unresolved buzz blocks closing or replacing the question until judged',
 
 test('reset cancels a pending answer and buzz results without scoring, then accepts a fresh buzz', () => {
   const session = gm.createSession('test-board');
+  gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   const first = gm.addPlayer(room, 'First', '#ff0000')!;
   const second = gm.addPlayer(room, 'Second', '#00ff00')!;
   try {
+    gm.startGame(room);
     gm.openQuestion(room, 'clue', false);
     gm.revealClue(room);
     gm.enableBuzzer(room);

@@ -58,13 +58,12 @@ function setFj(roomCode: string, fj: FinalPublicState | null) {
 export async function startFinal(io: Server, roomCode: string): Promise<{ ok: boolean; error?: string }> {
   const session = gm.getSession(roomCode);
   if (!session) return { ok: false, error: 'Room not found' };
+  if (session.phase !== 'playing') return { ok: false, error: 'Start the game before starting Final Jeopardy' };
   const board = await boardStorage.getBoard(session.boardId);
   const fjBoard = board?.finalJeopardy;
   if (!fjBoard || !fjBoard.category.trim() || !fjBoard.clue.trim()) {
     return { ok: false, error: 'This board has no Final Jeopardy clue configured' };
   }
-
-  if (session.phase === 'lobby' && !gm.startGame(roomCode)) return { ok: false, error: 'Finish team setup before starting' };
 
   // Snapshot reveal order: ascending score, ties broken by join order (index in players array).
   const competitors = getCompetitors(session);

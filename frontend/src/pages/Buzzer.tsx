@@ -11,6 +11,7 @@ import PlayerFinal from '../components/final/PlayerFinal';
 import AnswerCountdown from '../components/shared/AnswerCountdown';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
+import BuzzResults from '../components/shared/BuzzResults';
 import { useCountdown } from '../components/final/useCountdown';
 import { hasPendingAnswer } from '@shared/questionFlow';
 import { randomPlayerColor } from '../utils/colors';
@@ -53,12 +54,20 @@ export default function Buzzer() {
   // Derive this from game state so it also survives a reconnect or page reload.
   const isIncorrect = !!gameState?.activeQuestionId
     && gameState.buzzLockouts[myId] === PERMANENT_LOCKOUT;
-  const phase: BuzzerPhase = isIncorrect && gameState?.phase !== 'finished'
+  const inLobby = gameState?.phase === 'lobby';
+  const lobbyPhase: BuzzerPhase | null = inLobby && buzzerPhase !== 'join' && buzzerPhase !== 'closed'
+    ? gameState.buzzerState === 'open' ? 'open'
+      : gameState.buzzerState === 'locked'
+        ? gameState.buzzedPlayerId === myId ? 'winner'
+          : gameState.buzzWindow && !gameState.buzzHistory.some(entry => entry.playerId === myId) ? 'open' : 'too-late'
+        : 'lobby'
+    : null;
+  const phase: BuzzerPhase = lobbyPhase ?? (isIncorrect && gameState?.phase !== 'finished'
     && buzzerPhase !== 'join' && buzzerPhase !== 'closed'
     ? 'incorrect'
     : gameState?.buzzedPlayerId === myId && hasPendingAnswer(gameState)
       && gameState.phase !== 'finished' && buzzerPhase !== 'join' && buzzerPhase !== 'closed'
-      ? 'winner' : buzzerPhase;
+      ? 'winner' : buzzerPhase);
 
   // Kept in sync with `phase`/`myId` state below so the socket-handler effect
   // can read the current values without needing them in its dependency
@@ -87,6 +96,7 @@ export default function Buzzer() {
       setGameState(state);
       if (state.phase === 'finished') { setPhase('finished'); return; }
       const currentPhase = phaseRef.current;
+      if (state.phase === 'lobby' && currentPhase !== 'join' && currentPhase !== 'closed') { setPhase('lobby'); return; }
       if (state.buzzerState === 'locked' && currentPhase !== 'join' && currentPhase !== 'lobby' && currentPhase !== 'closed') {
         setWinnerName(state.buzzedPlayerName ?? 'Another player');
         if (state.buzzedPlayerId === myIdRef.current) setPhase('winner');
@@ -97,7 +107,7 @@ export default function Buzzer() {
         return;
       }
       const transient = currentPhase === 'locked-out';
-      if (!state.finalJeopardy && currentPhase !== 'join' && currentPhase !== 'lobby' && currentPhase !== 'finished' && currentPhase !== 'closed' && !transient) {
+      if (!state.finalJeopardy && currentPhase !== 'join' && currentPhase !== 'finished' && currentPhase !== 'closed' && !transient) {
         if (state.buzzerState === 'open') setPhase('open');
         else if (state.activeQuestionId) setPhase('armed');
         else setPhase('waiting');
@@ -108,7 +118,9 @@ export default function Buzzer() {
       setMyPlayer(player as any);
       setGameState(state);
       setWinnerName(state.buzzedPlayerName ?? 'Another player');
-      if (state.buzzerState === 'locked') {
+      if (state.phase === 'lobby') setPhase('lobby');
+      else if (state.phase === 'finished') setPhase('finished');
+      else if (state.buzzerState === 'locked') {
         const alreadyBuzzed = state.buzzHistory?.some(entry => entry.playerId === player.id);
         setPhase(state.buzzedPlayerId === player.id ? 'winner' : state.buzzWindow && !alreadyBuzzed ? 'open' : 'too-late');
       } else setPhase(state.buzzerState === 'open' ? 'open' : 'waiting');
@@ -189,14 +201,14 @@ export default function Buzzer() {
   }
 
   const myTeam = gameState ? getTeam(gameState, myId) : undefined;
-  const waitingForTeam = gameState?.mode === 'teams' && !myTeam;
+  const waitingForTeam = !inLobby && gameState?.mode === 'teams' && !myTeam;
   const myScore = gameState ? getCompetitor(gameState, myId)?.score ?? 0 : 0;
   const isDDWagering = !!(gameState?.dailyDouble && gameState.dailyDouble.playerId === myId
     && gameState.dailyDouble.stage === 'wagering' && gameState.dailyDouble.hasDevice);
 
   const showBuzzer = phase !== 'join' && phase !== 'finished' && phase !== 'closed'
     && !gameState?.finalJeopardy && !isDDWagering;
-  const canBuzz = !waitingForTeam && (phase === 'open' || phase === 'armed');
+  const canBuzz = (gameState?.phase === 'playing' || inLobby) && !waitingForTeam && (phase === 'open' || phase === 'armed');
   const buttonLabel = {
     open: 'BUZZ!', armed: 'Wait...', waiting: 'Waiting...', lobby: 'Waiting...',
     winner: 'Answering', 'too-late': 'Too slow!', 'locked-out': 'Too early!', incorrect: 'Locked out',
@@ -207,10 +219,13 @@ export default function Buzzer() {
   const answerRemainingMs = useCountdown(answerTimer?.deadline ?? null, answerTimer?.serverNow ?? null, 'second');
   const answerSeconds = answerRemainingMs == null ? null : Math.ceil(answerRemainingMs / 1000);
   const statusTitle = waitingForTeam ? 'Awaiting team'
+    : inLobby && phase === 'winner' ? 'First buzz!'
     : phase === 'winner' ? 'You buzzed in'
     : phase === 'incorrect' ? 'Incorrect answer'
     : buttonLabel;
   const statusHint = waitingForTeam ? 'Waiting for the host to assign you to a team.'
+    : inLobby && phase !== 'lobby' ? ''
+    : phase === 'lobby' ? 'Waiting for the host to start the game'
     : phase === 'winner' ? 'Your turn to answer'
     : phase === 'incorrect' ? 'Wait for the next question'
     : phase === 'locked-out' ? 'Wait for your buzzer to unlock'
@@ -356,6 +371,7 @@ export default function Buzzer() {
             </div>
           </section>
           <div className="player-buzzer-dock">
+            {inLobby && gameState && <BuzzResults entries={gameState.buzzHistory} winnerId={gameState.buzzedPlayerId} myId={myId} />}
             {gameState && (
               <section className="player-scoreboard" aria-labelledby="player-scoreboard-title">
                 <h2 id="player-scoreboard-title" className="text-gray-400 text-xs uppercase tracking-widest text-center">Scoreboard</h2>

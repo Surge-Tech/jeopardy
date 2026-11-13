@@ -23,7 +23,7 @@ function setup() {
   return { session, room, alice, bob, carol, blue, red };
 }
 
-test('team setup validates membership, names and captains and freezes on the first clue', () => {
+test('team setup validates membership, names and captains and freezes on Start game', () => {
   const { session, room, alice, blue, red } = setup();
   try {
     assert.equal(gm.saveTeam(room, undefined, ' blue ', '#ffffff').ok, false);
@@ -34,6 +34,8 @@ test('team setup validates membership, names and captains and freezes on the fir
     assert.equal(gm.startGame(room), false);
     assert.equal(gm.openQuestion(room, 'q', false), false);
     gm.assignTeam(room, alice.id, blue.id);
+    assert.equal(gm.openQuestion(room, 'q', false), false);
+    assert.equal(gm.startGame(room), true);
     assert.equal(gm.openQuestion(room, 'q', false), true);
     assert.equal(session.phase, 'playing');
     assert.equal(gm.assignTeam(room, alice.id, red.id).ok, false);
@@ -48,6 +50,7 @@ test('team setup validates membership, names and captains and freezes on the fir
 test('team scoring is shared, early penalties are personal and wrong answers lock out every teammate', () => {
   const { session, room, alice, bob, carol, blue, red } = setup();
   try {
+    gm.startGame(room);
     gm.openQuestion(room, 'q', false);
     assert.equal(gm.recordBuzz(room, alice.id, alice.name, null), 'early');
     assert.ok(session.buzzLockouts[alice.id]);
@@ -112,6 +115,7 @@ test('Final Jeopardy has one entry per team, enforces captains, keeps secrets an
     session.boardId = board.id;
     gm.setScore(room, blue.id, 1000);
     gm.setScore(room, red.id, 2000);
+    gm.startGame(room);
     assert.equal((await fj.startFinal(io, room)).ok, true);
     assert.deepEqual(session.finalJeopardy?.contestants.map(c => c.playerId), [blue.id, red.id]);
     fj.revealCategory(io, room);

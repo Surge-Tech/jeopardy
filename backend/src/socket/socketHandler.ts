@@ -239,6 +239,16 @@ export function registerSocketHandlers(io: Server) {
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
+    onHost(socket, SOCKET_EVENTS.HOST_SET_DD_TIME, ({ roomCode, seconds }: { roomCode: string; seconds: number }) => {
+      if (!gm.setDailyDoubleTime(roomCode, seconds)) return;
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+
+    onHost(socket, SOCKET_EVENTS.HOST_DD_START_TIMER, ({ roomCode }: { roomCode: string }) => {
+      if (!gm.startDailyDoubleTimer(roomCode)) return;
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+
     // ── HOST: open buzzer ────────────────────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_ENABLE_BUZZER, ({ roomCode }: { roomCode: string }) => {
       if (!gm.enableBuzzer(roomCode)) return;

@@ -61,6 +61,7 @@ test('host team controls, shared standings and captain-only Final Jeopardy scree
       { id: 'red', name: 'Red', score: 1000, color: '#ff0000', captainPlayerId: 'carol' },
     ],
     finalJeopardy: null, dailyDouble: null,
+    settings: { lockoutMs: 250, answerTimeS: 10, dailyDoubleTimeS: 15 },
   } as unknown as GameState;
   async function render(node: React.ReactNode) { await act(async () => root.render(node)); }
   function button(text: string): HTMLButtonElement {

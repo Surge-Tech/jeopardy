@@ -117,6 +117,7 @@ export interface FinalPublicState {
 }
 
 export interface DailyDoubleState {
+  timer?: { startedAt: number; deadline: number; serverNow: number } | null;
   outcome?: 'correct' | 'wrong';
   stage: 'picking' | 'wagering' | 'ready';
   playerId: string | null;
@@ -167,6 +168,7 @@ export interface GameState {
   buzzWindow: { deadline: number; serverNow: number } | null;
   settings: {
     lockoutMs: number;
+    dailyDoubleTimeS: number; // 0 disables the Daily Double countdown
     answerTimeS: number; // 0 disables the answer countdown
   };
   currentRoundIndex: number;

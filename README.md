@@ -10,7 +10,7 @@ A self-hosted, fully customizable Jeopardy game platform. Build your own boards,
 - **Board Editor** — Create unlimited Jeopardy boards with up to 6 categories and 5 clues each per round. Supports text, images, video, and audio clues, with separate image/video/audio uploads or YouTube links for correct answers, including Final Jeopardy. Answer media appears on the board when the host reveals the answer. Audio uploads support MP3, WAV, Ogg, M4A, AAC, FLAC, and WebM, with playback controls in the editor and on the board.
 - **Multi-Round Boards** — A board can hold several rounds (Jeopardy!, Double Jeopardy!, and beyond). Players, scores, and stats all carry over when the host advances to the next round — no need to start a new game.
 - **Real-time Buzzer System** — Players connect on any device via a browser. First buzz wins, ties are impossible. A configurable lockout (250/500/1000ms, or off) penalizes buzzing before the host opens it, so mashing the button no longer beats reacting to it.
-- **Daily Doubles with Wagering** — Mark any clue as a Daily Double. The host reveals it and the game automatically prompts the right player to wager on their phone (with a host override, and a manual picker for the rare case no player has answered correctly yet) — scoring then uses their wager instead of the clue's face value.
+- **Daily Doubles with Wagering** — Mark any clue as a Daily Double. The host reveals it and the game automatically prompts the right player to wager on their phone (with a host override, and a manual picker for the rare case no player has answered correctly yet) — scoring then uses their wager instead of the clue's face value. After showing the clue, the host can press **Space** or click **Start Answer Timer** to start a synced answer countdown (15 seconds by default). Set **Daily Double time** in the host controls to 0–300 seconds; 0 disables it. The countdown appears on the host panel, board, and contestant devices, and the host judges the answer when time runs out.
 - **Final Jeopardy** — A full wager-clue-reveal round with live wagers, a synced countdown timer, ambient music during the countdown, a dramatic per-contestant reveal, and a final scoreboard with a podium and stats.
 - **End-Game Lifecycle** — The game ends automatically once the last round is finished (if the board has no Final Jeopardy), or the host can end it manually at any point, including mid-Final-Jeopardy. A shared leaderboard — with tie handling — shows on every screen, and the host can resume or close the room from there.
 - **Projection View** — A fullscreen board view designed for a TV or shared screen.
@@ -70,9 +70,20 @@ Subsequent runs also install dependencies and rebuild the current checkout.
 Stop the server with Ctrl+C. Boards and uploaded media are stored in `backend/data/`.
 Other devices on the same network can open `http://YOUR_LAN_IP:3001`.
 
-For development with live reload, run `nix develop` in each of two terminals.
-Run `npm run install:all` once, then `npm run dev --prefix backend` in one terminal
-and `npm run dev --prefix frontend` in the other. Open http://localhost:5173.
+For development with live reload, run:
+
+```bash
+nix run .#dev
+```
+
+This installs the locked dependencies and starts both development servers in one
+terminal. Open http://localhost:5173, or `http://YOUR_LAN_IP:5173` on other devices.
+Frontend changes reload automatically; backend changes restart the server and
+clear active games. Ctrl+C stops both servers. Stop any existing server on port
+3001 before starting development mode.
+
+You can also use `nix develop` for a Node.js shell and start the servers separately
+with `npm run dev --prefix backend` and `npm run dev --prefix frontend`.
 The root `npm run dev` script below is Windows-specific.
 
 ### Node.js

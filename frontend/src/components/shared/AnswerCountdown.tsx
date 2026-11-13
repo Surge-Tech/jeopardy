@@ -4,14 +4,16 @@ import { useCountdown } from '../final/useCountdown';
 import CountdownDial from './CountdownDial';
 
 export default function AnswerCountdown({ gameState }: { gameState: GameState }) {
-  const timer = !gameState.responseVisible && hasPendingAnswer(gameState) ? gameState.answerTimer : null;
+  const dd = gameState.dailyDouble;
+  const ddTimer = dd && gameState.dailyDoubleRevealed && !dd.outcome ? dd.timer : null;
+  const timer = !gameState.responseVisible ? (dd ? ddTimer : hasPendingAnswer(gameState) ? gameState.answerTimer : null) : null;
   const remainingMs = useCountdown(timer?.deadline ?? null, timer?.serverNow ?? null);
   if (!timer || remainingMs == null) return null;
   const seconds = Math.ceil(remainingMs / 1000);
-  const totalMs = timer.deadline - (gameState.buzzTimestamp ?? timer.serverNow);
+  const totalMs = timer.deadline - (ddTimer?.startedAt ?? gameState.buzzTimestamp ?? timer.serverNow);
   return (
     <CountdownDial remainingMs={remainingMs} totalMs={totalMs}
-      ariaLabel="Answer countdown"
+      ariaLabel={dd ? 'Daily Double countdown' : 'Answer countdown'}
       label={seconds === 0 ? 'Time’s up!' : 'Answer time'} />
   );
 }

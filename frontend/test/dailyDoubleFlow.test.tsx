@@ -13,15 +13,15 @@ for (const correct of [true, false]) {
   test(`Daily Double ${correct ? 'accept' : 'reject'} follows the host workflow with keyboard controls and survives remount`, async () => {
     const testDir = dirname(fileURLToPath(import.meta.url));
     const tempDir = await mkdtemp(join(testDir, '.dd-flow-'));
-    const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
-    const old = { window: globalThis.window, document: globalThis.document };
-    Object.assign(globalThis, { window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true });
+    const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
+    const old = { window: globalThis.window, document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame, cancelAnimationFrame: globalThis.cancelAnimationFrame };
+    Object.assign(globalThis, { window: dom.window, document: dom.window.document, requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window), cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window), IS_REACT_ACT_ENVIRONMENT: true });
     await build({
       entryPoints: [join(testDir, '../src/components/dailydouble/DDHostPanel.tsx')], outfile: join(tempDir, 'panel.mjs'),
       bundle: true, platform: 'node', format: 'esm', packages: 'external', jsx: 'automatic', tsconfig: join(testDir, '../tsconfig.json'),
       plugins: [{ name: 'test-socket', setup(builder) {
         builder.onResolve({ filter: /\/socket$/ }, () => ({ path: 'socket', namespace: 'test' }));
-        builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const socket = { emit() {} };', loader: 'js' }));
+        builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const socket = { emit(event, payload) { window.dispatchEvent(new window.CustomEvent("test:socket", { detail: { event, payload } })); } };', loader: 'js' }));
       } }],
     });
     const { default: Panel } = await import(pathToFileURL(join(tempDir, 'panel.mjs')).href);
@@ -29,9 +29,18 @@ for (const correct of [true, false]) {
     const state = gm.createSession('board');
     const room = state.roomCode;
     const player = gm.addPlayer(room, 'Per', '#ffffff')!;
+    gm.startGame(room);
     gm.openQuestion(room, 'dd', true);
     gm.startDailyDoubleWager(room, null, 1000, false);
     const events: string[] = [];
+    let timerStarts = 0;
+    window.addEventListener('test:socket', ((event: CustomEvent) => {
+      if (event.detail.event === 'host:dd-start-timer') {
+        assert.equal(event.detail.payload.roomCode, room);
+        timerStarts++;
+        gm.startDailyDoubleTimer(room);
+      }
+    }) as EventListener);
     const render = () => act(async () => root.render(<Panel roomCode={room} gameState={structuredClone(state)}
       activeQ={{ id: 'dd', value: 200, clue: 'The clue', response: 'The answer', isDailyDouble: true }}
       onReveal={() => { events.push('reveal'); gm.revealDailyDouble(room); }}
@@ -58,7 +67,20 @@ for (const correct of [true, false]) {
       assert.match(primary().textContent!, /Show Clue/);
       await key(' ', 'Space'); await render();
       assert.match(status(), /Per is answering/);
+      assert.match(primary().textContent!, /Start Answer Timer.*15s.*Space/);
+      assert.equal(document.activeElement, primary(), 'timer is the next focused action');
+      const input = document.createElement('input');
+      document.body.append(input); input.focus();
+      await key(' ', 'Space');
+      assert.equal(timerStarts, 0, 'typing does not start the timer');
+      input.remove(); primary().focus();
+      await key(' ', 'Space'); await render();
+      assert.equal(timerStarts, 1);
+      assert.ok(state.dailyDouble?.timer);
       assert.match(primary().textContent!, /Accept/);
+      await key(' ', 'Space');
+      assert.equal(timerStarts, 1, 'Space cannot restart a running timer');
+      assert.deepEqual(events, ['reveal'], 'Space cannot judge the answer');
       await key('r');
       assert.deepEqual(events, ['reveal'], 'answer reveal waits for judgment');
       await key(correct ? 'y' : 'n'); await render();

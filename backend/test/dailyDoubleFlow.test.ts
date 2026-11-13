@@ -24,11 +24,17 @@ for (const outcome of ['correct', 'wrong'] as const) {
     const send = (event: string, payload: object = {}) => handlers.get(event)!({ roomCode, ...payload });
     try {
       send(E.HOST_JOIN);
+      assert.equal(session.settings.dailyDoubleTimeS, 15);
+      send(E.HOST_DD_START_TIMER);
+      assert.equal(session.dailyDouble, null);
       const player = gm.addPlayer(roomCode, 'Per', '#ffffff')!;
+      send(E.HOST_START);
       send(E.HOST_OPEN_QUESTION, { questionId: 'dd', isDailyDouble: true, boardHighValue: 1000 });
       assert.equal(session.dailyDouble?.stage, 'picking');
       send(E.HOST_REVEAL_DD);
       assert.equal(session.dailyDoubleRevealed, false, 'cannot reveal before wagering');
+      send(E.HOST_DD_START_TIMER);
+      assert.equal(session.dailyDouble?.timer, undefined);
       send(E.HOST_DD_PICK_PLAYER, { playerId: player.id });
       assert.equal(session.dailyDouble?.stage, 'wagering');
       send(E.HOST_DD_OVERRIDE_WAGER, { amount: 500 });
@@ -39,6 +45,21 @@ for (const outcome of ['correct', 'wrong'] as const) {
       send(E.HOST_REVEAL_DD);
       assert.equal(session.dailyDoubleRevealed, true);
       assert.equal(session.buzzerState, 'idle');
+      assert.equal(session.dailyDouble?.timer, undefined, 'revealing leaves time to read the clue');
+      send(E.HOST_DD_START_TIMER);
+      const timer = structuredClone(session.dailyDouble!.timer!);
+      assert.equal(timer.deadline - timer.startedAt, 15000);
+      send(E.HOST_DD_START_TIMER);
+      assert.equal(session.dailyDouble?.timer?.deadline, timer.deadline, 'duplicate start cannot restart the countdown');
+      send(E.HOST_SET_DD_TIME, { seconds: 25 });
+      assert.equal(session.settings.dailyDoubleTimeS, 25);
+      assert.equal(session.dailyDouble?.timer?.deadline, timer.deadline, 'configuration preserves the running timer');
+      for (const seconds of [-1, 301, 1.5, NaN, Infinity, '20']) {
+        send(E.HOST_SET_DD_TIME, { seconds });
+        assert.equal(session.settings.dailyDoubleTimeS, 25);
+      }
+      session.dailyDouble!.timer!.deadline = Date.now() - 1;
+      assert.equal(session.dailyDouble?.outcome, undefined, 'expiry leaves judgment to the host');
       send(E.HOST_SHOW_RESPONSE);
       assert.equal(session.responseVisible, false, 'cannot reveal answer before judging');
       assert.equal(gm.closeQuestion(roomCode), false, 'cannot dismiss an unjudged Daily Double');
@@ -48,6 +69,9 @@ for (const outcome of ['correct', 'wrong'] as const) {
       send(E.HOST_SCORE, judge);
       assert.equal(player.score, judge.delta);
       assert.equal(session.dailyDouble?.outcome, outcome);
+      assert.equal(session.dailyDouble?.timer, null);
+      send(E.HOST_DD_START_TIMER);
+      assert.equal(session.dailyDouble?.timer, null, 'judged answers cannot restart the timer');
       assert.equal(session.activeQuestionId, 'dd');
       assert.equal(session.responseVisible, false);
       assert.equal(broadcasts.at(-1).payload.dailyDouble.outcome, outcome, 'judgment is broadcast for resumed hosts');
@@ -64,3 +88,26 @@ for (const outcome of ['correct', 'wrong'] as const) {
     }
   });
 }
+
+test('Daily Double timer uses configured duration and supports disabling', () => {
+  const state = gm.createSession('board');
+  const room = state.roomCode;
+  try {
+    const player = gm.addPlayer(room, 'Per', '#ffffff')!;
+    gm.startGame(room);
+    gm.openQuestion(room, 'dd', true);
+    gm.startDailyDoubleWager(room, player.id, 1000, false);
+    gm.overrideDDWager(room, 500);
+    assert.equal(gm.startDailyDoubleTimer(room), false);
+    gm.revealDailyDouble(room);
+    gm.setDailyDoubleTime(room, 0);
+    assert.equal(gm.startDailyDoubleTimer(room), false);
+    gm.setDailyDoubleTime(room, 42);
+    assert.equal(gm.startDailyDoubleTimer(room), true);
+    const timer = state.dailyDouble!.timer!;
+    assert.equal(timer.deadline - timer.startedAt, 42000);
+    gm.endGame(room);
+    assert.equal(state.dailyDouble, null);
+    assert.equal(gm.startDailyDoubleTimer(room), false);
+  } finally { gm.deleteSession(room); }
+});

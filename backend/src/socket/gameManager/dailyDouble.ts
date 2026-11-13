@@ -11,6 +11,25 @@ export function revealDailyDouble(roomCode: string): boolean {
   return true;
 }
 
+export function setDailyDoubleTime(roomCode: string, seconds: number): boolean {
+  const session = sessions.get(roomCode);
+  if (!session || !Number.isInteger(seconds) || seconds < 0 || seconds > 300) return false;
+  session.settings.dailyDoubleTimeS = seconds;
+  return true;
+}
+
+export function startDailyDoubleTimer(roomCode: string): boolean {
+  const session = sessions.get(roomCode);
+  const dd = session?.dailyDouble;
+  if (!session || session.phase !== 'playing' || !session.activeQuestionId || !dd ||
+    dd.stage !== 'ready' || !session.dailyDoubleRevealed || session.responseVisible || dd.outcome || dd.timer) return false;
+  const seconds = session.settings.dailyDoubleTimeS ?? 15;
+  if (seconds <= 0) return false;
+  const now = Date.now();
+  dd.timer = { startedAt: now, deadline: now + seconds * 1000, serverNow: now };
+  return true;
+}
+
 // Begin the wager step for a newly-opened Daily Double. If no player has
 // correctly answered a regular question yet, falls into 'picking' so the
 // host can choose the contestant manually.

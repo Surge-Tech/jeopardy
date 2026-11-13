@@ -61,6 +61,23 @@ test('answer countdown uses server time, reaches time up, and disappears after j
     state.answerTimer = null;
     await act(async () => root.render(<AnswerCountdown gameState={state} />));
     assert.equal(document.querySelector('[role=timer]'), null);
+    state.dailyDouble = {
+      stage: 'ready', playerId: 'first', maxWager: 1000, boardHighValue: 1000,
+      wager: 500, hasDevice: true, submittedByPlayer: true,
+      timer: { startedAt: 200000, deadline: 215000, serverNow: 200000 },
+    };
+    state.dailyDoubleRevealed = false;
+    await act(async () => root.render(<AnswerCountdown gameState={state} />));
+    assert.equal(document.querySelector('[role=timer]'), null);
+    state.dailyDoubleRevealed = true;
+    await act(async () => root.render(<AnswerCountdown gameState={state} />));
+    assert.equal(document.querySelector('[aria-label="Daily Double countdown"] .answer-clock__number')?.textContent, '15');
+    now += 15000;
+    await act(async () => frame!(0));
+    assert.match(document.querySelector('[role=timer]')?.textContent ?? '', /Time’s up!/);
+    state.dailyDouble.outcome = 'correct';
+    await act(async () => root.render(<AnswerCountdown gameState={state} />));
+    assert.equal(document.querySelector('[role=timer]'), null);
   } finally {
     await act(async () => root.unmount());
     dom.window.close();

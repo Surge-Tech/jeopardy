@@ -8,6 +8,7 @@ import { PERMANENT_LOCKOUT } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
 import { LIMITS } from '@shared/limits';
 import PlayerFinal from '../components/final/PlayerFinal';
+import AnswerCountdown from '../components/shared/AnswerCountdown';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
 import { useCountdown } from '../components/final/useCountdown';
@@ -322,6 +323,9 @@ export default function Buzzer() {
           <DDPlayerWager dailyDouble={gameState.dailyDouble} />
         )}
 
+        {phase !== 'join' && !gameState?.finalJeopardy && gameState?.dailyDouble && (
+          <AnswerCountdown gameState={gameState} />
+        )}
       </main>
 
       {showBuzzer && (

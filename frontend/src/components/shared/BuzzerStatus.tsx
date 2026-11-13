@@ -8,6 +8,9 @@ export default function BuzzerStatus({ gameState, display = false, personal = fa
   display?: boolean;
   personal?: boolean;
 }) {
+  if (gameState.dailyDouble) {
+    return <AnswerCountdown gameState={gameState} />;
+  }
   const open = gameState.buzzerState === 'open';
   const player = gameState.buzzedPlayerId ? getCompetitor(gameState, gameState.buzzedPlayerId) : undefined;
   const pending = hasPendingAnswer(gameState);

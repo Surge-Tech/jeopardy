@@ -62,6 +62,8 @@ export const SOCKET_EVENTS = {
   HOST_SET_SCORE: 'host:set-score',
   HOST_WRONG_REOPEN: 'host:wrong-reopen',
   HOST_REVEAL_DD: 'host:reveal-dd',
+  HOST_DD_START_TIMER: 'host:dd-start-timer',
+  HOST_SET_DD_TIME: 'host:set-dd-time',
   HOST_DD_PICK_PLAYER: 'host:dd-pick-player',
   HOST_DD_OVERRIDE_WAGER: 'host:dd-override-wager',
   HOST_NEXT_ROUND: 'host:next-round',

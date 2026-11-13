@@ -162,6 +162,7 @@ export function recordOutcome(roomCode: string, playerId: string, outcome: 'corr
   if (session.dailyDouble?.playerId === playerId) {
     if (!validateScoreEligibility(roomCode, playerId, true)) return false;
     session.dailyDouble.outcome = outcome;
+    session.dailyDouble.timer = null;
   }
   markBuzzAttempted(roomCode, playerId);
   if (!player.stats) player.stats = { correct: 0, wrong: 0, buzzes: 0, earlyBuzzes: 0 };

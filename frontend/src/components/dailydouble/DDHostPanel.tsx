@@ -1,4 +1,5 @@
 import { getCompetitor, getCompetitors } from '@shared/competitors';
+import AnswerCountdown from '../shared/AnswerCountdown';
 import ResponseMedia from '../shared/ResponseMedia';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { socket } from '../../socket';
@@ -27,7 +28,8 @@ export default function DDHostPanel({
   const player = dd.playerId ? getCompetitor(gameState, dd.playerId) : null;
   const overrideUnlocked = !dd.hasDevice || dd.submittedByPlayer;
   const canJudge = dd.stage === 'ready' && revealed && !dd.outcome && !responseVisible;
-  const stage = dd.stage !== 'ready' ? dd.stage : !revealed ? 'reveal' : !dd.outcome ? 'judge' : responseVisible ? 'close' : 'answer';
+  const canStartTimer = canJudge && !dd.timer && (gameState.settings.dailyDoubleTimeS ?? 15) > 0;
+  const stage = canStartTimer ? 'timer' : dd.stage !== 'ready' ? dd.stage : !revealed ? 'reveal' : !dd.outcome ? 'judge' : responseVisible ? 'close' : 'answer';
 
   useEffect(() => {
     actionsRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
@@ -41,17 +43,19 @@ export default function DDHostPanel({
       const space = event.code === 'Space' || event.key === ' ';
       let action: (() => void) | undefined;
       if (space && stage === 'reveal') action = onReveal;
+      else if (space && canStartTimer) action = () => socket.emit(SOCKET_EVENTS.HOST_DD_START_TIMER, { roomCode });
       else if (space && stage === 'close') action = onClose;
       else if (event.key.toLowerCase() === 'r' && stage === 'answer') action = onShowAnswer;
       else if (canJudge && dd.playerId) {
         if (event.key.toLowerCase() === 'y') action = () => onAward(dd.playerId!, true);
         else if (event.key.toLowerCase() === 'n') action = () => onAward(dd.playerId!, false);
       }
-      if (action) { event.preventDefault(); action(); }
+      if (space || action) event.preventDefault();
+      action?.();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [stage, canJudge, dd.playerId, gameState.phase, onReveal, onClose, onShowAnswer, onAward]);
+  }, [stage, canStartTimer, roomCode, canJudge, dd.playerId, gameState.phase, onReveal, onClose, onShowAnswer, onAward]);
 
   function applyOverride(event: FormEvent) {
     event.preventDefault();
@@ -72,7 +76,8 @@ export default function DDHostPanel({
   const hint = dd.stage === 'picking' ? 'Choose who will play this Daily Double.'
     : dd.stage === 'wagering' ? (dd.hasDevice ? 'The contestant submits their wager on their device.' : 'Enter the contestant’s wager above.')
     : !revealed ? 'Show the clue when the contestant is ready.' : responseVisible ? 'Close the question to return to the board.'
-    : dd.outcome ? 'The wager has been scored. Show the answer before closing.' : 'Only this contestant answers. Accept or reject their answer; buzzers stay closed.';
+    : dd.outcome ? 'The wager has been scored. Show the answer before closing.'
+    : canStartTimer ? 'Press Space to start the answer timer when you finish reading the clue.' : 'Only this contestant answers. Accept or reject their answer; buzzers stay closed.';
   const primary = 'w-full rounded-lg bg-jeopardy-gold px-4 py-3 font-bold text-jeopardy-dark hover:brightness-110';
   const wagerForm = <form onSubmit={applyOverride} className="space-y-2">
     <label className="block text-sm text-gray-300" htmlFor="dd-wager">Wager · 0–{dd.maxWager}</label>
@@ -88,6 +93,10 @@ export default function DDHostPanel({
   return <div className="space-y-4">
     <section ref={actionsRef} aria-label="Question actions" className="space-y-2">
       <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Daily Double actions</h2>
+      {canStartTimer && <button
+        className={primary} onClick={() => socket.emit(SOCKET_EVENTS.HOST_DD_START_TIMER, { roomCode })}>
+        Start Answer Timer · {gameState.settings.dailyDoubleTimeS ?? 15}s (Space)
+      </button>}
       {dd.stage === 'picking' ? (
         <div className="space-y-2">
           {getCompetitors(gameState).map(contestant => <button key={contestant.id}
@@ -121,6 +130,7 @@ export default function DDHostPanel({
         <div className="font-bold text-lg text-jeopardy-gold">{title}</div>
         <p className="text-sm text-gray-300 mt-1">{hint}</p>
       </div>
+      <AnswerCountdown gameState={gameState} />
       {player && <div className="flex flex-wrap justify-between gap-2 text-sm">
         <span className="font-bold">{player.name}</span>
         <span className="text-jeopardy-gold">{dd.wager == null ? `Maximum wager: ${dd.maxWager}` : `Wager: ${dd.wager}`}</span>

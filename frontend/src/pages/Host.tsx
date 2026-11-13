@@ -345,6 +345,8 @@ export default function Host() {
           </div>
           <AnswerTimeSetting seconds={gameState.settings.answerTimeS ?? 10}
             onChange={seconds => socket.emit(SOCKET_EVENTS.HOST_SET_ANSWER_TIME, { roomCode, seconds })} />
+          <AnswerTimeSetting label="Daily Double time" max={300} seconds={gameState.settings.dailyDoubleTimeS ?? 15}
+            onChange={seconds => socket.emit(SOCKET_EVENTS.HOST_SET_DD_TIME, { roomCode, seconds })} />
           {gameState.phase !== 'finished' && (
             <button className="btn-danger text-sm py-1 px-3" onClick={endGame}>End Game</button>
           )}

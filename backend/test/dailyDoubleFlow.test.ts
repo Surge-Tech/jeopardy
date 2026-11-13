@@ -31,6 +31,14 @@ for (const outcome of ['correct', 'wrong'] as const) {
       const player = gm.addPlayer(roomCode, 'Per', '#ffffff')!;
       send(E.HOST_START);
       send(E.HOST_OPEN_QUESTION, { questionId: 'dd', isDailyDouble: true, boardHighValue: 1000 });
+      assert.equal(session.dailyDouble, null, 'selection must not start wagering');
+      assert.equal(gm.openQuestion(roomCode, 'other', false), true, 'a mistaken selection can be replaced');
+      send(E.HOST_OPEN_QUESTION, { questionId: 'dd', isDailyDouble: true, boardHighValue: 1000 });
+      assert.deepEqual(session.answeredQuestions, [], 'changing selection leaves both cards available');
+      send(E.HOST_ACTIVATE_DD, { boardHighValue: 1000 });
+      const activated = session.dailyDouble;
+      send(E.HOST_ACTIVATE_DD, { boardHighValue: 2000 });
+      assert.equal(session.dailyDouble, activated, 'repeated activation preserves wagering');
       assert.equal(session.dailyDouble?.stage, 'picking');
       send(E.HOST_REVEAL_DD);
       assert.equal(session.dailyDoubleRevealed, false, 'cannot reveal before wagering');

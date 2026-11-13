@@ -100,8 +100,11 @@ export default function BoardView() {
     const round = getRound(board, gameState);
     const q = round.categories.flatMap(c => c.questions).find(q => q.id === gameState.activeQuestionId);
     setShowQuestion(q ?? null);
-    if (q?.isDailyDouble) playDailyDouble();
   }, [gameState?.activeQuestionId, board, gameState?.currentRoundIndex]);
+
+  useEffect(() => {
+    if (gameState?.dailyDouble) playDailyDouble();
+  }, [gameState?.activeQuestionId, !!gameState?.dailyDouble]);
 
   if (roomClosed) {
     return (
@@ -143,8 +146,8 @@ export default function BoardView() {
   const round = getRound(board, gameState);
   const roundComplete = isRoundComplete(board, gameState.answeredQuestions, gameState.currentRoundIndex);
   const isLastRound = gameState.currentRoundIndex >= board.rounds.length - 1;
-  const isDDSplash = showQuestion?.isDailyDouble && (
-    !gameState.dailyDoubleRevealed || (gameState.dailyDouble != null && gameState.dailyDouble.stage !== 'ready')
+  const isDDSplash = showQuestion?.isDailyDouble && gameState.dailyDouble != null && (
+    !gameState.dailyDoubleRevealed || gameState.dailyDouble.stage !== 'ready'
   );
 
   return (
@@ -201,7 +204,7 @@ export default function BoardView() {
       )}
 
       {/* Question overlay — shown only after the host reveals the clue */}
-      {showQuestion && !isDDSplash && (showQuestion.isDailyDouble || gameState.clueVisible) && (
+      {showQuestion && !isDDSplash && (showQuestion.isDailyDouble ? gameState.dailyDoubleRevealed : gameState.clueVisible) && (
         <div className="fixed inset-0 bg-jeopardy-blue z-40 overflow-hidden flip-in">
           <div className={`board-clue-content ${showQuestion.isDailyDouble ? 'board-clue-content--solo' : ''}`}>
           <div className={`my-auto flex w-full shrink-0 flex-col items-center ${showQuestion.mediaType === 'image' ? 'board-clue-with-image' : ''} ${gameState.responseVisible ? 'board-clue-content--answered' : ''}`}>

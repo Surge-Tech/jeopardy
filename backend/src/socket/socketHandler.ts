@@ -287,21 +287,26 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: open a question ────────────────────────────────────────────
-    onHost(socket, SOCKET_EVENTS.HOST_OPEN_QUESTION, ({ roomCode, questionId, isDailyDouble, boardHighValue }: { roomCode: string; questionId: string; isDailyDouble: boolean; boardHighValue?: number }) => {
+    onHost(socket, SOCKET_EVENTS.HOST_OPEN_QUESTION, ({ roomCode, questionId, isDailyDouble }: { roomCode: string; questionId: string; isDailyDouble: boolean }) => {
       if (!gm.openQuestion(roomCode, questionId, isDailyDouble)) {
         if (gm.getSession(roomCode)?.phase === 'lobby') socket.emit('error', { message: 'Press Start game before selecting a question' });
         return;
       }
-      if (isDailyDouble) {
-        const session = gm.getSession(roomCode);
-        const lastCorrect = session?.lastCorrectPlayerId ?? null;
-        const submitter = session && lastCorrect ? wagerPlayerId(session, lastCorrect) : null;
-        const hasDevice = submitter
-          ? [...socketPlayers.values()].some(v => v.roomCode === roomCode && v.playerId === submitter)
-          : false;
-        gm.startDailyDoubleWager(roomCode, lastCorrect, boardHighValue ?? 0, hasDevice);
-      }
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+    });
+
+    // Selection only previews the card; activation starts contestant wagering.
+    onHost(socket, SOCKET_EVENTS.HOST_ACTIVATE_DD, ({ roomCode, boardHighValue }: { roomCode: string; boardHighValue: number }) => {
+      const session = gm.getSession(roomCode);
+      if (!session?.activeQuestionId || session.phase !== 'playing' || session.finalJeopardy ||
+          session.dailyDoubleRevealed || session.dailyDouble || session.clueVisible ||
+          !Number.isFinite(boardHighValue) || boardHighValue < 0) return;
+      const lastCorrect = session.lastCorrectPlayerId;
+      const submitter = lastCorrect ? wagerPlayerId(session, lastCorrect) : null;
+      const hasDevice = !!submitter && [...socketPlayers.values()]
+        .some(v => v.roomCode === roomCode && v.playerId === submitter);
+      gm.startDailyDoubleWager(roomCode, lastCorrect, boardHighValue, hasDevice);
+      io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, session);
     });
 
     // ── HOST: fallback pick of the Daily Double contestant ────────────────

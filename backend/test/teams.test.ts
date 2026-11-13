@@ -202,6 +202,7 @@ test('team socket controls require a host and Daily Double device availability f
     assert.equal(ack.ok, true);
     gm.setLastCorrectPlayer(room, bob.id);
     host.send(E.HOST_OPEN_QUESTION, { roomCode: room, questionId: 'dd', isDailyDouble: true, boardHighValue: 1000 });
+    host.send(E.HOST_ACTIVATE_DD, { roomCode: room, boardHighValue: 1000 });
     assert.equal(session.dailyDouble?.playerId, alice.id);
     assert.equal(session.dailyDouble?.hasDevice, true);
     first.send('disconnect');

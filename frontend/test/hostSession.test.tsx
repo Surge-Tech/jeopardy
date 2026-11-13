@@ -101,6 +101,16 @@ test('host remembers its room across browser closures, reconnects, and clears it
 
     // Daily Double rejection scores the wager without closing or reopening buzzers.
     gm.openQuestion(state.roomCode, 'dd', true);
+    await act(async () => handlers.get(E.GAME_STATE)!(structuredClone(state)));
+    const activate = [...document.querySelectorAll('button')].find(b => b.textContent === 'Activate Daily Double (Space)')!;
+    assert.ok(activate, 'Daily Double selection shows an activation step');
+    const beforeActivate = emitted.length;
+    const activateSpace = new window.KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true, cancelable: true });
+    await act(async () => document.activeElement!.dispatchEvent(activateSpace));
+    assert.equal(activateSpace.defaultPrevented, true);
+    assert.deepEqual(emitted.slice(beforeActivate), [{ event: E.HOST_ACTIVATE_DD, payload: { roomCode: state.roomCode, boardHighValue: 400 } }]);
+    await act(async () => activate.click());
+    assert.deepEqual(emitted.at(-1), { event: E.HOST_ACTIVATE_DD, payload: { roomCode: state.roomCode, boardHighValue: 400 } });
     gm.startDailyDoubleWager(state.roomCode, player.id, 1000, false);
     gm.overrideDDWager(state.roomCode, 500);
     gm.revealDailyDouble(state.roomCode);

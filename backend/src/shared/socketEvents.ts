@@ -16,6 +16,7 @@ export const SOCKET_EVENTS = {
 
   // Daily Double
   DD_WAGER: 'dd:wager',
+  HOST_ACTIVATE_DD: 'host:activate-dd',
 
   // Final Jeopardy
   FJ_WAGER: 'fj:wager',

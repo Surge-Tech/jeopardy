@@ -110,7 +110,13 @@ export default function Host() {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ||
           target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (!gameState?.activeQuestionId || gameState.phase === 'finished' || gameState.finalJeopardy || !activeQ) return;
-      if (activeQ.isDailyDouble) return;
+      if (activeQ.isDailyDouble) {
+        if (!gameState.dailyDouble && (event.code === 'Space' || event.key === ' ')) {
+          event.preventDefault();
+          activateDD();
+        }
+        return;
+      }
       const action = getQuestionShortcut(event, gameState);
       if (!action) return;
       event.preventDefault();
@@ -142,13 +148,17 @@ export default function Host() {
     if (gameState && (hasPendingAnswer(gameState) || gameState.dailyDouble)) return;
     setBuzzWinner(null);
     setBuzzWinnerId(null);
-    const boardHighValue = Math.max(...round.pointValues);
-    socket.emit(SOCKET_EVENTS.HOST_OPEN_QUESTION, { roomCode, questionId: q.id, isDailyDouble: !!q.isDailyDouble, boardHighValue });
+    socket.emit(SOCKET_EVENTS.HOST_OPEN_QUESTION, { roomCode, questionId: q.id, isDailyDouble: !!q.isDailyDouble });
     if (q.isDailyDouble) {
-      addLog({ type: 'dd', msg: `Daily Double opened — ${q.value} (${getCatName(q)})` });
+      addLog({ type: 'dd', msg: `Daily Double selected — ${q.value} (${getCatName(q)})` });
     } else {
       addLog({ type: 'open', msg: `Opened ${q.value} — ${getCatName(q)}` });
     }
+  }
+
+  function activateDD() {
+    socket.emit(SOCKET_EVENTS.HOST_ACTIVATE_DD, { roomCode, boardHighValue: Math.max(...round.pointValues) });
+    addLog({ type: 'dd', msg: 'Daily Double activated' });
   }
 
   function revealDD() {
@@ -447,7 +457,7 @@ export default function Host() {
                 activeQ={activeQ}
                 clueVisible={gameState.clueVisible}
                 readingClue={!!gameState.clueRecordingId}
-                onRevealClue={revealClue}
+                onRevealClue={activeQ.isDailyDouble ? activateDD : revealClue}
                 responseVisible={gameState.responseVisible}
                 buzzerState={gameState.buzzerState}
                 buzzWinner={gameState.buzzedPlayerName ?? buzzWinner}

@@ -69,7 +69,7 @@ export default function ActiveQuestionPanel({
   const title = !clueVisible ? 'Card selected' : pendingAnswer ? `${buzzWinner ?? 'Player'} is answering`
     : responseVisible ? 'Answer on board' : judged ? 'Answer accepted'
     : readingClue ? 'Reading clue recording' : collectingBuzzes ? 'Receiving buzzes' : buzzerState === 'open' ? 'Waiting for a buzz' : 'Clue on board';
-  const hint = !clueVisible ? 'Show the clue to begin.' : pendingAnswer ? 'Accept the answer, or reject it to reopen buzzers.'
+  const hint = !clueVisible ? 'Press Space to activate this card, or select another card to change your choice.' : pendingAnswer ? 'Accept the answer, or reject it to reopen buzzers.'
     : responseVisible ? 'Close the question to return to the board.' : judged ? 'Show the answer, then close the question.'
     : readingClue ? 'Buzzers will open automatically when the recording finishes. If autoplay is blocked, press Play on the board.'
     : buzzerState === 'open' ? 'If nobody answers, show the answer to continue.' : 'Open buzzers when players can answer.';
@@ -80,7 +80,7 @@ export default function ActiveQuestionPanel({
       <section ref={actionsRef} aria-label="Question actions" className="space-y-2">
         <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Question actions</h2>
         {!clueVisible ? (
-          <button className={primary} onClick={onRevealClue}>Show Clue (Space)</button>
+          <button className={primary} onClick={onRevealClue}>{activeQ.isDailyDouble ? 'Activate Daily Double (Space)' : 'Show Clue (Space)'}</button>
         ) : pendingAnswer ? (
           <div className="flex gap-2">
             <button className="flex-1 rounded-lg bg-green-600 hover:bg-green-500 py-3 font-bold" disabled={!buzzWinnerId}

@@ -99,6 +99,7 @@ test('host test buzzes share phone timing, history, team eligibility and scoring
     gm.setLastCorrectPlayer(room, alice.id);
     now += 1000;
     host.send(E.HOST_OPEN_QUESTION, { roomCode: room, questionId: 'dd', isDailyDouble: true, boardHighValue: 1000 });
+    host.send(E.HOST_ACTIVATE_DD, { roomCode: room, boardHighValue: 1000 });
     assert.equal(session.dailyDouble?.hasDevice, false);
     host.send(E.HOST_BUZZ_PLAYER, { roomCode: room, playerId: alice.id }, ack);
     assert.equal(result.outcome, 'ignored');

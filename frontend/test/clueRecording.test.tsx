@@ -95,6 +95,8 @@ test('board waits through blocked playback and pauses, reports actual ending, an
     assert.match(document.querySelector('[role=alert]')!.textContent!, /Press play/);
     assert.equal(sent.length, 0);
     const recording = document.querySelector<HTMLAudioElement>('audio[aria-label="Clue recording"]')!;
+    assert.equal(recording.hidden, true);
+    assert.equal(recording.controls, false);
     blocked = false;
     await act(async () => window.dispatchEvent(new dom.window.CustomEvent('board-media-command', { detail: { mediaId: 'q:recording', action: 'play' } })));
     await act(async () => recording.dispatchEvent(new dom.window.Event('pause')));

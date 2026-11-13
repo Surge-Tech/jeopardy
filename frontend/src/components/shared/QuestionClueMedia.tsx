@@ -20,10 +20,10 @@ export default function QuestionClueMedia({ question, gameState, roomCode }: {
 
   return <>
     {reading && <div className="mb-4 w-full max-w-2xl text-center">
-      <p className="mb-2 text-sm text-gray-300">Reading clue…{!question.isDailyDouble && ' Buzzers open when the recording ends.'}</p>
       <ClueMedia key={gameState.clueRecordingId ?? question.id} mediaType="audio" mediaUrl={question.clueAudioUrl}
-        controlId={`${question.id}:recording`} audioLabel="Clue recording" paused={false} hideVideo={false}
+        controlId={`${question.id}:recording`} audioLabel="Clue recording" paused={false} hideVideo={false} hideAudioPlayer
         onPlaybackProblem={setProblem}
+        onPlaying={() => setProblem('')}
         onEnded={() => {
           setFinished(true);
           if (gameState.clueRecordingId) socket.emit(SOCKET_EVENTS.HOST_CLUE_RECORDING_ENDED, {
@@ -31,6 +31,9 @@ export default function QuestionClueMedia({ question, gameState, roomCode }: {
           });
         }} />
       {problem && <p role="alert" className="text-sm text-yellow-300">{problem}</p>}
+      {problem.startsWith('Press play') && <button className="btn-ghost mt-2" onClick={() => {
+        window.dispatchEvent(new CustomEvent('board-media-command', { detail: { mediaId: `${question.id}:recording`, action: 'play' } }));
+      }}>Play recording</button>}
     </div>}
     {showMedia && <ClueMedia controlId={`${question.id}:clue`} key={`${question.id}:${question.mediaUrl}`} {...question}
       paused={reading || (!gameState.responseVisible && !!gameState.buzzedPlayerId)}

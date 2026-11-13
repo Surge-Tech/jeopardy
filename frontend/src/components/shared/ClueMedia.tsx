@@ -10,11 +10,13 @@ type Props = Pick<Question, 'mediaType' | 'mediaUrl'> & {
   onEnded?: () => void;
   onPlaybackProblem?: (message: string) => void;
   audioLabel?: string;
+  hideAudioPlayer?: boolean;
+  onPlaying?: () => void;
 };
 
 // Keep players mounted during an answer so reopening the buzzers resumes
 // the clue from where it paused rather than replaying it from the start.
-export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hideVideo, controlId, onEnded, onPlaybackProblem, audioLabel = 'Clue audio' }: Props) {
+export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hideVideo, controlId, onEnded, onPlaybackProblem, audioLabel = 'Clue audio', hideAudioPlayer = false, onPlaying }: Props) {
   const [manuallyPaused, setManuallyPaused] = useState(false);
   const paused = gamePaused || manuallyPaused;
   const mediaRef = useRef<HTMLMediaElement | null>(null);
@@ -141,8 +143,8 @@ export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hid
     return <img src={mediaUrl} alt="clue" className="max-h-[60dvh] object-contain mb-6 rounded w-full" />;
   }
   if (mediaType === 'audio') {
-    return <audio ref={element => { mediaRef.current = element; }} src={mediaUrl} autoPlay={!paused} controls aria-label={audioLabel}
-      onEnded={onEnded} onError={() => onPlaybackProblem?.('The recording could not be played. Open buzzers manually from the host to continue.')}
+    return <audio ref={element => { mediaRef.current = element; }} src={mediaUrl} autoPlay={!paused} controls={!hideAudioPlayer} hidden={hideAudioPlayer} aria-label={audioLabel}
+      onPlaying={onPlaying} onEnded={onEnded} onError={() => onPlaybackProblem?.('The recording could not be played. Open buzzers manually from the host to continue.')}
       className="mb-6 w-full max-w-2xl" />;
   }
   if (mediaType === 'video') {

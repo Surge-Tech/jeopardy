@@ -40,8 +40,8 @@
               trap 'exit 130' INT
               trap 'exit 143' TERM
 
-              echo "Starting development servers. Open http://localhost:5173 (Ctrl+C stops both)."
-              npm run dev --prefix backend &
+              echo "Starting development servers. Open http://localhost:3001 (Ctrl+C stops both)."
+              PORT=3002 npm run dev --prefix backend &
               backend_pid=$!
               npm run dev --prefix frontend -- --strictPort &
               frontend_pid=$!

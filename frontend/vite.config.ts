@@ -18,11 +18,13 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port: 5173,
+    port: 3001,
+    strictPort: true,
     host: true, // bind to 0.0.0.0 so LAN devices can reach the dev server
     proxy: {
-      '/api': 'http://localhost:3001',
-      '/media': 'http://localhost:3001',
+      '/api': 'http://127.0.0.1:3002',
+      '/media': 'http://127.0.0.1:3002',
+      '/socket.io': { target: 'http://127.0.0.1:3002', ws: true },
     },
   },
 });

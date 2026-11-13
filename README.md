@@ -83,13 +83,14 @@ nix run .#dev
 ```
 
 This installs the locked dependencies and starts both development servers in one
-terminal. Open http://localhost:5173, or `http://YOUR_LAN_IP:5173` on other devices.
+terminal. Open http://localhost:3001, or `http://YOUR_LAN_IP:3001` on other devices.
 Frontend changes reload automatically; backend changes restart the server and
-clear active games. Ctrl+C stops both servers. Stop any existing server on port
-3001 before starting development mode.
+clear active games. Vite serves the app on port 3001 and proxies API, media, and
+Socket.IO traffic to the backend on port 3002. Ctrl+C stops both servers.
+Stop any existing server on port 3001 before starting development mode.
 
 You can also use `nix develop` for a Node.js shell and start the servers separately
-with `npm run dev --prefix backend` and `npm run dev --prefix frontend`.
+with `PORT=3002 npm run dev --prefix backend` and `npm run dev --prefix frontend`.
 The root `npm run dev` script below is Windows-specific.
 
 ### Node.js
@@ -106,8 +107,8 @@ npm run install:all
 npm run dev
 ```
 
-- **Dashboard / Editor:** http://localhost:5173
-- **Share with players (LAN):** http://YOUR_LAN_IP:5173
+- **Dashboard / Editor:** http://localhost:3001
+- **Share with players (LAN):** http://YOUR_LAN_IP:3001
 
 > For a full local + deployment guide, see [SETUP.md](SETUP.md). For the REST API and Socket.io event reference, see [ARCHITECTURE.md](ARCHITECTURE.md).
 

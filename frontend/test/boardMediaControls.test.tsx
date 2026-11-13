@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import { createRoot } from 'react-dom/client';
-import type { Board, GameState } from '../../backend/src/shared/types';
+import type { Board, GameState, Question } from '../../backend/src/shared/types';
 import { SOCKET_EVENTS as E } from '../../backend/src/shared/socketEvents';
 
 test('admin media controls follow visible clues and answers, including Daily Double and Final Jeopardy', async () => {
@@ -29,7 +29,7 @@ test('admin media controls follow visible clues and answers, including Daily Dou
   });
   const { default: Controls } = await import(pathToFileURL(join(tempDir, 'controls.mjs')).href);
   const root = createRoot(document.getElementById('root')!);
-  const question = { id: 'q', value: 200, clue: 'Clue', response: 'Answer', mediaType: 'video', mediaUrl: '/clue.mp4', responseMediaType: 'audio', responseMediaUrl: '/answer.mp3' };
+  const question: Question = { id: 'q', value: 200, clue: 'Clue', response: 'Answer', mediaType: 'video', mediaUrl: '/clue.mp4', responseMediaType: 'audio', responseMediaUrl: '/answer.mp3' };
   const board = { rounds: [{ categories: [{ questions: [question] }] }] } as unknown as Board;
   const state = { phase: 'playing', currentRoundIndex: 0, activeQuestionId: 'q', clueVisible: false } as GameState;
   const render = () => act(async () => root.render(<Controls board={board} gameState={state} roomCode="ROOM" />));
@@ -38,6 +38,12 @@ test('admin media controls follow visible clues and answers, including Daily Dou
     await render();
     assert.equal(document.querySelector('section'), null);
     state.clueVisible = true;
+    state.clueRecordingId = 'reading';
+    question.clueAudioUrl = '/reading.mp3';
+    await render();
+    await act(async () => button('Play').click());
+    assert.deepEqual(sent.pop(), { event: E.HOST_MEDIA_COMMAND, payload: { roomCode: 'ROOM', mediaId: 'q:recording', action: 'play', value: undefined } });
+    state.clueRecordingId = null;
     await render();
     await act(async () => button('Play').click());
     assert.deepEqual(sent.pop(), { event: E.HOST_MEDIA_COMMAND, payload: { roomCode: 'ROOM', mediaId: 'q:clue', action: 'play', value: undefined } });

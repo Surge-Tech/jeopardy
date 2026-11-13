@@ -446,6 +446,7 @@ export default function Host() {
                 mediaControls={<BoardMediaControls board={board} gameState={gameState} roomCode={roomCode} />}
                 activeQ={activeQ}
                 clueVisible={gameState.clueVisible}
+                readingClue={!!gameState.clueRecordingId}
                 onRevealClue={revealClue}
                 responseVisible={gameState.responseVisible}
                 buzzerState={gameState.buzzerState}

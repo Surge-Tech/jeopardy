@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getCompetitor, getTeam, playerLabel } from '../../shared/competitors.js';
 import { hasPendingAnswer } from '../../shared/questionFlow.js';
 import type { GameState, Question } from '../../types.js';
@@ -17,14 +18,24 @@ export function openQuestion(roomCode: string, questionId: string, isDailyDouble
   return true;
 }
 
-export function revealClue(roomCode: string, mediaType?: Question['mediaType']): boolean {
+export function revealClue(roomCode: string, mediaType?: Question['mediaType'], hasRecording = false): boolean {
   const session = sessions.get(roomCode);
   if (!session?.activeQuestionId || session.clueVisible || session.dailyDouble || session.phase === 'finished') return false;
   session.clueVisible = true;
-  if (mediaType === 'image' || mediaType === 'audio' || mediaType === 'video' || mediaType === 'youtube') {
+  if (hasRecording) {
+    session.clueRecordingId = randomUUID();
+  } else if (mediaType === 'image' || mediaType === 'audio' || mediaType === 'video' || mediaType === 'youtube') {
     resetBuzzerFields(session, { buzzerState: 'open' });
   }
   return true;
+}
+
+export function finishClueRecording(roomCode: string, questionId: string, recordingId: string): boolean {
+  const session = sessions.get(roomCode);
+  if (!recordingId || !session || session.phase !== 'playing' || session.finalJeopardy || session.dailyDouble ||
+      session.activeQuestionId !== questionId || session.clueRecordingId !== recordingId ||
+      !session.clueVisible || session.responseVisible || session.buzzerState !== 'idle') return false;
+  return enableBuzzer(roomCode);
 }
 
 export function showResponse(roomCode: string): boolean {
@@ -32,6 +43,7 @@ export function showResponse(roomCode: string): boolean {
   if (!session) return false;
   if (session.dailyDouble && (!session.dailyDoubleRevealed || !session.dailyDouble.outcome)) return false;
   session.responseVisible = true;
+  session.clueRecordingId = null;
   session.answerTimer = null;
   pauseQuestionTimer(session);
   if (session.buzzerState === 'open') session.buzzerState = 'idle';
@@ -75,6 +87,7 @@ export function lockBuzzer(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
   pauseQuestionTimer(session);
+  session.clueRecordingId = null;
   session.buzzerState = 'idle';
   return true;
 }

@@ -30,6 +30,11 @@ export default function BoardMediaControls({ board, gameState, roomCode }: { boa
     type = response ? question.responseMediaType : question.mediaType;
     url = response ? question.responseMediaUrl : question.mediaUrl;
     answering = !gameState.responseVisible && !!gameState.buzzedPlayerId;
+    if (gameState.clueRecordingId && question.clueAudioUrl && !gameState.responseVisible) {
+      mediaId = `${question.id}:recording`;
+      type = 'audio';
+      url = question.clueAudioUrl;
+    }
   }
   if (!url || !['audio', 'video', 'youtube'].includes(type ?? '')) return null;
   return <MediaPlayerControls key={mediaId} roomCode={roomCode} mediaId={mediaId} answering={answering} />;

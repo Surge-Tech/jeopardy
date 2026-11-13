@@ -8,6 +8,7 @@ import { PERMANENT_LOCKOUT } from '@shared/types';
 export default function ActiveQuestionPanel({
   activeQ,
   clueVisible,
+  readingClue = false,
   onRevealClue,
   responseVisible,
   buzzerState,
@@ -34,6 +35,7 @@ export default function ActiveQuestionPanel({
   mediaControls?: ReactNode;
   activeQ: Question;
   clueVisible: boolean;
+  readingClue?: boolean;
   onRevealClue: () => void;
   responseVisible: boolean;
   buzzerState: 'idle' | 'open' | 'locked';
@@ -66,9 +68,10 @@ export default function ActiveQuestionPanel({
   const stage = !clueVisible ? 0 : responseVisible ? 4 : pendingAnswer ? 2 : judged ? 3 : 1;
   const title = !clueVisible ? 'Card selected' : pendingAnswer ? `${buzzWinner ?? 'Player'} is answering`
     : responseVisible ? 'Answer on board' : judged ? 'Answer accepted'
-    : collectingBuzzes ? 'Receiving buzzes' : buzzerState === 'open' ? 'Waiting for a buzz' : 'Clue on board';
+    : readingClue ? 'Reading clue recording' : collectingBuzzes ? 'Receiving buzzes' : buzzerState === 'open' ? 'Waiting for a buzz' : 'Clue on board';
   const hint = !clueVisible ? 'Show the clue to begin.' : pendingAnswer ? 'Accept the answer, or reject it to reopen buzzers.'
     : responseVisible ? 'Close the question to return to the board.' : judged ? 'Show the answer, then close the question.'
+    : readingClue ? 'Buzzers will open automatically when the recording finishes. If autoplay is blocked, press Play on the board.'
     : buzzerState === 'open' ? 'If nobody answers, show the answer to continue.' : 'Open buzzers when players can answer.';
   const primary = 'w-full min-h-12 rounded-lg bg-jeopardy-gold px-4 py-3 font-bold text-jeopardy-dark hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed';
 
@@ -89,7 +92,7 @@ export default function ActiveQuestionPanel({
           <button className={primary} onClick={onClose}>Close Question (Space)</button>
         ) : buzzerState === 'idle' && !judged ? (
           <>
-            <button className={primary} onClick={onEnableBuzzer}>Open Buzzers (Space)</button>
+            <button className={primary} onClick={onEnableBuzzer}>{readingClue ? 'Skip Recording & Open Buzzers (Space)' : 'Open Buzzers (Space)'}</button>
             <button className="btn-ghost text-sm w-full" onClick={onShowAnswer}>Show Answer on Board (R)</button>
           </>
         ) : (

@@ -7,11 +7,14 @@ type Props = Pick<Question, 'mediaType' | 'mediaUrl'> & {
   controlId?: string;
   paused: boolean;
   hideVideo: boolean;
+  onEnded?: () => void;
+  onPlaybackProblem?: (message: string) => void;
+  audioLabel?: string;
 };
 
 // Keep players mounted during an answer so reopening the buzzers resumes
 // the clue from where it paused rather than replaying it from the start.
-export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hideVideo, controlId }: Props) {
+export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hideVideo, controlId, onEnded, onPlaybackProblem, audioLabel = 'Clue audio' }: Props) {
   const [manuallyPaused, setManuallyPaused] = useState(false);
   const paused = gamePaused || manuallyPaused;
   const mediaRef = useRef<HTMLMediaElement | null>(null);
@@ -47,7 +50,9 @@ export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hid
         // Browsers may require a user gesture; keep controls available for it.
         void media.play().then(() => {
           if (cancelled && (youtubePaused.current || mediaRef.current !== media)) media.pause();
-        }).catch(() => {});
+        }).catch(() => {
+          if (!cancelled) onPlaybackProblem?.('Press play on the board to start the recording, or open buzzers manually from the host.');
+        });
       }
     }
     syncYouTube();
@@ -136,7 +141,9 @@ export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hid
     return <img src={mediaUrl} alt="clue" className="max-h-[60dvh] object-contain mb-6 rounded w-full" />;
   }
   if (mediaType === 'audio') {
-    return <audio ref={element => { mediaRef.current = element; }} src={mediaUrl} autoPlay={!paused} controls aria-label="Clue audio" className="mb-6 w-full max-w-2xl" />;
+    return <audio ref={element => { mediaRef.current = element; }} src={mediaUrl} autoPlay={!paused} controls aria-label={audioLabel}
+      onEnded={onEnded} onError={() => onPlaybackProblem?.('The recording could not be played. Open buzzers manually from the host to continue.')}
+      className="mb-6 w-full max-w-2xl" />;
   }
   if (mediaType === 'video') {
     return <video ref={element => { mediaRef.current = element; }} src={mediaUrl} autoPlay={!paused} playsInline controls style={{ visibility: hideVideo ? 'hidden' : 'visible' }} aria-hidden={hideVideo} aria-label="Clue video" className="max-h-[60dvh] object-contain mb-6 rounded w-full" />;

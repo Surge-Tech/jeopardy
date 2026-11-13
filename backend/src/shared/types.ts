@@ -11,6 +11,7 @@ export interface Question {
   id: string;
   value: number;
   clue: string;
+  clueAudioUrl?: string;
   response: string;
   responseMediaType?: 'image' | 'video' | 'audio' | 'youtube';
   responseMediaUrl?: string;
@@ -157,6 +158,8 @@ export interface GameState {
   questionTimer: { remainingMs: number; deadline: number | null; serverNow: number } | null;
   phase: 'lobby' | 'playing' | 'finished';
   clueVisible: boolean;  // regular clue explicitly revealed by host
+  // Unique to this reading; completion from a previous clue must be ignored.
+  clueRecordingId?: string | null;
   dailyDoubleRevealed: boolean;  // false until host clicks "Reveal Question"
   responseVisible: boolean;       // true after host clicks "Show Answer"
   finalJeopardy: FinalPublicState | null;

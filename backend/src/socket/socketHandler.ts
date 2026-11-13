@@ -339,13 +339,22 @@ export function registerSocketHandlers(io: Server) {
       if (gm.getSession(roomCode) !== session || session.activeQuestionId !== questionId) return;
       const question = board?.rounds[session.currentRoundIndex]?.categories
         .flatMap(category => category.questions).find(question => question.id === questionId);
-      if (!gm.revealClue(roomCode, question?.mediaUrl ? question.mediaType : undefined)) return;
+      if (!gm.revealClue(roomCode, question?.mediaUrl ? question.mediaType : undefined, !!question?.clueAudioUrl)) return;
       if (session.buzzerState === 'open') {
         buzzOpenedAt.set(roomCode, Date.now());
         io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
       }
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
+
+    onHost(socket, SOCKET_EVENTS.HOST_CLUE_RECORDING_ENDED,
+      ({ roomCode, questionId, recordingId }: { roomCode: string; questionId: string; recordingId: string }) => {
+        if (typeof questionId !== 'string' || typeof recordingId !== 'string' ||
+            !gm.finishClueRecording(roomCode, questionId, recordingId)) return;
+        buzzOpenedAt.set(roomCode, Date.now());
+        io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
+        io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
+      });
 
     // ── HOST: show response on board view ────────────────────────────────
     onHost(socket, SOCKET_EVENTS.HOST_SHOW_RESPONSE, ({ roomCode }: { roomCode: string }) => {

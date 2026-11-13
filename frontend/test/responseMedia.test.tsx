@@ -93,7 +93,7 @@ test('regular question editor saves answer media independently inside the rounds
   try {
     await act(async () => root.render(<MemoryRouter initialEntries={['/edit/board']}><Routes><Route path="/edit/:boardId" element={<Editor />} /></Routes></MemoryRouter>));
     await act(async () => document.querySelector<HTMLButtonElement>('tbody button')!.click());
-    const upload = document.querySelectorAll<HTMLInputElement>('input[type=file]')[1];
+    const upload = document.querySelector<HTMLInputElement>('input[aria-label="Response media (shown when the answer is revealed) upload"]')!;
     Object.defineProperty(upload, 'files', { value: [new Blob(['audio'], { type: 'audio/mpeg' })] });
     await act(async () => upload.dispatchEvent(new dom.window.Event('change', { bubbles: true })));
     await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent === 'Save')!.click());

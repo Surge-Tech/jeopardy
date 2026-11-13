@@ -1,6 +1,6 @@
 import { getCompetitors } from '@shared/competitors';
 import ResponseMedia from '../components/shared/ResponseMedia';
-import ClueMedia from '../components/shared/ClueMedia';
+import QuestionClueMedia from '../components/shared/QuestionClueMedia';
 import BoardBuzzerDock from '../components/shared/BoardBuzzerDock';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -213,11 +213,7 @@ export default function BoardView() {
           </div>
 
           {/* Media */}
-          {(!gameState.responseVisible || !showQuestion.responseMediaUrl || !['audio', 'video', 'youtube'].includes(showQuestion.responseMediaType ?? '') || showQuestion.mediaType === 'image') && (
-            <ClueMedia controlId={`${showQuestion.id}:clue`} key={`${showQuestion.id}:${showQuestion.mediaUrl}`} {...showQuestion}
-              paused={!gameState.responseVisible && !!gameState.buzzedPlayerId}
-              hideVideo={!!gameState.buzzedPlayerId && !gameState.responseVisible} />
-          )}
+          <QuestionClueMedia key={showQuestion.id} question={showQuestion} gameState={gameState} roomCode={roomCode!} />
 
           {/* Clue text */}
           <div className="text-white text-center text-3xl md:text-5xl font-black max-w-4xl leading-tight"

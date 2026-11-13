@@ -2,8 +2,9 @@ import { useState } from 'react';
 import type { Question } from '@shared/types';
 import { hostFetch } from '../../lib/hostAuth';
 
-export default function MediaEditor({ label, mediaType, mediaUrl, onChange, onUploadingChange, disabled = false }: {
+export default function MediaEditor({ label, mediaType, mediaUrl, onChange, onUploadingChange, disabled = false, audioOnly = false }: {
   disabled?: boolean;
+  audioOnly?: boolean;
   label: string;
   mediaType?: Question['mediaType'];
   mediaUrl?: string;
@@ -14,6 +15,10 @@ export default function MediaEditor({ label, mediaType, mediaUrl, onChange, onUp
   const [error, setError] = useState('');
 
   async function upload(file: File) {
+    if (audioOnly && !file.type.startsWith('audio/')) {
+      setError('Choose an audio recording.');
+      return;
+    }
     setUploading(true);
     onUploadingChange?.(true);
     setError('');
@@ -23,6 +28,7 @@ export default function MediaEditor({ label, mediaType, mediaUrl, onChange, onUp
       const res = await hostFetch('/api/media/upload', { method: 'POST', body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Upload failed');
+      if (audioOnly && data.mediaType !== 'audio') throw new Error('Choose an audio recording.');
       onChange({ mediaType: data.mediaType, mediaUrl: data.url });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
@@ -37,11 +43,11 @@ export default function MediaEditor({ label, mediaType, mediaUrl, onChange, onUp
       <legend className="text-sm text-gray-400 mb-2">{label}</legend>
       <div className="flex gap-2 flex-wrap">
         <label className={`btn-ghost text-sm py-1 px-3 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
-          {uploading ? 'Uploading...' : '📁 Upload Image/Video/Audio'}
-          <input type="file" aria-label={`${label} upload`} className="hidden" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/ogg,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/x-flac,audio/webm,.mp3,.wav,.ogg,.m4a,.aac,.flac,.weba"
+          {uploading ? 'Uploading...' : audioOnly ? '📁 Upload Recording' : '📁 Upload Image/Video/Audio'}
+          <input type="file" aria-label={`${label} upload`} className="hidden" accept={audioOnly ? 'audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.weba' : 'image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/ogg,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/x-m4a,audio/aac,audio/flac,audio/x-flac,audio/webm,.mp3,.wav,.ogg,.m4a,.aac,.flac,.weba'}
             onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void upload(file); }} />
         </label>
-        <button type="button" className="btn-ghost text-sm py-1 px-3" onClick={() => onChange({ mediaType: 'youtube', mediaUrl: '' })}>▶ YouTube URL</button>
+        {!audioOnly && <button type="button" className="btn-ghost text-sm py-1 px-3" onClick={() => onChange({ mediaType: 'youtube', mediaUrl: '' })}>▶ YouTube URL</button>}
         {mediaType && <button type="button" className="btn-danger text-sm py-1 px-3" onClick={() => onChange({ mediaType: undefined, mediaUrl: undefined })}>Remove Media</button>}
       </div>
       {mediaType === 'youtube' && <input aria-label={`${label} YouTube URL`} className="input-field" placeholder="https://www.youtube.com/watch?v=..." value={mediaUrl ?? ''} onChange={e => onChange({ mediaType, mediaUrl: e.target.value })} />}

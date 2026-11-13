@@ -308,7 +308,7 @@ export default function Editor() {
                   {round.categories.map((cat, ci) => {
                     const q = cat.questions[qi];
                     if (!q) return <td key={ci} />;
-                    const hasContent = q.clue || q.response || q.mediaUrl || q.responseMediaUrl;
+                    const hasContent = q.clue || q.response || q.mediaUrl || q.responseMediaUrl || q.clueAudioUrl;
                     return (
                       <td key={cat.id} className="p-1">
                         <button
@@ -397,6 +397,16 @@ function QuestionEditor({
               onChange={onChange}
               onUploadingChange={setUploading}
             />
+            <MediaEditor
+              disabled={uploading}
+              label="Clue recording (optional)"
+              audioOnly
+              mediaType={question.clueAudioUrl ? 'audio' : undefined}
+              mediaUrl={question.clueAudioUrl}
+              onChange={({ mediaUrl }) => onChange({ clueAudioUrl: mediaUrl })}
+              onUploadingChange={setUploading}
+            />
+            <p className="text-sm text-gray-400">Plays when the clue is shown. For regular questions, buzzers open automatically when the recording ends. Other clue audio and video wait until the reading finishes.</p>
           </fieldset>
 
           <fieldset className="rounded-lg border border-gray-700 bg-gray-800/30 p-4 space-y-3">

@@ -47,6 +47,7 @@ export function resetBuzzerFields(
   opts: { buzzerState: 'idle' | 'open'; clearLockouts?: boolean }
 ) {
   session.buzzerState = opts.buzzerState;
+  session.clueRecordingId = null;
   session.buzzedPlayerId = null;
   session.buzzedPlayerName = null;
   session.buzzTimestamp = null;

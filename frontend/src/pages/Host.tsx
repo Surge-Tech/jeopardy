@@ -431,7 +431,7 @@ export default function Host() {
                   setHostError(res.ok ? '' : res.error ?? 'Could not update buzzer test');
                 });
               }} />
-              <div><h2 className="text-xl font-bold text-jeopardy-gold">Players & teams</h2><p className="text-sm text-gray-300 mt-2">Manage the roster below. Gameplay begins when you press Start game.</p></div>
+              <h2 className="text-xl font-bold text-jeopardy-gold">Players & teams</h2>
               </div>
             ) : gameState.finalJeopardy ? (
               <HostFinalPanel roomCode={roomCode} gameState={gameState} board={board}

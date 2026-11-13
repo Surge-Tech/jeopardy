@@ -115,12 +115,12 @@ test('board lobby, host readiness and phones follow the explicit start transitio
     const control = (text: string) => [...document.querySelectorAll('button')].find(button => button.textContent === text)!;
     await act(async () => control('Open buzzers').click());
     assert.equal(state.phase, 'lobby');
-    assert.match(document.body.textContent!, /Buzzers open/);
+    assert.equal(control('Open buzzers').disabled, true);
     const practiceOpen = structuredClone(state);
     gm.recordBuzz(room, alice.id, alice.name, Date.now());
     await broadcast();
     const practiceWinner = structuredClone(state);
-    assert.match(document.querySelector('[aria-label="Lobby buzzer test"]')!.textContent!, /Alice.*buzzed first/);
+    assert.match(document.querySelector('[aria-label="Lobby buzzer test"]')!.textContent!, /Alice.*First/);
     await act(async () => control('Reset test').click());
     assert.equal(state.buzzerState, 'idle');
     assert.equal(document.querySelector('[aria-label="Buzz order"]'), null);

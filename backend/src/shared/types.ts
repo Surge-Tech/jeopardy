@@ -152,6 +152,8 @@ export interface GameState {
   buzzedPlayerName: string | null;
   buzzTimestamp: number | null;
   answerTimer: { deadline: number; serverNow: number } | null;
+  // Host's 30-second waiting budget; a null deadline means it is paused.
+  questionTimer: { remainingMs: number; deadline: number | null; serverNow: number } | null;
   phase: 'lobby' | 'playing' | 'finished';
   clueVisible: boolean;  // regular clue explicitly revealed by host
   dailyDoubleRevealed: boolean;  // false until host clicks "Reveal Question"

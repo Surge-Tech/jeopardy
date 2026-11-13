@@ -17,6 +17,7 @@ import { getQuestionShortcut } from '../utils/questionShortcuts';
 import ShareLink from '../components/host/ShareLink';
 import BoardGrid from '../components/host/BoardGrid';
 import ActiveQuestionPanel from '../components/host/ActiveQuestionPanel';
+import QuestionCountdown from '../components/host/QuestionCountdown';
 import BuzzerStatus from '../components/shared/BuzzerStatus';
 import AnswerTimeSetting from '../components/host/AnswerTimeSetting';
 import PlayersTab from '../components/host/PlayersTab';
@@ -420,7 +421,10 @@ export default function Host() {
             ) : activeQ ? (
               <ActiveQuestionPanel
                 category={getCatName(activeQ)}
-                statusContent={(gameState.buzzerState === 'open' || hasPendingAnswer(gameState)) ? <BuzzerStatus gameState={gameState} /> : null}
+                statusContent={<>
+                  <QuestionCountdown gameState={gameState} />
+                  {(gameState.buzzerState === 'open' || hasPendingAnswer(gameState)) && <BuzzerStatus gameState={gameState} />}
+                </>}
                 mediaControls={<BoardMediaControls board={board} gameState={gameState} roomCode={roomCode} />}
                 activeQ={activeQ}
                 clueVisible={gameState.clueVisible}

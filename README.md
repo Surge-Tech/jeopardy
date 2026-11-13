@@ -45,6 +45,8 @@ For a team game, open the host’s **Players** tab, set **Game mode** to **Teams
 
 To test players created in the host panel without using phones, enable **Show test buzzers** in the **Players** tab. Each player gets a test buzzer that follows the normal buzz rules, including early-buzz penalties, answer timers, team lockouts, and buzz history. Disabled buttons explain why buzzing is unavailable. Test buzzes affect game stats and normal judging/scoring; they do not connect a player device or replace phone latency testing.
 
+For regular questions, the host panel shows a 30-second **Waiting for answers** countdown when buzzers first open. It pauses on a buzz or when buzzers are locked, resumes with the remaining time when buzzers reopen (including after a wrong answer), and survives a host-page refresh. Reaching 0:00 does not change the game; the host decides when to show the answer. Each new question gets a fresh 30 seconds.
+
 To project a join code, use **Player QR code (project this)** in the host's sharing links. **Open** displays `/qr/<roomCode>` on a separate screen; **Copy** shares that display URL. The page generates its QR locally and sends scanning phones directly to the normal `/buzz/<roomCode>` player page. It also shows the room code and a copyable player URL. For local games, open the host using its LAN address and connect phones to the same Wi-Fi; sharing a localhost address will not work on other devices. The QR display stays available when a game ends or a room closes, and opening it does not join the game.
 
 Run the frontend QR decode and sharing checks with `npm test --prefix frontend`.

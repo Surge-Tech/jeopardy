@@ -20,6 +20,23 @@ export const sessions = new Map<string, GameState>();
 // activity.
 export const lastActivityAt = new Map<string, number>();
 
+export function pauseQuestionTimer(session: GameState, now = Date.now()) {
+  const timer = session.questionTimer;
+  if (!timer || timer.deadline === null) return;
+  timer.remainingMs = Math.max(0, timer.deadline - now);
+  timer.deadline = null;
+  timer.serverNow = now;
+}
+
+function resumeQuestionTimer(session: GameState) {
+  if (!session.activeQuestionId || !session.clueVisible || session.responseVisible || session.dailyDouble || session.finalJeopardy) return;
+  const now = Date.now();
+  const timer = session.questionTimer ?? { remainingMs: 30000, deadline: null, serverNow: now };
+  if (timer.deadline === null) timer.deadline = now + timer.remainingMs;
+  timer.serverNow = now;
+  session.questionTimer = timer;
+}
+
 // Resets the buzzer-related fields shared by every "start fresh" transition
 // (openQuestion, closeQuestion, resetBuzzer, enableBuzzer, advanceRound,
 // endGame). Callers that need to reset additional fields (dailyDoubleRevealed,
@@ -37,4 +54,6 @@ export function resetBuzzerFields(
   session.buzzHistory = [];
   session.buzzWindow = null;
   if (opts.clearLockouts) session.buzzLockouts = {};
+  if (opts.buzzerState === 'idle') session.questionTimer = null;
+  else resumeQuestionTimer(session);
 }

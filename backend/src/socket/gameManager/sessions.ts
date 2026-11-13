@@ -26,6 +26,7 @@ export function createSession(boardId: string): GameState {
     buzzedPlayerName: null,
     buzzTimestamp: null,
     answerTimer: null,
+    questionTimer: null,
     phase: 'lobby',
     clueVisible: false,
     dailyDoubleRevealed: false,
@@ -51,6 +52,7 @@ export function getSession(roomCode: string): GameState | undefined {
     lastActivityAt.set(roomCode, now);
     if (session.buzzWindow) session.buzzWindow.serverNow = now;
     if (session.answerTimer) session.answerTimer.serverNow = now;
+    if (session.questionTimer) session.questionTimer.serverNow = now;
   }
   return session;
 }

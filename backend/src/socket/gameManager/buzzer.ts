@@ -2,7 +2,7 @@ import { getCompetitor, getTeam, playerLabel } from '../../shared/competitors.js
 import { startGame } from './sessions.js';
 import { hasPendingAnswer } from '../../shared/questionFlow.js';
 import type { GameState, Question } from '../../types.js';
-import { sessions, resetBuzzerFields, PERMANENT_LOCKOUT } from './state.js';
+import { sessions, resetBuzzerFields, pauseQuestionTimer, PERMANENT_LOCKOUT } from './state.js';
 
 // ── Question lifecycle (buzzer-adjacent) ────────────────────────────────────
 
@@ -35,6 +35,7 @@ export function showResponse(roomCode: string): boolean {
   if (session.dailyDouble && (!session.dailyDoubleRevealed || !session.dailyDouble.outcome)) return false;
   session.responseVisible = true;
   session.answerTimer = null;
+  pauseQuestionTimer(session);
   if (session.buzzerState === 'open') session.buzzerState = 'idle';
   return true;
 }
@@ -75,6 +76,7 @@ export function resetBuzzer(roomCode: string): boolean {
 export function lockBuzzer(roomCode: string): boolean {
   const session = sessions.get(roomCode);
   if (!session) return false;
+  pauseQuestionTimer(session);
   session.buzzerState = 'idle';
   return true;
 }
@@ -136,6 +138,7 @@ export function recordBuzz(roomCode: string, playerId: string, playerName: strin
 
   // buzzerState === 'open'
   const reactionMs = buzzOpenedAt ? (now - buzzOpenedAt) : 0;
+  pauseQuestionTimer(session, now);
   session.buzzerState = 'locked';
   session.buzzedPlayerId = playerId;
   session.buzzedPlayerName = playerName;

@@ -6,12 +6,12 @@ import * as gm from '../src/socket/gameManager.js';
 import { SOCKET_EVENTS as E } from '../src/shared/socketEvents.js';
 
 for (const outcome of ['correct', 'wrong'] as const) {
-  test(`Daily Double ${outcome} is scored once and stays open for answer reveal and close`, () => {
-    const handlers = new Map<string, (...args: any[]) => void>();
+  test(`Daily Double ${outcome} is scored once and stays open for answer reveal and close`, async () => {
+    const handlers = new Map<string, (...args: any[]) => any>();
     const rooms = new Set<string>();
     const broadcasts: any[] = [];
     const socket = { id: `dd-${outcome}`, rooms,
-      on: (event: string, handler: (...args: any[]) => void) => handlers.set(event, handler),
+      on: (event: string, handler: (...args: any[]) => any) => handlers.set(event, handler),
       join: (room: string) => rooms.add(room), emit: () => {},
     } as unknown as Socket;
     const io = {
@@ -40,7 +40,7 @@ for (const outcome of ['correct', 'wrong'] as const) {
       send(E.HOST_ACTIVATE_DD, { boardHighValue: 2000 });
       assert.equal(session.dailyDouble, activated, 'repeated activation preserves wagering');
       assert.equal(session.dailyDouble?.stage, 'picking');
-      send(E.HOST_REVEAL_DD);
+      await send(E.HOST_REVEAL_DD);
       assert.equal(session.dailyDoubleRevealed, false, 'cannot reveal before wagering');
       send(E.HOST_DD_START_TIMER);
       assert.equal(session.dailyDouble?.timer, undefined);
@@ -51,7 +51,7 @@ for (const outcome of ['correct', 'wrong'] as const) {
       const judge = { playerId: player.id, delta: outcome === 'correct' ? 500 : -500, outcome, isDailyDouble: true };
       send(E.HOST_SCORE, judge);
       assert.equal(player.score, 0, 'cannot judge a hidden clue');
-      send(E.HOST_REVEAL_DD);
+      await send(E.HOST_REVEAL_DD);
       assert.equal(session.dailyDoubleRevealed, true);
       assert.equal(session.buzzerState, 'idle');
       assert.equal(session.dailyDouble?.timer, undefined, 'revealing leaves time to read the clue');

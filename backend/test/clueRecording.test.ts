@@ -105,6 +105,44 @@ test('recorded clues wait for authenticated playback completion, then open buzze
     assert.equal(session.buzzerState, 'idle');
     complete(fresh);
     assert.equal(session.buzzerState, 'open');
+    gm.closeQuestion(room);
+
+    // Daily Double recordings start the answer timer, without opening buzzers.
+    for (const mode of ['auto', 'disabled', 'manual', 'judged'] as const) {
+      gm.openQuestion(room, 'q', true);
+      gm.startDailyDoubleWager(room, player.id, 1000, false);
+      gm.overrideDDWager(room, 500);
+      gm.setDailyDoubleTime(room, mode === 'disabled' ? 0 : 23);
+      await handlers.get(E.HOST_REVEAL_DD)!({ roomCode: room });
+      const token = session.clueRecordingId!;
+      assert.ok(token);
+      assert.equal(session.dailyDouble!.timer, undefined);
+      complete(stale);
+      complete(token, 'other');
+      rooms.clear();
+      complete(token);
+      rooms.add(`host:${room}`);
+      assert.equal(session.dailyDouble!.timer, undefined, 'stale and unauthorized completions are ignored');
+      if (mode === 'manual') gm.startDailyDoubleTimer(room);
+      if (mode === 'judged') gm.recordOutcome(room, player.id, 'correct');
+      const manualTimer = session.dailyDouble!.timer;
+      emitted.length = 0;
+      complete(token);
+      assert.equal(session.clueRecordingId, null);
+      assert.equal(session.buzzerState, 'idle');
+      assert.equal(session.questionTimer, null);
+      assert.equal(emitted.includes(E.BUZZER_OPEN), false);
+      const timer = session.dailyDouble!.timer;
+      if (mode === 'auto' || mode === 'manual') {
+        assert.ok(timer);
+        assert.equal(timer.deadline - timer.startedAt, 23000);
+        if (mode === 'manual') assert.equal(timer, manualTimer);
+      } else assert.ok(!timer);
+      complete(token);
+      assert.equal(session.dailyDouble!.timer, timer, 'duplicate completion cannot restart timing');
+      if (mode !== 'judged') gm.recordOutcome(room, player.id, 'correct');
+      gm.closeQuestion(room);
+    }
   } finally {
     if (room) gm.deleteSession(room);
     if (previous === undefined) delete process.env.DATA_DIR;

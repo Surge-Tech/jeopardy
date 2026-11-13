@@ -4,17 +4,13 @@ import { SOCKET_EVENTS } from '@shared/socketEvents';
 import { socket } from '../../socket';
 import ClueMedia from './ClueMedia';
 
-// Mounted once per selected question. Normal readings are tracked by the
-// server so a refreshed board cannot replay a completed reading or open a
-// later question's buzzers. Daily Doubles have no buzzer to open.
+// Readings are tracked by the server so refreshes cannot replay a completed
+// reading or let stale playback open buzzers or start a Daily Double timer.
 export default function QuestionClueMedia({ question, gameState, roomCode }: {
   question: Question; gameState: GameState; roomCode: string;
 }) {
-  const [finished, setFinished] = useState(false);
   const [problem, setProblem] = useState('');
-  const reading = !!question.clueAudioUrl && !gameState.responseVisible && (
-    question.isDailyDouble ? !finished : !!gameState.clueRecordingId
-  );
+  const reading = !!question.clueAudioUrl && !gameState.responseVisible && !!gameState.clueRecordingId;
   const showMedia = !gameState.responseVisible || !question.responseMediaUrl ||
     !['audio', 'video', 'youtube'].includes(question.responseMediaType ?? '') || question.mediaType === 'image';
 
@@ -25,7 +21,6 @@ export default function QuestionClueMedia({ question, gameState, roomCode }: {
         onPlaybackProblem={setProblem}
         onPlaying={() => setProblem('')}
         onEnded={() => {
-          setFinished(true);
           if (gameState.clueRecordingId) socket.emit(SOCKET_EVENTS.HOST_CLUE_RECORDING_ENDED, {
             roomCode, questionId: question.id, recordingId: gameState.clueRecordingId,
           });

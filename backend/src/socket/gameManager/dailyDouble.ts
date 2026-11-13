@@ -1,13 +1,15 @@
+import { randomUUID } from 'node:crypto';
 import { getCompetitor, wagerPlayerId } from '../../shared/competitors.js';
 import type { DailyDoubleState } from '../../types.js';
 import { sessions } from './state.js';
 
 // ── Daily Double wagering ───────────────────────────────────────────────────
 
-export function revealDailyDouble(roomCode: string): boolean {
+export function revealDailyDouble(roomCode: string, hasRecording = false): boolean {
   const session = sessions.get(roomCode);
   if (!session || session.phase === 'finished' || session.dailyDouble?.stage !== 'ready' || session.dailyDouble.wager == null || session.dailyDoubleRevealed) return false;
   session.dailyDoubleRevealed = true;
+  session.clueRecordingId = hasRecording ? randomUUID() : null;
   return true;
 }
 

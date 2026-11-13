@@ -77,6 +77,7 @@ export default function DDHostPanel({
     : dd.stage === 'wagering' ? (dd.hasDevice ? 'The contestant submits their wager on their device.' : 'Enter the contestant’s wager above.')
     : !revealed ? 'Show the clue when the contestant is ready.' : responseVisible ? 'Close the question to return to the board.'
     : dd.outcome ? 'The wager has been scored. Show the answer before closing.'
+    : canStartTimer && gameState.clueRecordingId ? 'The answer timer starts automatically when the clue recording finishes. Press Space to start it now.'
     : canStartTimer ? 'Press Space to start the answer timer when you finish reading the clue.' : 'Only this contestant answers. Accept or reject their answer; buzzers stay closed.';
   const primary = 'w-full rounded-lg bg-jeopardy-gold px-4 py-3 font-bold text-jeopardy-dark hover:brightness-110';
   const wagerForm = <form onSubmit={applyOverride} className="space-y-2">

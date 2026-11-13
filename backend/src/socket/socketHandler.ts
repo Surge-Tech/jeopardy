@@ -337,8 +337,15 @@ export function registerSocketHandlers(io: Server) {
     });
 
     // ── HOST: reveal DD clue (after DD splash screen) ────────────────────
-    onHost(socket, SOCKET_EVENTS.HOST_REVEAL_DD, ({ roomCode }: { roomCode: string }) => {
-      gm.revealDailyDouble(roomCode);
+    onHost(socket, SOCKET_EVENTS.HOST_REVEAL_DD, async ({ roomCode }: { roomCode: string }) => {
+      const session = gm.getSession(roomCode);
+      if (!session?.activeQuestionId) return;
+      const questionId = session.activeQuestionId;
+      const board = await boardStorage.getBoard(session.boardId);
+      if (gm.getSession(roomCode) !== session || session.activeQuestionId !== questionId) return;
+      const question = board?.rounds[session.currentRoundIndex]?.categories
+        .flatMap(category => category.questions).find(question => question.id === questionId);
+      if (!gm.revealDailyDouble(roomCode, !!question?.clueAudioUrl)) return;
       io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
     });
 
@@ -363,8 +370,10 @@ export function registerSocketHandlers(io: Server) {
       ({ roomCode, questionId, recordingId }: { roomCode: string; questionId: string; recordingId: string }) => {
         if (typeof questionId !== 'string' || typeof recordingId !== 'string' ||
             !gm.finishClueRecording(roomCode, questionId, recordingId)) return;
-        buzzOpenedAt.set(roomCode, Date.now());
-        io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
+        if (gm.getSession(roomCode)?.buzzerState === 'open') {
+          buzzOpenedAt.set(roomCode, Date.now());
+          io.to(roomCode).emit(SOCKET_EVENTS.BUZZER_OPEN);
+        }
         io.to(roomCode).emit(SOCKET_EVENTS.GAME_STATE, gm.getSession(roomCode));
       });
 

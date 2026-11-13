@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { getCompetitor, getTeam, playerLabel } from '../../shared/competitors.js';
 import { hasPendingAnswer } from '../../shared/questionFlow.js';
 import type { GameState, Question } from '../../types.js';
+import { startDailyDoubleTimer } from './dailyDouble.js';
 import { sessions, resetBuzzerFields, pauseQuestionTimer, PERMANENT_LOCKOUT } from './state.js';
 
 // ── Question lifecycle (buzzer-adjacent) ────────────────────────────────────
@@ -32,9 +33,16 @@ export function revealClue(roomCode: string, mediaType?: Question['mediaType'], 
 
 export function finishClueRecording(roomCode: string, questionId: string, recordingId: string): boolean {
   const session = sessions.get(roomCode);
-  if (!recordingId || !session || session.phase !== 'playing' || session.finalJeopardy || session.dailyDouble ||
+  if (!recordingId || !session || session.phase !== 'playing' || session.finalJeopardy ||
       session.activeQuestionId !== questionId || session.clueRecordingId !== recordingId ||
-      !session.clueVisible || session.responseVisible || session.buzzerState !== 'idle') return false;
+      session.responseVisible || session.buzzerState !== 'idle') return false;
+  if (session.dailyDouble) {
+    if (!session.dailyDoubleRevealed || session.dailyDouble.stage !== 'ready' || session.dailyDouble.outcome) return false;
+    session.clueRecordingId = null;
+    startDailyDoubleTimer(roomCode);
+    return true;
+  }
+  if (!session.clueVisible) return false;
   return enableBuzzer(roomCode);
 }
 
@@ -203,6 +211,7 @@ export function recordOutcome(roomCode: string, playerId: string, outcome: 'corr
   if (session.dailyDouble?.playerId === playerId) {
     if (!validateScoreEligibility(roomCode, playerId, true)) return false;
     session.dailyDouble.outcome = outcome;
+    session.clueRecordingId = null;
     session.dailyDouble.timer = null;
   }
   markBuzzAttempted(roomCode, playerId);

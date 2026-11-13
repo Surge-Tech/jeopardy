@@ -131,6 +131,46 @@
   padding: 2rem;
 }
 .board-clue-content--solo { height: 100%; }
+.board-clue-content--answered {
+  max-height: 100%;
+  flex-shrink: 1;
+}
+.board-answer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+  flex-shrink: 1;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.board-answer > :not(.board-answer-media) { flex-shrink: 0; }
+/* Give answer media the remaining height instead of adding its viewport
+   height to the clue and text. Keep the entire image visible with contain. */
+.board-answer-media {
+  position: relative;
+  flex: 0 1 50dvh;
+  min-height: 4rem;
+  margin-top: 0.75rem;
+}
+.board-answer-media > :first-child {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+}
+.board-answer-media img, .board-answer-media video {
+  object-fit: contain;
+}
+.board-answer-media > div > * {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+}
+.board-answer-media--audio { flex: 0 0 3.5rem; min-height: 3.5rem; }
 .board-answer-overlay {
   position: absolute;
   z-index: 10;

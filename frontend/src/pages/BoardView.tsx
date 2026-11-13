@@ -200,7 +200,7 @@ export default function BoardView() {
       {showQuestion && !isDDSplash && (showQuestion.isDailyDouble || gameState.clueVisible) && (
         <div className="fixed inset-0 bg-jeopardy-blue z-40 overflow-hidden flip-in">
           <div className={`board-clue-content ${showQuestion.isDailyDouble ? 'board-clue-content--solo' : ''}`}>
-          <div className="my-auto flex w-full shrink-0 flex-col items-center">
+          <div className={`my-auto flex w-full shrink-0 flex-col items-center ${gameState.responseVisible ? 'board-clue-content--answered' : ''}`}>
           <div className="text-jeopardy-gold font-black text-2xl mb-4 tracking-widest">
             {showQuestion.value}
             {showQuestion.isDailyDouble && (
@@ -223,12 +223,16 @@ export default function BoardView() {
 
           {/* Answer — shown when host clicks "Show Answer" */}
           {gameState.responseVisible && (
-            <div className={`mt-8 fade-up bg-black/90 border-2 border-jeopardy-gold rounded-xl px-8 py-4 text-center w-full max-w-3xl ${showQuestion.mediaType === 'image' ? `board-answer-overlay ${showQuestion.isDailyDouble ? 'board-answer-overlay--solo' : ''}` : ''}`}>
+            <div className={`board-answer mt-8 fade-up bg-black/90 border-2 border-jeopardy-gold rounded-xl px-8 py-4 text-center w-full max-w-3xl ${showQuestion.mediaType === 'image' ? `board-answer-overlay ${showQuestion.isDailyDouble ? 'board-answer-overlay--solo' : ''}` : ''}`}>
               <div className="text-gray-400 text-lg mb-1 uppercase tracking-widest">Answer</div>
-              <div className="text-jeopardy-gold font-black text-3xl md:text-4xl" style={{ textShadow: '2px 2px 0 #000' }}>
+              <div className="text-jeopardy-gold font-black text-2xl md:text-3xl" style={{ textShadow: '2px 2px 0 #000' }}>
                 {showQuestion.response}
               </div>
-              <ResponseMedia {...showQuestion} autoPlay controlId={`${showQuestion.id}:response`} />
+              {showQuestion.responseMediaType && showQuestion.responseMediaUrl && (
+                <div className={`board-answer-media board-answer-media--${showQuestion.responseMediaType}`}>
+                  <ResponseMedia {...showQuestion} autoPlay controlId={`${showQuestion.id}:response`} />
+                </div>
+              )}
             </div>
           )}
 

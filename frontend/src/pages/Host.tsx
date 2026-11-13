@@ -1,6 +1,7 @@
 import BoardMediaControls from '../components/host/BoardMediaControls';
 import TeamsPanel from '../components/host/TeamsPanel';
 import LobbyBuzzerTest from '../components/shared/LobbyBuzzerTest';
+import LobbySpeakerTest from '../components/shared/LobbySpeakerTest';
 import { getCompetitor, playerLabel } from '@shared/competitors';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -424,6 +425,7 @@ export default function Host() {
           <div className="p-5 xl:p-6 border-b border-gray-700 flex-shrink-0">
             {gameState.phase === 'lobby' ? (
               <div className="space-y-4">
+              <LobbySpeakerTest roomCode={roomCode} />
               <LobbyBuzzerTest gameState={gameState} onAction={action => {
                 socket.emit(SOCKET_EVENTS.HOST_LOBBY_BUZZER, { roomCode, action }, (res: { ok: boolean; error?: string }) => {
                   setHostError(res.ok ? '' : res.error ?? 'Could not update buzzer test');

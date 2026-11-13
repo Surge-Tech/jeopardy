@@ -17,6 +17,7 @@ test('board lobby, host readiness and phones follow the explicit start transitio
   const tempDir = await mkdtemp(join(testDir, '.lobby-'));
   const dom = new JSDOM('<div id="root"></div>', { url: 'http://192.168.1.5:5173' });
   const originalFetch = globalThis.fetch;
+  dom.window.HTMLMediaElement.prototype.pause = () => {};
   Object.assign(globalThis, { window: dom.window, document: dom.window.document,
     localStorage: dom.window.localStorage, HTMLElement: dom.window.HTMLElement,
     IS_REACT_ACT_ENVIRONMENT: true, requestAnimationFrame: () => 1, cancelAnimationFrame: () => {},

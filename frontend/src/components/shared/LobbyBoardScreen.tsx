@@ -1,6 +1,7 @@
 import type { GameState, Player } from '@shared/types';
 import PlayerJoinCode from './PlayerJoinCode';
 import BoardBuzzerDock from './BoardBuzzerDock';
+import LobbySpeakerTest from './LobbySpeakerTest';
 
 export default function LobbyBoardScreen({ gameState, boardName }: { gameState: GameState; boardName: string }) {
   const teamsMode = gameState.mode === 'teams';
@@ -35,6 +36,7 @@ export default function LobbyBoardScreen({ gameState, boardName }: { gameState: 
         </> : roster(gameState.players)}
       </section>
     </div>
+    <LobbySpeakerTest />
     {testing && <BoardBuzzerDock gameState={gameState} />}
   </main>;
 }

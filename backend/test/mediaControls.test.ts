@@ -40,6 +40,12 @@ test('media commands require room host membership, validate values and only reac
     assert.equal(sent.length, 0);
     handlers.get(E.HOST_MEDIA_STATUS)!({ roomCode: session.roomCode, mediaId: 'q:clue', playing: false, currentTime: 42, duration: 120, playbackRate: 1.5 });
     assert.deepEqual(sent.pop()?.payload, { mediaId: 'q:clue', playing: false, currentTime: 42, duration: 120, playbackRate: 1.5 });
+    handlers.get(E.HOST_MEDIA_STATUS)!({ roomCode: session.roomCode, mediaId: 'lobby:speaker-test', playing: false, error: 'Click the board to enable playback.' });
+    assert.deepEqual(sent.pop()?.payload, { mediaId: 'lobby:speaker-test', playing: false, error: 'Click the board to enable playback.' });
+    for (const error of [false, {}, 'x'.repeat(513)]) {
+      handlers.get(E.HOST_MEDIA_STATUS)!({ roomCode: session.roomCode, mediaId: 'lobby:speaker-test', playing: false, error });
+      assert.equal(sent.length, 0);
+    }
     for (const timing of [{ currentTime: NaN }, { duration: Infinity }, { currentTime: -1 }, { playbackRate: 'fast' }]) {
       handlers.get(E.HOST_MEDIA_STATUS)!({ roomCode: session.roomCode, mediaId: 'q:clue', playing: true, ...timing });
       assert.equal(sent.length, 0);

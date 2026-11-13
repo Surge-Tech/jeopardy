@@ -11,4 +11,7 @@ export interface MediaPlaybackStatus {
   currentTime?: number;
   duration?: number;
   playbackRate?: number;
+  error?: string;
 }
+
+export const SPEAKER_TEST_MEDIA_ID = 'lobby:speaker-test';

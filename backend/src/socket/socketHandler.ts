@@ -98,11 +98,13 @@ export function registerSocketHandlers(io: Server) {
   io.on('connection', (socket: Socket) => {
     registerFinalHandlers(io, socket, socketPlayers);
 
-    onHost(socket, SOCKET_EVENTS.HOST_MEDIA_STATUS, ({ roomCode, mediaId, playing, currentTime, duration, playbackRate }: MediaPlaybackStatus & { roomCode: string }) => {
+    onHost(socket, SOCKET_EVENTS.HOST_MEDIA_STATUS, ({ roomCode, mediaId, playing, currentTime, duration, playbackRate, error }: MediaPlaybackStatus & { roomCode: string }) => {
       if (typeof mediaId !== 'string' || mediaId.length > 512 || typeof playing !== 'boolean') return;
+      if (error !== undefined && (typeof error !== 'string' || error.length > 512)) return;
       const timing = { currentTime, duration, playbackRate };
       if (Object.values(timing).some(value => value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0))) return;
       io.to(`host:${roomCode}`).emit(SOCKET_EVENTS.BOARD_MEDIA_STATUS, { mediaId, playing,
+        ...(error !== undefined ? { error } : {}),
         ...Object.fromEntries(Object.entries(timing).filter(([, value]) => value !== undefined)),
       });
     });

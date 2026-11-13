@@ -1,3 +1,4 @@
+import BoardMediaPreview from './BoardMediaPreview';
 import type { Board, GameState } from '@shared/types';
 import { useEffect, useState } from 'react';
 import type { MediaAction, MediaPlaybackStatus } from '@shared/mediaControls';
@@ -37,16 +38,16 @@ export default function BoardMediaControls({ board, gameState, roomCode }: { boa
     }
   }
   if (!url || !['audio', 'video', 'youtube'].includes(type ?? '')) return null;
-  return <MediaPlayerControls key={mediaId} roomCode={roomCode} mediaId={mediaId} answering={answering} />;
+  return <MediaPlayerControls key={mediaId} roomCode={roomCode} mediaId={mediaId} answering={answering} type={type!} url={url} />;
 }
 
-function MediaPlayerControls({ roomCode, mediaId, answering }: {
-  roomCode: string; mediaId: string; answering: boolean;
+function MediaPlayerControls({ roomCode, mediaId, answering, type, url }: {
+  roomCode: string; mediaId: string; answering: boolean; type: string; url: string;
 }) {
-  const [playing, setPlaying] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<MediaPlaybackStatus | null>(null);
   useEffect(() => {
     function update(status: MediaPlaybackStatus) {
-      if (status.mediaId === mediaId) setPlaying(status.playing);
+      if (status.mediaId === mediaId) setStatus(status);
     }
     function requestStatus() {
       socket.emit(SOCKET_EVENTS.HOST_MEDIA_COMMAND, { roomCode, mediaId, action: 'status' });
@@ -62,11 +63,16 @@ function MediaPlayerControls({ roomCode, mediaId, answering }: {
   function send(action: MediaAction, value?: number) {
     socket.emit(SOCKET_EVENTS.HOST_MEDIA_COMMAND, { roomCode, mediaId, action, value });
   }
-  const isPlaying = !answering && playing === true;
+  const isPlaying = !answering && status?.playing === true;
   const toggleLabel = isPlaying ? 'Pause' : 'Play';
   const skipClass = 'flex h-11 w-11 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-jeopardy-gold';
   return (
     <section className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800 to-gray-950 p-4 shadow-lg" aria-label="Board media controls">
+      <div className="mb-2 text-xs text-gray-400">Board playback · muted preview</div>
+      <BoardMediaPreview type={type} url={url} status={status} />
+      {status?.duration !== undefined && status.duration > 0 && <input type="range" min={0} max={status.duration}
+        step={0.1} value={Math.min(status.currentTime ?? 0, status.duration)} aria-label="Board playback position"
+        className="mb-3 w-full accent-yellow-400" onChange={event => send('seekTo', Number(event.target.value))} />}
       <div className="flex items-center justify-center gap-5">
         <button className={skipClass} aria-label="Skip back 10 seconds" title="Skip back 10 seconds" onClick={() => send('seek', -10)}><SkipIcon /></button>
         <button className="flex h-14 w-14 items-center justify-center rounded-full bg-jeopardy-gold text-gray-950 shadow-lg shadow-yellow-500/10 transition hover:scale-105 hover:bg-yellow-300 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-4 focus-visible:ring-offset-slate-900 disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-40"

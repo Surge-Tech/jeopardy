@@ -16,6 +16,8 @@ test('admin media controls follow visible clues and answers, including Daily Dou
   const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
   const old = { window: globalThis.window, document: globalThis.document };
   Object.assign(globalThis, { window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true });
+  dom.window.HTMLMediaElement.prototype.play = async () => {};
+  dom.window.HTMLMediaElement.prototype.pause = () => {};
   const sent: unknown[] = [];
   const listeners = new Map<string, Function>();
   (globalThis as any).__mediaControlSocket = { on: (event: string, fn: Function) => listeners.set(event, fn), off: (event: string) => listeners.delete(event), emit: (event: string, payload: unknown) => sent.push({ event, payload }) };
@@ -45,6 +47,8 @@ test('admin media controls follow visible clues and answers, including Daily Dou
     assert.deepEqual(sent.pop(), { event: E.HOST_MEDIA_COMMAND, payload: { roomCode: 'ROOM', mediaId: 'q:recording', action: 'play', value: undefined } });
     state.clueRecordingId = null;
     await render();
+    assert.equal(document.querySelector('video')?.getAttribute('src'), '/clue.mp4');
+    assert.equal(document.querySelector('video')?.muted, true);
     await act(async () => button('Play').click());
     assert.deepEqual(sent.pop(), { event: E.HOST_MEDIA_COMMAND, payload: { roomCode: 'ROOM', mediaId: 'q:clue', action: 'play', value: undefined } });
     await act(async () => listeners.get(E.BOARD_MEDIA_STATUS)!({ mediaId: 'other', playing: true }));
@@ -62,6 +66,9 @@ test('admin media controls follow visible clues and answers, including Daily Dou
     assert.equal(document.querySelectorAll('button').length, 3);
     assert.equal(document.querySelector('input[type=range]'), null);
     assert.equal(button('Pause'), undefined);
+    await act(async () => listeners.get(E.BOARD_MEDIA_STATUS)!({ mediaId: 'q:clue', playing: false, currentTime: 12, duration: 50 }));
+    assert.equal(document.querySelector('video')?.currentTime, 12);
+    assert.equal(document.querySelector<HTMLInputElement>('input[type=range]')?.value, '12');
     state.responseVisible = true;
     await render();
     await act(async () => button('Skip back 10 seconds').click());

@@ -2,7 +2,8 @@ import ClueMedia from './ClueMedia';
 import type { Question } from '@shared/types';
 import { getYouTubeEmbedUrl } from '../../utils/media';
 
-export default function ResponseMedia({ responseMediaType, responseMediaUrl, autoPlay = false, controlId }: Pick<Question, 'responseMediaType' | 'responseMediaUrl'> & { autoPlay?: boolean; controlId?: string }) {
+export default function ResponseMedia({ responseMediaType, responseMediaUrl, autoPlay = false, controlId, staticOnly = false }: Pick<Question, 'responseMediaType' | 'responseMediaUrl'> & { autoPlay?: boolean; controlId?: string; staticOnly?: boolean }) {
+  if (staticOnly && responseMediaType !== 'image') return null;
   if (!responseMediaType || !responseMediaUrl) return null;
   if (controlId && responseMediaType !== 'image') {
     return <div className="mt-3"><ClueMedia mediaType={responseMediaType} mediaUrl={responseMediaUrl} paused={!autoPlay} hideVideo={false} controlId={controlId} /></div>;

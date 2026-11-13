@@ -153,13 +153,15 @@ export default function ActiveQuestionPanel({
         <div className="bg-gray-800 rounded-lg p-4 text-lg text-white leading-relaxed break-words">
           <div className="text-xs text-gray-400 uppercase mb-2">Clue</div>
           {activeQ.clue}
+        {activeQ.mediaType === 'image' && activeQ.mediaUrl && <img src={activeQ.mediaUrl} alt="Clue image"
+          className="mt-3 max-h-80 w-full rounded-lg object-contain" />}
         </div>
         <div className={`border rounded-lg p-4 text-lg leading-relaxed break-words transition-colors ${responseVisible
           ? 'bg-jeopardy-gold/10 border-jeopardy-gold text-white'
           : 'bg-gray-800 border-gray-700 text-gray-300'}`}>
           <div className={`text-xs uppercase mb-2 ${responseVisible ? 'text-jeopardy-gold' : 'text-gray-400'}`}>Answer · {responseVisible ? 'Shown on board' : 'Host only'}</div>
           {activeQ.response}
-          <ResponseMedia {...activeQ} />
+          <ResponseMedia {...activeQ} staticOnly />
         </div>
       </section>
     </div>

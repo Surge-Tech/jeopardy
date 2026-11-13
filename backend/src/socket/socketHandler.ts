@@ -98,16 +98,21 @@ export function registerSocketHandlers(io: Server) {
   io.on('connection', (socket: Socket) => {
     registerFinalHandlers(io, socket, socketPlayers);
 
-    onHost(socket, SOCKET_EVENTS.HOST_MEDIA_STATUS, ({ roomCode, mediaId, playing }: MediaPlaybackStatus & { roomCode: string }) => {
+    onHost(socket, SOCKET_EVENTS.HOST_MEDIA_STATUS, ({ roomCode, mediaId, playing, currentTime, duration, playbackRate }: MediaPlaybackStatus & { roomCode: string }) => {
       if (typeof mediaId !== 'string' || mediaId.length > 512 || typeof playing !== 'boolean') return;
-      io.to(`host:${roomCode}`).emit(SOCKET_EVENTS.BOARD_MEDIA_STATUS, { mediaId, playing });
+      const timing = { currentTime, duration, playbackRate };
+      if (Object.values(timing).some(value => value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0))) return;
+      io.to(`host:${roomCode}`).emit(SOCKET_EVENTS.BOARD_MEDIA_STATUS, { mediaId, playing,
+        ...Object.fromEntries(Object.entries(timing).filter(([, value]) => value !== undefined)),
+      });
     });
 
     onHost(socket, SOCKET_EVENTS.HOST_MEDIA_COMMAND, (payload: MediaCommand & { roomCode: string }, ack) => {
       const { roomCode, mediaId, action, value } = payload;
       if (!gm.getSession(roomCode) || typeof mediaId !== 'string' || mediaId.length > 512 ||
-          !['play', 'pause', 'seek', 'status'].includes(action) ||
-          (action === 'seek' && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 60))) {
+          !['play', 'pause', 'seek', 'seekTo', 'status'].includes(action) ||
+          (action === 'seek' && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 60)) ||
+          (action === 'seekTo' && (typeof value !== 'number' || !Number.isFinite(value) || value < 0))) {
         ack?.({ ok: false, error: 'Invalid media command' });
         return;
       }

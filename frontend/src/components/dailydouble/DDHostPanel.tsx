@@ -145,10 +145,12 @@ export default function DDHostPanel({
       <div className="bg-gray-800 rounded-lg p-4 text-lg leading-relaxed break-words">
         <div className="text-xs text-gray-400 uppercase mb-2">Clue · {revealed ? 'Shown on board' : 'Host only'}</div>
         {activeQ.clue}
+        {activeQ.mediaType === 'image' && activeQ.mediaUrl && <img src={activeQ.mediaUrl} alt="Clue image"
+          className="mt-3 max-h-80 w-full rounded-lg object-contain" />}
       </div>
       <div className="bg-green-950 border border-green-700 rounded-lg p-4 text-lg text-green-300 leading-relaxed break-words">
         <div className="text-xs text-green-400 uppercase mb-2">Answer · {responseVisible ? 'Shown on board' : 'Host only'}</div>
-        {activeQ.response}<ResponseMedia {...activeQ} />
+        {activeQ.response}<ResponseMedia {...activeQ} staticOnly />
       </div>
     </section>
   </div>;

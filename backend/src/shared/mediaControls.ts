@@ -1,4 +1,4 @@
-export type MediaAction = 'play' | 'pause' | 'seek' | 'status';
+export type MediaAction = 'play' | 'pause' | 'seek' | 'seekTo' | 'status';
 export interface MediaCommand {
   mediaId: string;
   action: MediaAction;
@@ -8,4 +8,7 @@ export interface MediaCommand {
 export interface MediaPlaybackStatus {
   mediaId: string;
   playing: boolean;
+  currentTime?: number;
+  duration?: number;
+  playbackRate?: number;
 }

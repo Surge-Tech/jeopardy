@@ -99,7 +99,8 @@ for (const mediaType of ['audio', 'video', 'youtube'] as const) {
           data: JSON.stringify({ event: 'infoDelivery', info: { playerState: 1 } }),
         }));
       }
-      assert.deepEqual(statuses.at(-1), { mediaId: 'q:clue', playing: true });
+      assert.equal(statuses.at(-1)?.mediaId, 'q:clue');
+      assert.equal(statuses.at(-1)?.playing, true);
       if (media) {
         Object.defineProperty(media, 'paused', { value: true, configurable: true });
         media.dispatchEvent(new dom.window.Event('ended'));
@@ -109,9 +110,11 @@ for (const mediaType of ['audio', 'video', 'youtube'] as const) {
           data: JSON.stringify({ event: 'onStateChange', info: 0 }),
         }));
       }
-      assert.deepEqual(statuses.at(-1), { mediaId: 'q:clue', playing: false });
+      assert.equal(statuses.at(-1)?.mediaId, 'q:clue');
+      assert.equal(statuses.at(-1)?.playing, false);
       await send('status');
-      assert.deepEqual(statuses.at(-1), { mediaId: 'q:clue', playing: false });
+      assert.equal(statuses.at(-1)?.mediaId, 'q:clue');
+      assert.equal(statuses.at(-1)?.playing, false);
       const initialPlays = plays;
       await send('pause', undefined, 'other:clue');
       assert.equal(pauses, 0);
@@ -133,6 +136,8 @@ for (const mediaType of ['audio', 'video', 'youtube'] as const) {
           data: JSON.stringify({ event: 'infoDelivery', info: { currentTime: 12, duration: 25 } }),
         }));
       }
+      await send('seekTo', 12);
+      assert.ok(media ? media.currentTime === 12 : commands.at(-1)?.args[0] === 12);
       await send('seek', -10);
       assert.ok(media ? media.currentTime === 2 : commands.at(-1)?.func === 'seekTo' && commands.at(-1)?.args[0] === 2);
       await send('seek', -10);

@@ -16,7 +16,7 @@ type Props = Pick<Question, 'mediaType' | 'mediaUrl'> & {
 
 // Keep players mounted during an answer so reopening the buzzers resumes
 // the clue from where it paused rather than replaying it from the start.
-export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hideVideo, controlId, onEnded, onPlaybackProblem, audioLabel = 'Clue audio', hideAudioPlayer = false, onPlaying }: Props) {
+export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hideVideo, controlId, onEnded, onPlaybackProblem, audioLabel = 'Clue audio', hideAudioPlayer = true, onPlaying }: Props) {
   const [manuallyPaused, setManuallyPaused] = useState(false);
   const paused = gamePaused || manuallyPaused;
   const mediaRef = useRef<HTMLMediaElement | null>(null);
@@ -53,7 +53,7 @@ export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hid
     if (media) {
       if (paused) media.pause();
       else {
-        // Browsers may require a user gesture; keep controls available for it.
+        // Report blocked autoplay so the board can offer a playback fallback.
         void media.play().then(() => {
           if (cancelled && (youtubePaused.current || mediaRef.current !== media)) media.pause();
         }).catch(() => {

@@ -125,7 +125,8 @@ test('Final Jeopardy audio plays only in clue and response stages', () => {
     assert.equal(markup.includes('/clue.mp3'), stage === 'clue' || stage === 'answering');
     assert.equal(markup.includes('/answer.mp3'), stage === 'response');
     if (stage === 'clue' || stage === 'answering' || stage === 'response') {
-      assert.match(markup, /<audio[^>]+autoPlay=""[^>]+controls=""/i);
+      assert.match(markup, /<audio[^>]+autoPlay=""[^>]+hidden=""/i);
+      assert.doesNotMatch(markup, /controls=""/i);
     }
   }
 });

@@ -11,7 +11,6 @@ import PlayerFinal from '../components/final/PlayerFinal';
 import AnswerCountdown from '../components/shared/AnswerCountdown';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
-import BuzzResults from '../components/shared/BuzzResults';
 import { useCountdown } from '../components/final/useCountdown';
 import { hasPendingAnswer } from '@shared/questionFlow';
 import { randomPlayerColor } from '../utils/colors';
@@ -371,7 +370,6 @@ export default function Buzzer() {
             </div>
           </section>
           <div className="player-buzzer-dock">
-            {inLobby && gameState && <BuzzResults entries={gameState.buzzHistory} winnerId={gameState.buzzedPlayerId} myId={myId} />}
             {gameState && (
               <section className="player-scoreboard" aria-labelledby="player-scoreboard-title">
                 <h2 id="player-scoreboard-title" className="text-gray-400 text-xs uppercase tracking-widest text-center">Scoreboard</h2>

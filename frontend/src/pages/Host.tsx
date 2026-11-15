@@ -1,6 +1,7 @@
 import { THEME_MEDIA_ID } from '@shared/mediaControls';
 import BoardMediaControls from '../components/host/BoardMediaControls';
 import TeamsPanel from '../components/host/TeamsPanel';
+import LobbyRulesScript from '../components/host/LobbyRulesScript';
 import LobbyBuzzerTest from '../components/shared/LobbyBuzzerTest';
 import LobbySpeakerTest from '../components/shared/LobbySpeakerTest';
 import { getCompetitor, playerLabel } from '@shared/competitors';
@@ -409,6 +410,7 @@ export default function Host() {
               <div><h2 className="text-3xl font-black text-jeopardy-gold">Game lobby</h2>
                 <p className="text-gray-300 mt-2">Choose a mode, let players join, then press Start game. The board view displays the QR code and live roster.</p></div>
               <TeamsPanel gameState={gameState} roomCode={roomCode} />
+              <LobbyRulesScript />
             </section>
           ) : <BoardGrid
             round={round}

@@ -84,7 +84,7 @@ export default function FinalJeopardyEditor({
               onChange={({ mediaUrl }) => setClueAudioUrl(mediaUrl ?? '')}
               onUploadingChange={setUploading}
             />
-            <p className="text-sm text-gray-400">Plays when the clue is shown. Other clue audio and video wait until the recording finishes. Start the answer timer from the host when ready.</p>
+            <p className="text-sm text-gray-400">Plays when the clue is shown. Other clue audio and video wait until the recording finishes. The answer timer starts automatically when the recording ends. You can also start it manually from the host.</p>
           </fieldset>
 
           <fieldset className="rounded-lg border border-gray-700 bg-gray-800/30 p-4 space-y-3">

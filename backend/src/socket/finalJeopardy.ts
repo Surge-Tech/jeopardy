@@ -219,9 +219,7 @@ export function revealClue(io: Server, roomCode: string, force: boolean): { ok: 
 export function finishRecording(io: Server, roomCode: string, recordingId: string) {
   const fj = getFj(roomCode);
   if (!fj || fj.stage !== 'clue' || !recordingId || fj.clueRecordingId !== recordingId) return;
-  fj.clueRecordingId = null;
-  setFj(roomCode, fj);
-  broadcastState(io, roomCode);
+  startTimer(io, roomCode);
 }
 
 export function startTimer(io: Server, roomCode: string) {

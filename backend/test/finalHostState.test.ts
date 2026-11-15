@@ -19,7 +19,7 @@ test('Final Jeopardy private previews can be restored only by an authorized room
   gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   try {
-    const board = await storage.createBoard({ name: 'Final test', finalJeopardy: { category: 'Final', clue: 'Clue', clueAudioUrl: '/recording.mp3', response: 'Answer' } });
+    const board = await storage.createBoard({ name: 'Final test', finalJeopardy: { category: 'Final', clue: 'Clue', clueAudioUrl: '/recording.mp3', response: 'Answer', timerSeconds: 45 } });
     session.boardId = board.id;
     const player = gm.addPlayer(room, 'Per', '#ffffff')!;
     gm.setScore(room, player.id, 1000);
@@ -35,10 +35,17 @@ test('Final Jeopardy private previews can be restored only by an authorized room
     assert.ok(recordingId);
     final.finishRecording(io, room, 'stale-recording');
     assert.equal(session.finalJeopardy?.clueRecordingId, recordingId);
+    assert.equal(session.finalJeopardy?.deadline, null);
     final.finishRecording(io, room, recordingId);
     assert.equal(session.finalJeopardy?.clueRecordingId, null);
-    assert.equal(session.finalJeopardy?.stage, 'clue', 'finishing narration leaves the timer under host control');
+    assert.equal(session.finalJeopardy?.stage, 'answering', 'finishing narration starts the countdown');
+    assert.equal(session.finalJeopardy!.deadline! - session.finalJeopardy!.serverNow, 45000);
+    const deadline = session.finalJeopardy?.deadline;
+    const broadcastCount = broadcasts.length;
+    final.finishRecording(io, room, recordingId);
     final.startTimer(io, room);
+    assert.equal(session.finalJeopardy?.deadline, deadline, 'duplicate completion and manual start cannot reset the countdown');
+    assert.equal(broadcasts.length, broadcastCount);
     final.saveDraft(io, room, player.id, 'Private draft');
     function client(authorized: boolean) {
       const handlers = new Map<string, (payload: object) => void>();

@@ -1,6 +1,6 @@
-export default function LobbyRulesScript() {
+export default function LobbyRulesScript({ initiallyOpen = true }: { initiallyOpen?: boolean }) {
   return (
-    <details open className="rounded-xl border border-gray-700 bg-gray-900 p-5">
+    <details open={initiallyOpen} className="rounded-xl border border-gray-700 bg-gray-900 p-5">
       <summary className="cursor-pointer text-xl font-bold text-jeopardy-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-jeopardy-gold">
         Rules introduction
       </summary>

@@ -412,12 +412,17 @@ export default function Host() {
               <TeamsPanel gameState={gameState} roomCode={roomCode} />
               <LobbyRulesScript />
             </section>
-          ) : <BoardGrid
-            round={round}
-            answered={answered}
-            activeQuestionId={gameState.activeQuestionId}
-            onOpenQuestion={openQuestion}
-          />}
+          ) : <>
+            <BoardGrid
+              round={round}
+              answered={answered}
+              activeQuestionId={gameState.activeQuestionId}
+              onOpenQuestion={openQuestion}
+            />
+            <div className="mt-4">
+              <LobbyRulesScript initiallyOpen={false} />
+            </div>
+          </>}
 
           {/* Share links */}
           <div className="mt-4 space-y-2">

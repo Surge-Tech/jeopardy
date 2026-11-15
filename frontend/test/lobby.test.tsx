@@ -153,7 +153,11 @@ test('board lobby, host readiness and phones follow the explicit start transitio
     assert.equal(document.querySelector('[aria-label="Join game"]'), null);
     assert.equal(intro.plays, 0, 'joining an ongoing game does not play the intro');
     await act(async () => handlers.get(E.GAME_STATE)!(lobby));
+    assert.match(document.body.textContent!, /Sound is not enabled/);
+    await act(async () => window.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })));
+    assert.doesNotMatch(document.body.textContent!, /Sound is not enabled/);
     await broadcast();
+    assert.doesNotMatch(document.body.textContent!, /Sound is not enabled/, 'enabled sound stays enabled when the lobby becomes the game board');
     assert.equal(intro.plays, 1, 'the live lobby-to-game transition plays the intro');
     await broadcast();
     await act(async () => handlers.get('connect')!());

@@ -151,7 +151,9 @@ export default function BoardView() {
   }
 
   if (gameState.phase === 'lobby') {
-    return <><SoundControl /><LobbyBoardScreen gameState={gameState} boardName={board.name} /></>;
+    // Keep the same root and SoundControl position across board phases so audio
+    // readiness is preserved when React switches from the lobby to the game.
+    return <div><SoundControl /><LobbyBoardScreen gameState={gameState} boardName={board.name} /></div>;
   }
 
   if (gameState.phase === 'finished') {

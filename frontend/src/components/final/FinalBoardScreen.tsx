@@ -6,6 +6,7 @@ import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import { playFinalJeopardy, playTick, playTimesUp, playReveal, playThinkingPulse, stopThinkingPulse } from '../../utils/sounds';
 import ClueMedia from '../shared/ClueMedia';
+import FinalClueMedia from './FinalClueMedia';
 
 function CountdownRing({ remainingMs, totalMs }: { remainingMs: number; totalMs: number }) {
   const pct = totalMs > 0 ? Math.max(0, Math.min(1, remainingMs / totalMs)) : 0;
@@ -34,7 +35,7 @@ function CountdownRing({ remainingMs, totalMs }: { remainingMs: number; totalMs:
   );
 }
 
-export default function FinalBoardScreen({ gameState }: { gameState: GameState }) {
+export default function FinalBoardScreen({ gameState, onRecordingEnded }: { gameState: GameState; onRecordingEnded?: (recordingId: string) => void }) {
   const fj = gameState.finalJeopardy!;
   const remainingMs = useCountdown(fj.deadline, fj.serverNow);
   const prevStage = useRef<string | null>(null);
@@ -107,7 +108,7 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
         <div className="text-center max-w-4xl">
           <div className="text-jeopardy-gold font-black text-2xl mb-4 uppercase tracking-widest">{fj.category}</div>
           <div className="w-full max-w-2xl mx-auto">
-            <ClueMedia mediaType={fj.mediaType} mediaUrl={fj.mediaUrl} paused={false} hideVideo={false} controlId="final:clue" />
+            <FinalClueMedia finalJeopardy={fj} onRecordingEnded={onRecordingEnded} />
           </div>
           <div className="text-white text-3xl md:text-5xl font-black leading-tight" style={{ textShadow: '2px 2px 0 #000' }}>
             {fj.clue}

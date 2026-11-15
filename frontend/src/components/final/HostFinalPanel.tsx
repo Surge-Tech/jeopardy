@@ -85,14 +85,14 @@ export default function HostFinalPanel({ roomCode, gameState, board, mediaContro
 
   const title = fj.stage === 'intro' ? 'Ready for Final Jeopardy'
     : fj.stage === 'wagering' ? (missing.length ? 'Waiting for wagers' : 'All wagers are in')
-    : fj.stage === 'clue' ? 'Clue on board · Timer not started'
+    : fj.stage === 'clue' ? (fj.clueRecordingId ? 'Reading clue recording · Timer not started' : 'Clue on board · Timer not started')
     : fj.stage === 'answering' ? 'Answering in progress'
     : fj.stage === 'locked' ? 'Answers locked'
     : fj.stage === 'reveal' ? `${contestantLabel} ${fj.revealIndex + 1} of ${fj.contestants.length} · ${current?.playerName ?? ''}`
     : fj.stage === 'response' ? 'Correct answer on board' : 'Final scoreboard on board';
   const hint = fj.stage === 'intro' ? 'Show the category so contestants can decide their wagers.'
     : fj.stage === 'wagering' ? (missing.length ? `Waiting for: ${missing.map(c => c.playerName).join(', ')}.` : 'Show the clue when everyone is ready.')
-    : fj.stage === 'clue' ? 'Read the clue, then start the answer timer.'
+    : fj.stage === 'clue' ? (fj.clueRecordingId ? 'Wait for the recording to finish, then start the answer timer. If playback fails, start the timer to continue.' : 'Read the clue, then start the answer timer.')
     : fj.stage === 'answering' ? 'Answers lock automatically when time runs out. Unsubmitted drafts are saved.'
     : fj.stage === 'locked' ? 'Reveal each contestant’s wager and answer, starting with the lowest score.'
     : fj.stage === 'reveal' ? ({ name: 'Their name is on the board. Show their wager next.', wager: 'Their wager is on the board. Show their answer next.', answer: 'Their answer is on the board. Accept or reject it to score the wager.', judged: 'Wager scored. Continue, or undo the judgment under More controls.' }[fj.revealStep])

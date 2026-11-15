@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getCompetitor, getCompetitors, getTeam } from '../shared/competitors.js';
 import type { Server, Socket } from 'socket.io';
 import * as gm from './gameManager.js';
@@ -205,12 +206,22 @@ export function revealClue(io: Server, roomCode: string, force: boolean): { ok: 
   fj.clue = secret.board.clue;
   fj.mediaType = secret.board.mediaType;
   fj.mediaUrl = secret.board.mediaUrl;
+  fj.clueAudioUrl = secret.board.clueAudioUrl;
+  fj.clueRecordingId = fj.clueAudioUrl ? randomUUID() : null;
   fj.serverNow = Date.now();
   setFj(roomCode, fj);
   broadcastState(io, roomCode);
   broadcastHostState(io, roomCode);
   hostLog(io, roomCode, 'Clue revealed');
   return { ok: true };
+}
+
+export function finishRecording(io: Server, roomCode: string, recordingId: string) {
+  const fj = getFj(roomCode);
+  if (!fj || fj.stage !== 'clue' || !recordingId || fj.clueRecordingId !== recordingId) return;
+  fj.clueRecordingId = null;
+  setFj(roomCode, fj);
+  broadcastState(io, roomCode);
 }
 
 export function startTimer(io: Server, roomCode: string) {
@@ -220,6 +231,7 @@ export function startTimer(io: Server, roomCode: string) {
   if (fj.stage !== 'clue') return;
   const seconds = secret.board.timerSeconds ?? 30;
   const deadline = Date.now() + seconds * 1000;
+  fj.clueRecordingId = null;
   fj.stage = 'answering';
   fj.deadline = deadline;
   fj.serverNow = Date.now();
@@ -475,6 +487,10 @@ export function registerFinalHandlers(
   onHost(socket, SOCKET_EVENTS.HOST_FJ_REVEAL_CLUE, ({ roomCode, force }: { roomCode: string; force?: boolean }) => {
     const res = revealClue(io, roomCode, !!force);
     if (!res.ok) socket.emit('error', { message: res.error });
+  });
+
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_RECORDING_ENDED, ({ roomCode, recordingId }: { roomCode: string; recordingId: string }) => {
+    if (typeof recordingId === 'string') finishRecording(io, roomCode, recordingId);
   });
 
   onHost(socket, SOCKET_EVENTS.HOST_FJ_START_TIMER, ({ roomCode }: { roomCode: string }) => {

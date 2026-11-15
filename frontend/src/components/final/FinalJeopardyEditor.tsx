@@ -12,6 +12,7 @@ export default function FinalJeopardyEditor({
 }) {
   const [category, setCategory] = useState(finalJeopardy?.category ?? '');
   const [clue, setClue] = useState(finalJeopardy?.clue ?? '');
+  const [clueAudioUrl, setClueAudioUrl] = useState(finalJeopardy?.clueAudioUrl ?? '');
   const [response, setResponse] = useState(finalJeopardy?.response ?? '');
   const [mediaType, setMediaType] = useState<FinalJeopardyBoard['mediaType']>(finalJeopardy?.mediaType);
   const [mediaUrl, setMediaUrl] = useState(finalJeopardy?.mediaUrl ?? '');
@@ -24,6 +25,7 @@ export default function FinalJeopardyEditor({
     onSave({
       category: category.trim(),
       clue,
+      clueAudioUrl: clueAudioUrl || undefined,
       response,
       responseMediaType,
       responseMediaUrl: responseMediaUrl || undefined,
@@ -73,6 +75,16 @@ export default function FinalJeopardyEditor({
               onChange={media => { setMediaType(media.mediaType); setMediaUrl(media.mediaUrl ?? ''); }}
               onUploadingChange={setUploading}
             />
+            <MediaEditor
+              disabled={uploading}
+              label="Clue recording (optional)"
+              audioOnly
+              mediaType={clueAudioUrl ? 'audio' : undefined}
+              mediaUrl={clueAudioUrl}
+              onChange={({ mediaUrl }) => setClueAudioUrl(mediaUrl ?? '')}
+              onUploadingChange={setUploading}
+            />
+            <p className="text-sm text-gray-400">Plays when the clue is shown. Other clue audio and video wait until the recording finishes. Start the answer timer from the host when ready.</p>
           </fieldset>
 
           <fieldset className="rounded-lg border border-gray-700 bg-gray-800/30 p-4 space-y-3">

@@ -19,15 +19,25 @@ test('Final Jeopardy private previews can be restored only by an authorized room
   gm.setMode(session.roomCode, 'individual');
   const room = session.roomCode;
   try {
-    const board = await storage.createBoard({ name: 'Final test', finalJeopardy: { category: 'Final', clue: 'Clue', response: 'Answer' } });
+    const board = await storage.createBoard({ name: 'Final test', finalJeopardy: { category: 'Final', clue: 'Clue', clueAudioUrl: '/recording.mp3', response: 'Answer' } });
     session.boardId = board.id;
     const player = gm.addPlayer(room, 'Per', '#ffffff')!;
     gm.setScore(room, player.id, 1000);
     gm.startGame(room);
     await final.startFinal(io, room);
+    assert.equal(session.finalJeopardy?.clueAudioUrl, undefined);
     final.revealCategory(io, room);
+    assert.equal(session.finalJeopardy?.clueAudioUrl, undefined);
     final.submitWager(io, room, player.id, 500);
     final.revealClue(io, room, false);
+    assert.equal(session.finalJeopardy?.clueAudioUrl, '/recording.mp3');
+    const recordingId = session.finalJeopardy?.clueRecordingId;
+    assert.ok(recordingId);
+    final.finishRecording(io, room, 'stale-recording');
+    assert.equal(session.finalJeopardy?.clueRecordingId, recordingId);
+    final.finishRecording(io, room, recordingId);
+    assert.equal(session.finalJeopardy?.clueRecordingId, null);
+    assert.equal(session.finalJeopardy?.stage, 'clue', 'finishing narration leaves the timer under host control');
     final.startTimer(io, room);
     final.saveDraft(io, room, player.id, 'Private draft');
     function client(authorized: boolean) {

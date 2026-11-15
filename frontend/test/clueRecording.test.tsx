@@ -9,6 +9,9 @@ import { JSDOM } from 'jsdom';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Editor from '../src/pages/Editor';
+import FinalJeopardyEditor from '../src/components/final/FinalJeopardyEditor';
+import FinalClueMedia from '../src/components/final/FinalClueMedia';
+import type { FinalJeopardyBoard, FinalPublicState } from '../../backend/src/shared/types';
 import type { Board, GameState, Question } from '../../backend/src/shared/types';
 import { SOCKET_EVENTS as E } from '../../backend/src/shared/socketEvents';
 
@@ -133,3 +136,89 @@ for (const isDailyDouble of [false, true]) {
   });
 
 }
+
+test('Final Jeopardy recording uploads, persists when reopened and removes independently of other media', async () => {
+  const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
+  const old = { window: globalThis.window, document: globalThis.document, fetch: globalThis.fetch };
+  Object.assign(globalThis, { window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true });
+  let root = createRoot(document.getElementById('root')!);
+  let saved: FinalJeopardyBoard = { category: 'Final', clue: 'Clue', response: 'Answer', mediaType: 'image', mediaUrl: '/image.png', responseMediaType: 'audio', responseMediaUrl: '/answer.mp3' };
+  globalThis.fetch = async () => new Response(JSON.stringify({ mediaType: 'audio', url: '/final-reading.mp3' }));
+  const render = () => act(async () => root.render(<FinalJeopardyEditor finalJeopardy={saved} onSave={value => { saved = value; }} onRemove={() => {}} onClose={() => {}} />));
+  const save = () => act(async () => [...document.querySelectorAll('button')].find(b => b.textContent === 'Save')!.click());
+  try {
+    await render();
+    const upload = document.querySelector<HTMLInputElement>('input[aria-label="Clue recording (optional) upload"]')!;
+    assert.match(upload.accept, /audio/);
+    Object.defineProperty(upload, 'files', { value: [new Blob(['audio'], { type: 'audio/mpeg' })] });
+    await act(async () => upload.dispatchEvent(new dom.window.Event('change', { bubbles: true })));
+    assert.equal(document.querySelector('audio[aria-label="Clue recording (optional) preview"]')!.getAttribute('src'), '/final-reading.mp3');
+    await save();
+    assert.equal(saved.clueAudioUrl, '/final-reading.mp3');
+    await act(async () => root.unmount());
+    root = createRoot(document.getElementById('root')!);
+    await render();
+    const preview = document.querySelector('audio[aria-label="Clue recording (optional) preview"]')!;
+    assert.equal(preview.getAttribute('src'), '/final-reading.mp3');
+    await act(async () => [...preview.parentElement!.querySelectorAll('button')].find(b => b.textContent === 'Remove Media')!.click());
+    await save();
+    assert.equal(saved.clueAudioUrl, undefined);
+    assert.equal(saved.mediaUrl, '/image.png');
+    assert.equal(saved.responseMediaUrl, '/answer.mp3');
+  } finally {
+    await act(async () => root.unmount()); dom.window.close(); Object.assign(globalThis, old);
+  }
+});
+
+test('Final Jeopardy narration handles blocked playback, holds other media and does not replay after completion', async () => {
+    const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
+    const old = { window: globalThis.window, document: globalThis.document };
+    Object.assign(globalThis, { window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true });
+    const sent: unknown[] = [];
+    const root = createRoot(document.getElementById('root')!);
+    let blocked = true;
+    const plays: string[] = [];
+    dom.window.HTMLMediaElement.prototype.play = async function () {
+      plays.push(this.getAttribute('src')!);
+      if (blocked) throw new Error('Autoplay blocked');
+    };
+    dom.window.HTMLMediaElement.prototype.pause = () => {};
+    const state = { stage: 'clue', clueRecordingId: 'reading-1', clueAudioUrl: '/reading.mp3', mediaType: 'video', mediaUrl: '/clue.mp4' } as FinalPublicState;
+    const render = () => act(async () => root.render(<FinalClueMedia finalJeopardy={{ ...state }} onRecordingEnded={(recordingId: string) => sent.push({ event: E.HOST_FJ_RECORDING_ENDED, payload: { roomCode: 'ROOM', recordingId } })} />));
+    try {
+      await render();
+      assert.deepEqual(plays, ['/reading.mp3']);
+      assert.match(document.querySelector('[role=alert]')!.textContent!, /Press play/);
+      assert.equal(sent.length, 0);
+      const recording = document.querySelector<HTMLAudioElement>('audio[aria-label="Clue recording"]')!;
+      assert.equal(recording.hidden, true);
+      assert.equal(recording.controls, false);
+      blocked = false;
+      await act(async () => window.dispatchEvent(new dom.window.CustomEvent('board-media-command', { detail: { mediaId: 'final:recording', action: 'play' } })));
+      await act(async () => recording.dispatchEvent(new dom.window.Event('pause')));
+      assert.equal(sent.length, 0);
+      await act(async () => recording.dispatchEvent(new dom.window.Event('error')));
+      assert.match(document.querySelector('[role=alert]')!.textContent!, /could not be played/);
+      assert.equal(sent.length, 0);
+      await act(async () => recording.dispatchEvent(new dom.window.Event('ended')));
+      assert.deepEqual(sent, [{ event: E.HOST_FJ_RECORDING_ENDED, payload: { roomCode: 'ROOM', recordingId: 'reading-1' } }]);
+      state.clueRecordingId = null;
+      await render();
+      assert.equal(document.querySelector('audio'), null);
+      assert.equal(plays.at(-1), '/clue.mp4');
+      state.stage = 'answering';
+      await render();
+      assert.equal(document.querySelector('audio'), null);
+      assert.equal(sent.length, 1);
+      await act(async () => root.unmount());
+      // Refresh after completion: only ordinary clue media starts.
+      const refreshed = createRoot(document.getElementById('root')!);
+      await act(async () => refreshed.render(<FinalClueMedia finalJeopardy={state} onRecordingEnded={(recordingId: string) => sent.push({ event: E.HOST_FJ_RECORDING_ENDED, payload: { roomCode: 'ROOM', recordingId } })} />));
+      assert.equal(document.querySelector('audio'), null);
+      await act(async () => refreshed.unmount());
+    } finally {
+      await act(async () => root.unmount());
+      dom.window.close();
+      Object.assign(globalThis, old);
+    }
+});

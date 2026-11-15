@@ -29,6 +29,7 @@ export interface Category {
 export interface FinalJeopardyBoard {
   category: string;
   clue: string;
+  clueAudioUrl?: string;
   response: string;
   responseMediaType?: 'image' | 'video' | 'audio' | 'youtube';
   responseMediaUrl?: string;
@@ -103,6 +104,8 @@ export interface FinalPublicState {
   stage: FinalStage;
   category: string | null;
   clue: string | null;
+  clueAudioUrl?: string;
+  clueRecordingId?: string | null;
   mediaType?: 'image' | 'video' | 'audio' | 'youtube';
   mediaUrl?: string;
   deadline: number | null;

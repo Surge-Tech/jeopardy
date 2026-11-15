@@ -22,6 +22,11 @@ export default function BoardMediaControls({ board, gameState, roomCode }: { boa
     mediaId = `final:${response ? 'response' : 'clue'}`;
     type = response ? fj.responseMediaType : fj.mediaType;
     url = response ? fj.responseMediaUrl : fj.mediaUrl;
+    if (fj.stage === 'clue' && fj.clueRecordingId && fj.clueAudioUrl) {
+      mediaId = 'final:recording';
+      type = 'audio';
+      url = fj.clueAudioUrl;
+    }
   } else {
     if (!question || (question.isDailyDouble
       ? !gameState.dailyDoubleRevealed || (gameState.dailyDouble && gameState.dailyDouble.stage !== 'ready')

@@ -180,7 +180,7 @@ export default function BoardView() {
       <SoundControl />
 
       {/* Final Jeopardy takes over the whole screen once it starts */}
-      {gameState.finalJeopardy && <FinalBoardScreen gameState={gameState} />}
+      {gameState.finalJeopardy && <FinalBoardScreen gameState={gameState} onRecordingEnded={recordingId => socket.emit(SOCKET_EVENTS.HOST_FJ_RECORDING_ENDED, { roomCode, recordingId })} />}
 
       {/* Round splash — shown briefly when the host advances to a new round */}
       {roundSplash && !gameState.finalJeopardy && (

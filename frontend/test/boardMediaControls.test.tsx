@@ -90,6 +90,12 @@ test('admin media controls follow visible clues and answers, including Daily Dou
     await render();
     await act(async () => button('Skip forward 10 seconds').click());
     assert.deepEqual(sent.pop(), { event: E.HOST_MEDIA_COMMAND, payload: { roomCode: 'ROOM', mediaId: 'final:clue', action: 'seek', value: 10 } });
+    Object.assign(state.finalJeopardy!, { clueAudioUrl: '/final-recording.mp3', clueRecordingId: 'final-reading' });
+    await render();
+    assert.equal(document.querySelector('audio')?.getAttribute('src'), '/final-recording.mp3');
+    await act(async () => button('Play').click());
+    assert.deepEqual(sent.pop(), { event: E.HOST_MEDIA_COMMAND, payload: { roomCode: 'ROOM', mediaId: 'final:recording', action: 'play', value: undefined } });
+    state.finalJeopardy!.clueRecordingId = null;
     state.finalJeopardy!.stage = 'locked';
     await render();
     assert.equal(document.querySelector('section'), null);

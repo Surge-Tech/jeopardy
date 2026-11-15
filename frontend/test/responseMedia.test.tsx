@@ -47,7 +47,7 @@ for (const mediaType of ['video', 'audio'] as const) {
     };
     try {
       await act(async () => root.render(<FinalJeopardyEditor finalJeopardy={{ category: 'Final', clue: 'Clue', response: '', mediaType: 'image', mediaUrl: '/media/clue.png' }} onSave={value => { saved = value; }} onRemove={() => {}} onClose={() => {}} />));
-      const upload = document.querySelectorAll<HTMLInputElement>('input[type=file]')[1];
+      const upload = document.querySelector<HTMLInputElement>('input[aria-label="Response media (shown when the answer is revealed) upload"]')!;
       const file = new Blob(['test media'], { type: mediaType === 'audio' ? 'audio/mpeg' : 'video/mp4' });
       Object.defineProperty(upload, 'files', { value: [file], configurable: true });
       await act(async () => upload.dispatchEvent(new dom.window.Event('change', { bubbles: true })));

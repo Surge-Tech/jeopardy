@@ -1,6 +1,7 @@
 import ClueMedia from './ClueMedia';
 import type { Question } from '@shared/types';
 import { getYouTubeEmbedUrl } from '../../utils/media';
+import LoadingImage from './LoadingImage';
 
 export default function ResponseMedia({ responseMediaType, responseMediaUrl, autoPlay = false, controlId, staticOnly = false }: Pick<Question, 'responseMediaType' | 'responseMediaUrl'> & { autoPlay?: boolean; controlId?: string; staticOnly?: boolean }) {
   if (staticOnly && responseMediaType !== 'image') return null;
@@ -9,7 +10,7 @@ export default function ResponseMedia({ responseMediaType, responseMediaUrl, aut
     return <div className="mt-3"><ClueMedia mediaType={responseMediaType} mediaUrl={responseMediaUrl} paused={!autoPlay} hideVideo={false} controlId={controlId} /></div>;
   }
   if (responseMediaType === 'image') {
-    return <img src={responseMediaUrl} alt="Correct answer" className="max-h-[50dvh] max-w-full object-contain rounded mx-auto mt-3" />;
+    return <LoadingImage src={responseMediaUrl} alt="Correct answer" className="max-h-[50dvh] max-w-full rounded mx-auto mt-3" />;
   }
   if (responseMediaType === 'audio') {
     return <audio key={responseMediaUrl} src={responseMediaUrl} autoPlay={autoPlay} controls aria-label="Correct answer audio" className="w-full mt-3" />;

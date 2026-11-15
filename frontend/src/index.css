@@ -138,10 +138,36 @@
 }
 /* Reserve room for the value and full clue text before sizing the image. */
 .board-clue-with-image > * { flex-shrink: 0; }
-.board-clue-with-image > img {
+.board-clue-with-image > .loading-image {
   min-height: 0;
   flex-shrink: 1;
   object-fit: contain;
+}
+.loading-image {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+}
+.loading-image img {
+  display: block;
+  max-width: 100%;
+  max-height: inherit;
+  object-fit: contain;
+}
+.loading-image[data-status="loading"], .loading-image[data-status="error"] {
+  min-height: 8rem;
+}
+.loading-image__status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: rgb(0 0 0 / 15%);
+  color: #d1d5db;
+  font: 600 1rem/1.5 Arial, sans-serif;
 }
 .board-clue-content--answered {
   max-height: 100%;

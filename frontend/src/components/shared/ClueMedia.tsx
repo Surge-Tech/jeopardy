@@ -2,6 +2,7 @@ import type { MediaCommand } from '@shared/mediaControls';
 import { useEffect, useRef, useState } from 'react';
 import type { Question } from '@shared/types';
 import { getYouTubeEmbedUrl } from '../../utils/media';
+import LoadingImage from './LoadingImage';
 
 type Props = Pick<Question, 'mediaType' | 'mediaUrl'> & {
   controlId?: string;
@@ -151,7 +152,7 @@ export default function ClueMedia({ mediaType, mediaUrl, paused: gamePaused, hid
 
   if (!mediaUrl) return null;
   if (mediaType === 'image') {
-    return <img src={mediaUrl} alt="clue" className="max-h-[60dvh] object-contain mb-6 rounded w-full" />;
+    return <LoadingImage src={mediaUrl} alt="clue" className="max-h-[60dvh] mb-6 rounded w-full" />;
   }
   if (mediaType === 'audio') {
     return <audio ref={element => { mediaRef.current = element; }} src={mediaUrl} autoPlay={!paused} controls={!hideAudioPlayer} hidden={hideAudioPlayer} aria-label={audioLabel}

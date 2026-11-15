@@ -16,6 +16,7 @@ import Leaderboard from '../components/shared/Leaderboard';
 import SoundControl from '../components/shared/SoundControl';
 import { getRound, isRoundComplete } from '../utils/rounds';
 import { formatScore } from '../utils/format';
+import { useBoardImagePreload } from '../hooks/useBoardImagePreload';
 
 const API = '/api';
 
@@ -30,6 +31,7 @@ export default function BoardView() {
   const prevBuzzerState = useRef<string>('idle');
   const prevActiveId = useRef<string | null>(null);
   const stopIntro = useRef<(() => void) | undefined>();
+  useBoardImagePreload(board, gameState?.currentRoundIndex ?? 0, gameState?.activeQuestionId);
 
   useEffect(() => {
     function relay(command: import('@shared/mediaControls').MediaCommand) {

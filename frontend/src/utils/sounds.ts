@@ -1,5 +1,6 @@
 let ctx: AudioContext | null = null;
 let output: GainNode | null = null;
+const SOUND_EFFECT_GAIN = 2;
 
 let introBuffer: Promise<AudioBuffer> | null = null;
 
@@ -64,6 +65,7 @@ function tone(
   delay = 0,
   endFreq?: number,
   attack = 0.012,
+  gainMultiplier = SOUND_EFFECT_GAIN,
 ) {
   const c = getCtx();
   // Drop blocked cues instead of replaying a backlog after audio is enabled.
@@ -81,7 +83,7 @@ function tone(
   if (endFreq !== undefined) osc.frequency.linearRampToValueAtTime(endFreq, t + duration);
   // Ease into each note and fade all the way to silence to avoid clicks.
   envelope.gain.setValueAtTime(0, t);
-  envelope.gain.linearRampToValueAtTime(gain, t + attack);
+  envelope.gain.linearRampToValueAtTime(gain * gainMultiplier, t + attack);
   envelope.gain.exponentialRampToValueAtTime(0.0001, t + duration);
   envelope.gain.linearRampToValueAtTime(0, t + duration + 0.025);
   osc.onended = () => {
@@ -129,7 +131,7 @@ export function playTick() {
 
 // A brief, low falling tone marks the end of the timer.
 export function playTimesUp() {
-  tone(293.66, 0.38, 0.19, 0, 196, 0.02);
+  tone(293.66, 0.38, 0.28, 0, 196, 0.02);
 }
 
 // A small upward chime accompanies each reveal.
@@ -151,7 +153,8 @@ export function playWinnerFanfare() {
 let thinkingInterval: number | null = null;
 export function playThinkingPulse() {
   if (thinkingInterval !== null) return;
-  const beat = () => tone(196, 0.38, 0.035, 0, undefined, 0.06);
+  // Keep the ambient countdown music at its existing level.
+  const beat = () => tone(196, 0.38, 0.035, 0, undefined, 0.06, 1);
   beat();
   thinkingInterval = window.setInterval(beat, 1200);
 }

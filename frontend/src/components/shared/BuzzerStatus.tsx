@@ -9,7 +9,7 @@ export default function BuzzerStatus({ gameState, display = false, personal = fa
   personal?: boolean;
 }) {
   if (gameState.dailyDouble) {
-    return <AnswerCountdown gameState={gameState} />;
+    return <AnswerCountdown gameState={gameState} sound={display} />;
   }
   const open = gameState.buzzerState === 'open';
   const player = gameState.buzzedPlayerId ? getCompetitor(gameState, gameState.buzzedPlayerId) : undefined;
@@ -31,7 +31,7 @@ export default function BuzzerStatus({ gameState, display = false, personal = fa
           {!open && pending && personal && <div className="buzzer-status__hint">Your turn to answer</div>}
         </div>
       </div>
-      {!open && <AnswerCountdown gameState={gameState} />}
+      {!open && <AnswerCountdown gameState={gameState} sound={display} />}
     </div>
   );
 }

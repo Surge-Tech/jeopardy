@@ -19,11 +19,9 @@ export default function BuzzerStatus({ gameState, display = false, personal = fa
     <div className={`buzzer-status ${open ? 'buzzer-status--open' : 'buzzer-status--answering'} ${display ? 'buzzer-status--display' : ''}`}>
       <div className="buzzer-status__identity" role="status">
         {open ? (
-          <span className="buzzer-status__signal" aria-hidden="true"><span /></span>
+          <span className="buzzer-status__signal" aria-hidden="true" />
         ) : (
-          <span className="buzzer-status__avatar" style={{ backgroundColor: player?.color ?? '#FFD700' }} aria-hidden="true">
-            {(gameState.buzzedPlayerName ?? '?').trim().slice(0, 1).toUpperCase()}
-          </span>
+          <span className="buzzer-status__avatar" style={{ backgroundColor: player?.color ?? '#FFD700' }} aria-hidden="true" />
         )}
         <div className="min-w-0">
           {!open && pending && <div className="buzzer-status__eyebrow">{personal ? 'You buzzed in' : 'Buzzed in'}</div>}

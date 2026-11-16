@@ -251,7 +251,7 @@ export default function BoardView() {
 
           {/* Answer — shown when host clicks "Show Answer" */}
           {gameState.responseVisible && (
-            <div className={`board-answer mt-8 fade-up bg-black/90 border-2 border-jeopardy-gold rounded-xl px-8 py-4 text-center w-full max-w-3xl ${showQuestion.mediaType === 'image' ? `board-answer-overlay ${showQuestion.isDailyDouble ? 'board-answer-overlay--solo' : ''}` : ''}`}>
+            <div className={`board-answer mt-8 fade-up bg-black/90 border-2 border-jeopardy-gold rounded-xl px-8 py-4 text-center w-full max-w-3xl ${['image', 'video', 'youtube'].includes(showQuestion.mediaType ?? '') ? `board-answer-overlay ${showQuestion.isDailyDouble ? 'board-answer-overlay--solo' : ''}` : ''}`}>
               <div className="text-gray-400 text-lg mb-1 uppercase tracking-widest">Answer</div>
               <div className="text-jeopardy-gold font-black text-2xl md:text-3xl" style={{ textShadow: '2px 2px 0 #000' }}>
                 {showQuestion.response}

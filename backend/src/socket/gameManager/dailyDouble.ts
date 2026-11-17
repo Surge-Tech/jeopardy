@@ -1,12 +1,34 @@
+import { randomUUID } from 'node:crypto';
+import { getCompetitor, wagerPlayerId } from '../../shared/competitors.js';
 import type { DailyDoubleState } from '../../types.js';
 import { sessions } from './state.js';
 
 // ── Daily Double wagering ───────────────────────────────────────────────────
 
-export function revealDailyDouble(roomCode: string): boolean {
+export function revealDailyDouble(roomCode: string, hasRecording = false): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || session.phase === 'finished' || session.dailyDouble?.stage !== 'ready' || session.dailyDouble.wager == null || session.dailyDoubleRevealed) return false;
   session.dailyDoubleRevealed = true;
+  session.clueRecordingId = hasRecording ? randomUUID() : null;
+  return true;
+}
+
+export function setDailyDoubleTime(roomCode: string, seconds: number): boolean {
+  const session = sessions.get(roomCode);
+  if (!session || !Number.isInteger(seconds) || seconds < 0 || seconds > 300) return false;
+  session.settings.dailyDoubleTimeS = seconds;
+  return true;
+}
+
+export function startDailyDoubleTimer(roomCode: string): boolean {
+  const session = sessions.get(roomCode);
+  const dd = session?.dailyDouble;
+  if (!session || session.phase !== 'playing' || !session.activeQuestionId || !dd ||
+    dd.stage !== 'ready' || !session.dailyDoubleRevealed || session.responseVisible || dd.outcome || dd.timer) return false;
+  const seconds = session.settings.dailyDoubleTimeS ?? 15;
+  if (seconds <= 0) return false;
+  const now = Date.now();
+  dd.timer = { startedAt: now, deadline: now + seconds * 1000, serverNow: now };
   return true;
 }
 
@@ -22,7 +44,7 @@ export function startDailyDoubleWager(
   const session = sessions.get(roomCode);
   if (!session) return null;
 
-  if (!lastCorrectPlayerId || !session.players.some(p => p.id === lastCorrectPlayerId)) {
+  if (!lastCorrectPlayerId || !getCompetitor(session, lastCorrectPlayerId)) {
     session.dailyDouble = {
       stage: 'picking',
       playerId: null,
@@ -35,10 +57,10 @@ export function startDailyDoubleWager(
     return session.dailyDouble;
   }
 
-  const player = session.players.find(p => p.id === lastCorrectPlayerId)!;
+  const player = getCompetitor(session, lastCorrectPlayerId)!;
   session.dailyDouble = {
     stage: 'wagering',
-    playerId: player.id,
+    playerId: wagerPlayerId(session, player.id),
     maxWager: Math.max(player.score, boardHighValue),
     boardHighValue,
     wager: null,
@@ -51,10 +73,10 @@ export function startDailyDoubleWager(
 // Host's fallback pick when there's no tracked "last correct" player.
 export function pickDDContestant(roomCode: string, playerId: string, hasDevice: boolean): boolean {
   const session = sessions.get(roomCode);
-  if (!session || !session.dailyDouble) return false;
-  const player = session.players.find(p => p.id === playerId);
+  if (!session || session.dailyDouble?.stage !== 'picking') return false;
+  const player = getCompetitor(session, playerId);
   if (!player) return false;
-  session.dailyDouble.playerId = player.id;
+  session.dailyDouble.playerId = wagerPlayerId(session, player.id);
   session.dailyDouble.maxWager = Math.max(player.score, session.dailyDouble.boardHighValue);
   session.dailyDouble.hasDevice = hasDevice;
   session.dailyDouble.stage = 'wagering';
@@ -84,6 +106,7 @@ export function overrideDDWager(roomCode: string, amount: number): { ok: boolean
   const session = sessions.get(roomCode);
   const dd = session?.dailyDouble;
   if (!session || !dd || !dd.playerId) return { ok: false, error: 'No Daily Double contestant assigned' };
+  if (session.dailyDoubleRevealed) return { ok: false, error: 'The wager is locked after revealing the clue' };
   if (dd.hasDevice && !dd.submittedByPlayer) {
     return { ok: false, error: "Waiting for the player's own wager first" };
   }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jeopardy Content"
+  short_description: "Create and edit Jeopardy boards through the API"
+  default_prompt: "Use $jeopardy-content to fill in categories, clues, and answers for my Jeopardy game."

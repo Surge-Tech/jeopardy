@@ -35,19 +35,29 @@ Game sessions are **in-memory only** (`backend/src/socket/gameManager.ts`), keye
 
 ## Data Model
 
-Canonical types live in `backend/src/types.ts` (frontend has a mirrored copy in `frontend/src/types.ts`).
+Canonical types live in `backend/src/shared/types.ts`, imported by the frontend through `@shared/types` and re-exported by `backend/src/types.ts`.
 
 | Type | Purpose |
 |---|---|
 | `Board` | A saved board: a list of `rounds`, optional Final Jeopardy config. Persisted to disk. |
 | `Round` | One grid: `{ id, name?, categories, pointValues }`. A board plays through `rounds` in order (Jeopardy!, Double Jeopardy!, ...). |
 | `Category` / `Question` | A round's grid content. A `Question` may be flagged `isDailyDouble`. Question ids are UUIDs, unique across the whole board (not just within a round) — this is what lets `answeredQuestions` stay a single flat list while still being able to tell whether a *specific round* is complete. |
-| `GameState` | The full state of one live session: players, buzzer state (incl. `buzzLockouts` and the configurable `settings.lockoutMs`), active question, `currentRoundIndex`, Daily Double sub-state, Final Jeopardy public sub-state, `phase`. Broadcast wholesale to every client on every change via `game:state`. |
-| `Player` | `{ id, name, score, color, stats? }`. `stats` (`correct`/`wrong`/`buzzes`/`earlyBuzzes`) is populated lazily on first use. |
+| `GameState` | The full state of one live session: `mode` (`individual` or `teams`), `teams`, players, buzzer state (incl. `buzzLockouts` and the configurable `settings.lockoutMs`), active question, `currentRoundIndex`, Daily Double sub-state, Final Jeopardy public sub-state, `phase`. Broadcast wholesale to every client on every change via `game:state`. |
+| `Player` | `{ id, name, score, color, teamId?, stats? }`. `stats` (`correct`/`wrong`/`buzzes`/`earlyBuzzes`) is populated lazily on first use. |
 | `DailyDoubleState` | Sub-state while a Daily Double wager is being collected (see [Daily Double](#daily-double)). |
 | `FinalPublicState` | The *public* Final Jeopardy state broadcast to all clients. Wagers and answers are hidden here until revealed — see [Final Jeopardy](#final-jeopardy). |
 
 `GameState` is intentionally broadcast in full rather than diffed — sessions are small (a handful of players), so simplicity wins over bandwidth.
+
+### Team competitors
+
+Sessions default to individual mode. `Team` holds `{ id, name, color, score, captainPlayerId, stats? }`. Team setup belongs to live session state, so boards need no migration. Shared helpers in `backend/src/shared/competitors.ts` resolve a player to their scoring competitor and produce team standings without duplicating scores onto members. Team stats store Final Jeopardy outcomes; member stats are aggregated for standings.
+
+Mode, teams and membership are editable only in the lobby. Starting or opening the first clue validates every player's assignment and every team's captain, then changes the phase to `playing`. New players cannot join team games after this point; reconnects retain their identity and membership. Captains can change between clues, during Daily Double wagering, and throughout Final Jeopardy.
+
+Regular buzzes and stats retain the actual player's ID; displayed buzz names include the team. An early buzz penalizes only that player. A wrong answer applies a permanent lockout to every member until the next clue. Daily Doubles resolve the last correct player's team, use the team's score for the wager limit, and assign wagering to its current captain (`DailyDoubleState.playerId`). Captain changes during wagering update this ID and device availability.
+
+Final Jeopardy's legacy `playerId` fields contain **competitor IDs**: team IDs in team mode, player IDs in individual mode. Public contestants and private wager/answer/draft maps therefore have one entry per team. Player submissions resolve their socket-bound player identity to a team and require the current captain. Changing captains preserves submissions and reveal order. Host Final Jeopardy controls use the competitor ID directly; judgment and undo update the shared score and team-level stats. Secrets remain outside the public game state.
 
 ### Legacy board migration
 
@@ -78,7 +88,13 @@ $DATA_DIR/
 
 ## REST API
 
-Base path: `/api`. All bodies are JSON.
+Base path: `/api`. Board request bodies are JSON (`Content-Type: application/json`); media uploads use multipart form data. The backend defaults to `http://localhost:3001`; use the deployed origin when editing a remote instance.
+
+### Authentication
+
+Board and media reads do not require authentication. All board and media writes require the `X-Host-Passcode` request header when the server's `HOST_PASSCODE` environment variable is set. Missing or incorrect credentials return `401` with `{ "error": "Invalid or missing host passcode" }`. Development permits writes without the header when no passcode is configured; production refuses to start without a passcode. See `backend/src/middleware/requireHostPasscode.ts`.
+
+Keep the passcode in a private environment variable or credential store; do not put its value in board JSON, documentation, or committed scripts.
 
 ### Boards — `backend/src/routes/boards.ts`
 
@@ -89,6 +105,47 @@ Base path: `/api`. All bodies are JSON.
 | `POST` | `/api/boards` | `Partial<Board>` (accepts either `rounds` or legacy `categories`/`pointValues`) | `201` + `Board` | Missing fields get defaults (one empty round, `[200,400,600,800,1000]` point values). |
 | `PUT` | `/api/boards/:id` | `Partial<Board>` | `Board` | Shallow-merges onto the existing (normalized) board; 404 if not found. |
 | `DELETE` | `/api/boards/:id` | — | `204` | 404 if not found. |
+
+#### Content payloads and updates
+
+Questions use `clue` for the prompt and `response` for the correct answer. The following is a minimal creation payload with one category and one question (a full round normally has more):
+
+```json
+{
+  "name": "Geography Night",
+  "rounds": [
+    {
+      "id": "be648575-7ec4-441c-8412-bd3053da37fe",
+      "name": "Jeopardy!",
+      "pointValues": [200],
+      "categories": [
+        {
+          "id": "07dc12fa-c4a4-49b1-a084-90c7d580dbb8",
+          "name": "European Capitals",
+          "questions": [
+            {
+              "id": "541bd1a4-956b-48b5-8561-114a87583698",
+              "value": 200,
+              "clue": "This city is the capital of Denmark.",
+              "response": "What is Copenhagen?"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+`POST` generates the board ID and timestamps, but callers must supply IDs for nested rounds, categories, and questions. Generate fresh UUIDs for new items; preserve IDs when editing existing items. Question IDs must be unique across the board. In a normal grid, every category has one question for each entry in its round's `pointValues`, in the same order and with matching `value` fields.
+
+Optional answer fields on both questions and `finalJeopardy` are `responseMediaType` (`image`, `video`, or `youtube`) and `responseMediaUrl`. These are independent of clue media and accompany the correct answer on reveal; text remains optional in practice (use an empty `response` string for a media-only answer). Upload answer files through the same `/api/media/upload` endpoint, then store its `mediaType` and `url` in these answer fields. To remove answer media via JSON, send both fields as `null` (runtime accepts nulls although the TypeScript interfaces use optional fields); when updating a question, include its full containing `rounds` array. Final Jeopardy answer media is added to public game state only when the host reveals the correct response. Existing boards without these optional fields keep their text-only answers.
+
+Optional question fields are `isDailyDouble`, `mediaType` (`image`, `video`, or `youtube`), and `mediaUrl`. Optional top-level `finalJeopardy` contains `category`, `clue`, `response`, and optional `mediaType`, `mediaUrl`, and `timerSeconds`. See the canonical shared types for the complete schema.
+
+`PUT` merges only top-level properties: sending `rounds` replaces the entire rounds array, including all categories and questions. There are no individual category/question endpoints. Fetch the full board, change the intended items, and send the complete modified `rounds` array while preserving unrelated content. Omitted top-level properties are retained; send `"finalJeopardy": null` to remove Final Jeopardy (runtime storage accepts this although the TypeScript interface models only an optional object).
+
+The API has no schema validation or conditional update support (such as `If-Match`). Validate payloads before writing, and avoid concurrent edits: re-read the board before saving and reconcile if `updatedAt` changed. Read it back after saving to verify the intended content persisted. A successful response alone does not prove the board has a playable shape. If a creation request times out, check the board list before retrying to avoid creating duplicates.
 
 ### Media — `backend/src/routes/media.ts`
 
@@ -129,6 +186,7 @@ Convention: `host:*` and `player:*` (and bare verbs like `buzz`) are **client �
 | `host:join` | → server | `{ roomCode }` | Rejoin as host after a refresh. Replies with `game:state`, or `error` if the room's gone. |
 | `player:join` | → server | `{ roomCode, name, color }` | Adds a new player. Replies `player:joined` to the caller, then `game:state` to the room. |
 | `host:add-player` | → server | `{ roomCode, name, color }` | Host adds a player who has no phone of their own (see [Daily Double](#daily-double) for why this matters). |
+| `host:buzz-player` | → server (ack) | `{ roomCode, playerId }` | Host-only test buzz for a player in this room. Uses the same rate limit, game-manager buzz logic, broadcasts, and collection timer as phone buzzes. Ack: `{ ok, outcome?, error? }`; outcome is `won`, `early`, `locked-out`, `recorded`, or `ignored`. Does not bind the host socket to the player or mark a wagering device as connected. |
 | `player:rejoin` | → server | `{ roomCode, playerId }` | Reconnect flow (e.g. phone screen locked) — re-associates the socket with an existing player id without creating a new player. |
 | `buzz` | → server | — | Records a buzz for the calling socket's player. Rate-limited server-side to ~10 presses/sec per socket. Outcome depends on state — see [Buzzer](#buzzer) below. `won` broadcasts `buzz:winner` + `game:state`; `early`/`locked-out` reply `buzz:locked-out` to the caller (and push a stats-only `game:state` to the host panel); `ignored` replies `buzz:too-late`. |
 | `host:enable-buzzer` | → server | `{ roomCode }` | Opens the buzzer. Broadcasts `buzzer:open`. |
@@ -142,10 +200,16 @@ Convention: `host:*` and `player:*` (and bare verbs like `buzz`) are **client �
 | `host:reveal-dd` | → server | `{ roomCode }` | Reveals the Daily Double clue after the wager is locked and the splash has played. |
 | `host:show-response` | → server | `{ roomCode }` | Reveals the answer on the board view. |
 | `host:close-question` | → server | `{ roomCode }` | Marks the active question answered and clears per-question state. If this closed the last clue of the last round and the board has no Final Jeopardy, also ends the game (see [Phase / end-game](#phase--end-game)). |
-| `host:score` | → server | `{ roomCode, playerId, delta, outcome?, isDailyDouble? }` | Applies a score delta. If `outcome` is given, also updates that player's stats and, for a non-Daily-Double correct answer, records them as `lastCorrectPlayerId` (who gets offered the next Daily Double). Broadcasts `score:result`. |
-| `host:set-score` | → server | `{ roomCode, playerId, score }` | Absolute score override (manual correction). |
+| `host:score` | → server | `{ roomCode, playerId, delta, outcome?, isDailyDouble? }` | Applies a score delta (to the team in team mode; manual adjustments also accept team IDs). Optional ack: `{ ok, error? }`. If `outcome` is given, also updates that player's stats and, for a non-Daily-Double correct answer, records them as `lastCorrectPlayerId` (who gets offered the next Daily Double). Broadcasts `score:result`. |
+| `host:set-score` | → server | `{ roomCode, playerId, score }` | Absolute score override (manual correction). In team mode, resolves a player ID or team ID to the shared team score. |
 | `host:remove-player` | → server | `{ roomCode, playerId }` | Removes a player from the session. |
-| `host:start` | → server | `{ roomCode }` | Moves `phase` from `lobby` to `playing`. |
+| `host:start` | → server (ack) | `{ roomCode }` | Validates team setup and moves `phase` from `lobby` to `playing`. Ack: `{ ok, error? }`. |
+| `host:set-mode` | → server (ack) | `{ roomCode, mode }` | Lobby only: `individual` or `teams`. |
+| `host:save-team` | → server (ack) | `{ roomCode, id?, name, color }` | Lobby only: create a team or update its name/color. |
+| `host:remove-team` | → server (ack) | `{ roomCode, teamId }` | Lobby only: remove a team and unassign its members. |
+| `host:assign-team` | → server (ack) | `{ roomCode, playerId, teamId }` | Lobby only: assign a member; `teamId: null` unassigns them. |
+| `host:auto-assign-teams` | → server (ack) | `{ roomCode }` | Lobby and team mode only: shuffle all players into existing teams with sizes differing by at most one and select captains. Requires at least two teams and at least as many players as teams; replaces prior assignments. Ack: `{ ok, error? }`. |
+| `host:set-captain` | → server (ack) | `{ roomCode, teamId, playerId }` | Choose a member as captain between clues or during wagering/Final Jeopardy. |
 | `host:next-round` | → server (ack) | `{ roomCode }` | Advances `currentRoundIndex`, carrying players/scores/stats/`lastCorrectPlayerId` forward and clearing per-question/buzzer/lockout state. Rejects (ack `{ ok: false, error }`) if a question/Daily-Double/Final-Jeopardy is active, or this is already the last round. Broadcasts `round:changed` then `game:state`. |
 | `host:end-game` | → server | `{ roomCode }` | Sets `phase` to `finished` (see [Phase / end-game](#phase--end-game)), tearing down any in-progress Final Jeopardy secrets. Valid at any point, including mid-Final-Jeopardy. |
 | `host:resume-game` | → server | `{ roomCode }` | Moves `phase` back to `playing` — undoes an accidental `host:end-game`. |
@@ -252,7 +316,7 @@ lobby ──host:start──► playing ──host:end-game (or auto-end)──�
                           └───────────────────────host:end (Close Room, any phase)──► session deleted
 ```
 
-`phase` starts at `lobby` and the current UI never calls `host:start` (kept for future use), so in practice a session is `playing` from creation until it's explicitly ended. `host:close-question` checks, after closing, whether the just-completed round was the board's *last* round and is now complete:
+`phase` starts at `lobby`. Clicking **Start game**, opening the first clue, or starting Final Jeopardy validates setup and moves the session to `playing`. `host:close-question` checks, after closing, whether the just-completed round was the board's *last* round and is now complete:
 
 - **Not the last round** — nothing happens server-side; the client-side "round complete" state just enables the host's "Next Round" button.
 - **Last round, board has Final Jeopardy** — nothing happens server-side either; the host panel prompts "Start Final Jeopardy" or "End Game" instead.

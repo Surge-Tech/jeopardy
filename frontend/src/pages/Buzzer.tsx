@@ -1,17 +1,22 @@
+import { getCompetitor, getCompetitors, getTeam, playerLabel } from '@shared/competitors';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { GameState } from '@shared/types';
+import { PERMANENT_LOCKOUT } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
 import { LIMITS } from '@shared/limits';
 import PlayerFinal from '../components/final/PlayerFinal';
+import AnswerCountdown from '../components/shared/AnswerCountdown';
 import DDPlayerWager from '../components/dailydouble/DDPlayerWager';
 import Leaderboard from '../components/shared/Leaderboard';
+import { useCountdown } from '../components/final/useCountdown';
+import { hasPendingAnswer } from '@shared/questionFlow';
 import { randomPlayerColor } from '../utils/colors';
-import { formatMoney } from '../utils/format';
+import { formatScore } from '../utils/format';
 
-type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'armed' | 'open' | 'winner' | 'too-late' | 'locked-out' | 'finished' | 'closed';
+type BuzzerPhase = 'join' | 'lobby' | 'waiting' | 'armed' | 'open' | 'winner' | 'too-late' | 'locked-out' | 'incorrect' | 'finished' | 'closed';
 
 function rejoinKey(roomCode: string | undefined) {
   return `jeopardy:player:${roomCode ?? ''}`;
@@ -20,14 +25,48 @@ function rejoinKey(roomCode: string | undefined) {
 export default function Buzzer() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const { gameState, setGameState, setMyPlayer } = useGameStore();
-  const [phase, setPhase] = useState<BuzzerPhase>('join');
+  const [buzzerPhase, setPhase] = useState<BuzzerPhase>('join');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [winnerName, setWinnerName] = useState('');
   const [myId, setMyId] = useState('');
+  const screenRef = useRef<HTMLDivElement>(null);
   const [editingName, setEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
   const [editNameError, setEditNameError] = useState('');
+
+  // The on-screen keyboard can shrink the visual viewport without changing dvh.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    function resize() {
+      if (viewport!.scale === 1) {
+        screenRef.current?.style.setProperty('--player-viewport-height', `${viewport!.height}px`);
+      }
+    }
+    resize();
+    viewport.addEventListener('resize', resize);
+    return () => viewport.removeEventListener('resize', resize);
+  }, []);
+
+  // Server lockouts take precedence over broadcasts and transient feedback.
+  // Derive this from game state so it also survives a reconnect or page reload.
+  const isIncorrect = !!gameState?.activeQuestionId
+    && gameState.buzzLockouts[myId] === PERMANENT_LOCKOUT;
+  const inLobby = gameState?.phase === 'lobby';
+  const lobbyPhase: BuzzerPhase | null = inLobby && buzzerPhase !== 'join' && buzzerPhase !== 'closed'
+    ? gameState.buzzerState === 'open' ? 'open'
+      : gameState.buzzerState === 'locked'
+        ? gameState.buzzedPlayerId === myId ? 'winner'
+          : gameState.buzzWindow && !gameState.buzzHistory.some(entry => entry.playerId === myId) ? 'open' : 'too-late'
+        : 'lobby'
+    : null;
+  const phase: BuzzerPhase = lobbyPhase ?? (isIncorrect && gameState?.phase !== 'finished'
+    && buzzerPhase !== 'join' && buzzerPhase !== 'closed'
+    ? 'incorrect'
+    : gameState?.buzzedPlayerId === myId && hasPendingAnswer(gameState)
+      && gameState.phase !== 'finished' && buzzerPhase !== 'join' && buzzerPhase !== 'closed'
+      ? 'winner' : buzzerPhase);
 
   // Kept in sync with `phase`/`myId` state below so the socket-handler effect
   // can read the current values without needing them in its dependency
@@ -56,8 +95,18 @@ export default function Buzzer() {
       setGameState(state);
       if (state.phase === 'finished') { setPhase('finished'); return; }
       const currentPhase = phaseRef.current;
-      const transient = currentPhase === 'winner' || currentPhase === 'too-late' || currentPhase === 'locked-out';
-      if (!state.finalJeopardy && currentPhase !== 'join' && currentPhase !== 'lobby' && currentPhase !== 'finished' && currentPhase !== 'closed' && !transient) {
+      if (state.phase === 'lobby' && currentPhase !== 'join' && currentPhase !== 'closed') { setPhase('lobby'); return; }
+      if (state.buzzerState === 'locked' && currentPhase !== 'join' && currentPhase !== 'lobby' && currentPhase !== 'closed') {
+        setWinnerName(state.buzzedPlayerName ?? 'Another player');
+        if (state.buzzedPlayerId === myIdRef.current) setPhase('winner');
+        else if (currentPhase !== 'locked-out') {
+          const alreadyBuzzed = state.buzzHistory?.some(entry => entry.playerId === myIdRef.current);
+          setPhase(state.buzzWindow && !alreadyBuzzed ? 'open' : 'too-late');
+        }
+        return;
+      }
+      const transient = currentPhase === 'locked-out';
+      if (!state.finalJeopardy && currentPhase !== 'join' && currentPhase !== 'finished' && currentPhase !== 'closed' && !transient) {
         if (state.buzzerState === 'open') setPhase('open');
         else if (state.activeQuestionId) setPhase('armed');
         else setPhase('waiting');
@@ -67,7 +116,13 @@ export default function Buzzer() {
       setMyId(player.id);
       setMyPlayer(player as any);
       setGameState(state);
-      setPhase('waiting');
+      setWinnerName(state.buzzedPlayerName ?? 'Another player');
+      if (state.phase === 'lobby') setPhase('lobby');
+      else if (state.phase === 'finished') setPhase('finished');
+      else if (state.buzzerState === 'locked') {
+        const alreadyBuzzed = state.buzzHistory?.some(entry => entry.playerId === player.id);
+        setPhase(state.buzzedPlayerId === player.id ? 'winner' : state.buzzWindow && !alreadyBuzzed ? 'open' : 'too-late');
+      } else setPhase(state.buzzerState === 'open' ? 'open' : 'waiting');
       if (roomCode) localStorage.setItem(rejoinKey(roomCode), player.id);
     });
     socket.on(SOCKET_EVENTS.BUZZ_WINNER, ({ playerId, playerName }: { playerId: string; playerName: string }) => {
@@ -80,7 +135,11 @@ export default function Buzzer() {
       }
       setTimeout(() => setPhase(prev => prev === 'winner' || prev === 'too-late' ? 'waiting' : prev), 5000);
     });
+    socket.on(SOCKET_EVENTS.BUZZ_RECORDED, () => setPhase('too-late'));
+    socket.on(SOCKET_EVENTS.BUZZ_TOO_LATE, () => setPhase('too-late'));
     socket.on(SOCKET_EVENTS.BUZZ_LOCKED_OUT, ({ until }: { until: number }) => {
+      // A wrong-answer lockout ends with the question, never with a timer.
+      if (until === PERMANENT_LOCKOUT) return;
       setPhase('locked-out');
       const delay = Math.max(0, until - Date.now());
       setTimeout(() => setPhase(prev => prev === 'locked-out' ? 'armed' : prev), delay);
@@ -94,6 +153,8 @@ export default function Buzzer() {
       socket.off(SOCKET_EVENTS.PLAYER_JOINED);
       socket.off(SOCKET_EVENTS.BUZZ_WINNER);
       socket.off(SOCKET_EVENTS.BUZZ_LOCKED_OUT);
+      socket.off(SOCKET_EVENTS.BUZZ_RECORDED);
+      socket.off(SOCKET_EVENTS.BUZZ_TOO_LATE);
       socket.off(SOCKET_EVENTS.BUZZER_OPEN);
       socket.off(SOCKET_EVENTS.BUZZER_LOCKED);
       socket.off(SOCKET_EVENTS.GAME_ENDED);
@@ -138,191 +199,189 @@ export default function Buzzer() {
     });
   }
 
-  const myScore = gameState?.players.find(p => p.id === myId)?.score ?? 0;
+  const myTeam = gameState ? getTeam(gameState, myId) : undefined;
+  const waitingForTeam = !inLobby && gameState?.mode === 'teams' && !myTeam;
+  const myScore = gameState ? getCompetitor(gameState, myId)?.score ?? 0 : 0;
   const isDDWagering = !!(gameState?.dailyDouble && gameState.dailyDouble.playerId === myId
     && gameState.dailyDouble.stage === 'wagering' && gameState.dailyDouble.hasDevice);
 
+  const showBuzzer = phase !== 'join' && phase !== 'finished' && phase !== 'closed'
+    && !gameState?.finalJeopardy && !isDDWagering;
+  const canBuzz = (gameState?.phase === 'playing' || inLobby) && !waitingForTeam && (phase === 'open' || phase === 'armed');
+  const buttonLabel = {
+    open: 'BUZZ!', armed: 'Wait...', waiting: 'Waiting...', lobby: 'Waiting...',
+    winner: 'Answering', 'too-late': 'Too slow!', 'locked-out': 'Too early!', incorrect: 'Locked out',
+  }[phase as Exclude<BuzzerPhase, 'join' | 'closed' | 'finished'>];
+  const displayName = gameState ? playerLabel(gameState, myId) || name : name;
+  const answerTimer = phase === 'winner' && gameState && !gameState.responseVisible && hasPendingAnswer(gameState)
+    ? gameState.answerTimer : null;
+  const answerRemainingMs = useCountdown(answerTimer?.deadline ?? null, answerTimer?.serverNow ?? null, 'second');
+  const answerSeconds = answerRemainingMs == null ? null : Math.ceil(answerRemainingMs / 1000);
+  const statusTitle = waitingForTeam ? 'Awaiting team'
+    : inLobby && phase === 'winner' ? 'First buzz!'
+    : phase === 'winner' ? 'You buzzed in'
+    : phase === 'incorrect' ? 'Incorrect answer'
+    : buttonLabel;
+  const statusHint = waitingForTeam ? 'Waiting for the host to assign you to a team.'
+    : inLobby && phase !== 'lobby' ? ''
+    : phase === 'lobby' ? 'Waiting for the host to start the game'
+    : phase === 'winner' ? 'Your turn to answer'
+    : phase === 'incorrect' ? 'Wait for the next question'
+    : phase === 'locked-out' ? 'Wait for your buzzer to unlock'
+    : phase === 'too-late' ? `${winnerName} buzzed in first`
+    : phase === 'armed' ? 'Get ready' : '';
+
+  const scoreboardRows = gameState && (
+    <div className="space-y-1">
+      {[...getCompetitors(gameState)].sort((a, b) => b.score - a.score).map(p => (
+        <div key={p.id} className="flex justify-between items-center px-3 py-1 rounded bg-gray-900">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+            <span className={`text-sm break-words min-w-0 ${(p.id === myId || p.id === myTeam?.id) ? 'text-white font-bold' : 'text-gray-400'}`}>{p.name}</span>
+          </div>
+          <span className="font-bold text-sm shrink-0 ml-2" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
+            {formatScore(p.score)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-jeopardy-dark flex flex-col items-center justify-center p-4 select-none">
+    <div ref={screenRef} className={`player-screen bg-jeopardy-dark select-none ${showBuzzer ? 'player-buzzer-screen' : ''}`}>
 
-      {/* Room code display */}
-      <div className="text-gray-500 text-sm mb-6 text-center">
-        Room: <span className="text-jeopardy-gold font-bold tracking-widest">{roomCode}</span>
-      </div>
-
-      {/* JOIN phase */}
-      {phase === 'join' && (
-        <div className="w-full max-w-sm">
-          <h1 className="text-4xl font-black text-jeopardy-gold text-center mb-8" style={{ textShadow: '2px 2px 0 #000' }}>
-            JEOPARDY!
-          </h1>
-          <input
-            autoFocus
-            className="input-field text-xl py-4 text-center mb-4"
-            placeholder="Your name"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && joinGame()}
-          />
-          {error && <p className="text-red-400 text-center mb-3">{error}</p>}
-          <button className="btn-primary w-full text-xl py-4" onClick={joinGame}>
-            Join Game
-          </button>
+      <header className="player-header">
+        <div className="text-gray-400 text-xs">
+          Room: <span className="text-jeopardy-gold font-bold tracking-widest">{roomCode}</span>
         </div>
-      )}
-
-      {/* Room closed by the host */}
-      {phase === 'closed' && (
-        <div className="text-center">
-          <h2 className="text-3xl font-black text-jeopardy-gold mb-2">Room Closed</h2>
-          <p className="text-gray-400">The host ended this game session.</p>
-        </div>
-      )}
-
-      {/* Game finished — leaderboard */}
-      {phase === 'finished' && gameState && (
-        <Leaderboard gameState={gameState} compact myId={myId} />
-      )}
-
-      {/* Final Jeopardy takes over once it starts */}
-      {phase !== 'join' && phase !== 'finished' && phase !== 'closed' && gameState?.finalJeopardy && myId && (
-        <PlayerFinal gameState={gameState} myId={myId} />
-      )}
-
-      {/* Daily Double wager — only the assigned contestant sees this */}
-      {phase !== 'join' && !gameState?.finalJeopardy && isDDWagering && gameState?.dailyDouble && (
-        <DDPlayerWager dailyDouble={gameState.dailyDouble} />
-      )}
-
-      {/* Inline name editor — lobby only, shown once regardless of sub-phase */}
-      {phase !== 'join' && phase !== 'finished' && phase !== 'closed' && gameState?.phase === 'lobby' && myId && (
-        <div className="mb-4 w-full max-w-xs">
-          {editingName ? (
-            <div className="flex flex-col gap-2">
-              <input
-                autoFocus
-                className="input-field text-sm text-center"
-                value={editNameValue}
-                onChange={e => setEditNameValue(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') saveEditName(); if (e.key === 'Escape') cancelEditName(); }}
-                maxLength={LIMITS.PLAYER_NAME_MAX}
-              />
-              {editNameError && <p className="text-red-400 text-xs text-center">{editNameError}</p>}
-              <div className="flex gap-2 justify-center">
-                <button className="btn-primary text-xs py-1 px-3" onClick={saveEditName}>Save</button>
-                <button className="btn-ghost text-xs py-1 px-3" onClick={cancelEditName}>Cancel</button>
-              </div>
+        <div className="player-header__actions">
+          {phase !== 'join' && phase !== 'closed' && myTeam?.captainPlayerId === myId && (
+            <span className="rounded-full border border-jeopardy-gold/20 bg-jeopardy-gold/5 px-2 py-0.5 text-xs text-jeopardy-gold/80" title="You are the team captain">
+              Captain
+            </span>
+          )}
+          {/* Name editor — lobby only */}
+          {phase !== 'join' && phase !== 'finished' && phase !== 'closed' && gameState?.phase === 'lobby' && myId && (
+            <div className={`player-name-editor ${editingName ? 'player-name-editor--editing' : ''}`}>
+              {editingName ? (
+                <div className="flex flex-col gap-2">
+                  <input
+                    autoFocus
+                    className="input-field text-sm text-center"
+                    value={editNameValue}
+                    onChange={e => setEditNameValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveEditName(); if (e.key === 'Escape') cancelEditName(); }}
+                    maxLength={LIMITS.PLAYER_NAME_MAX}
+                  />
+                  {editNameError && <p className="text-red-400 text-xs text-center">{editNameError}</p>}
+                  <div className="flex gap-2 justify-center">
+                    <button className="btn-primary text-xs py-1 px-3" onClick={saveEditName}>Save</button>
+                    <button className="btn-ghost text-xs py-1 px-3" onClick={cancelEditName}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="text-xs text-gray-500 hover:text-gray-300 underline underline-offset-2 mx-auto block"
+                  onClick={startEditName}
+                >
+                  ✎ Edit name
+                </button>
+              )}
             </div>
-          ) : (
-            <button
-              className="text-xs text-gray-500 hover:text-gray-300 underline underline-offset-2 mx-auto block"
-              onClick={startEditName}
-            >
-              ✎ Edit name
-            </button>
           )}
         </div>
-      )}
+      </header>
 
-      {/* WAITING phase */}
-      {!gameState?.finalJeopardy && !isDDWagering && phase === 'waiting' && (
-        <div className="text-center">
-          <p className="text-3xl font-black text-white mb-2">{name}</p>
-          <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {formatMoney(myScore)}
-          </p>
-          <div className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto">
-            <span className="text-gray-500 text-xl font-bold text-center px-4">Waiting...</span>
+      <main className="player-content" hidden={showBuzzer}>
+        {/* JOIN phase */}
+        {phase === 'join' && (
+          <div className="w-full max-w-sm">
+            <h1 className="text-4xl font-black text-jeopardy-gold text-center mb-8" style={{ textShadow: '2px 2px 0 #000' }}>
+              JEOPARDY!
+            </h1>
+            <input
+              autoFocus
+              className="input-field text-xl py-4 text-center mb-4"
+              placeholder="Your name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && joinGame()}
+            />
+            {error && <p className="text-red-400 text-center mb-3">{error}</p>}
+            <button className="btn-primary w-full text-xl py-4" onClick={joinGame}>
+              Join Game
+            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ARMED phase — question is active but buzzer isn't open yet; pressing still reaches the server */}
-      {!gameState?.finalJeopardy && !isDDWagering && phase === 'armed' && (
-        <div className="text-center">
-          <p className="text-3xl font-black text-white mb-2">{name}</p>
-          <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {formatMoney(myScore)}
-          </p>
-          <button
-            className="w-48 h-48 rounded-full bg-gray-800 border-8 border-gray-600 flex items-center justify-center mx-auto cursor-pointer"
-            style={{ fontSize: '1.25rem', fontWeight: 900, color: '#6b7280', touchAction: 'manipulation' }}
-            onClick={buzz}
-            onTouchStart={e => { e.preventDefault(); buzz(); }}
-          >
-            Wait...
-          </button>
-          <p className="text-gray-500 font-bold mt-6">Get ready</p>
-        </div>
-      )}
-
-      {/* LOCKED-OUT phase — pressed too early */}
-      {!gameState?.finalJeopardy && phase === 'locked-out' && (
-        <div className="text-center flip-in">
-          <div className="w-48 h-48 rounded-full bg-red-900 border-8 border-red-500 flex items-center justify-center mx-auto animate-pulse">
-            <span className="text-red-300 text-2xl font-black">Too early!</span>
+        {/* Room closed by the host */}
+        {phase === 'closed' && (
+          <div className="text-center">
+            <h2 className="text-3xl font-black text-jeopardy-gold mb-2">Room Closed</h2>
+            <p className="text-gray-400">The host ended this game session.</p>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* OPEN phase — buzzer ready */}
-      {!gameState?.finalJeopardy && !isDDWagering && phase === 'open' && (
-        <div className="text-center">
-          <p className="text-3xl font-black text-white mb-2">{name}</p>
-          <p className="text-jeopardy-gold font-black text-2xl mb-8">
-            {formatMoney(myScore)}
-          </p>
-          <button
-            className="w-56 h-56 rounded-full border-8 border-jeopardy-gold bg-jeopardy-blue flex items-center justify-center mx-auto buzzer-active cursor-pointer"
-            style={{ fontSize: '1.5rem', fontWeight: 900, color: '#FFD700', touchAction: 'manipulation' }}
-            onClick={buzz}
-            onTouchStart={e => { e.preventDefault(); buzz(); }}
-          >
-            BUZZ!
-          </button>
-          <p className="text-green-400 font-bold mt-6 animate-pulse">Buzzers are open!</p>
-        </div>
-      )}
+        {/* Game finished — leaderboard */}
+        {phase === 'finished' && gameState && (
+          <Leaderboard gameState={gameState} compact myId={myId} />
+        )}
 
-      {/* WINNER phase */}
-      {!gameState?.finalJeopardy && phase === 'winner' && (
-        <div className="text-center flip-in">
-          <div className="text-6xl mb-4">⚡</div>
-          <h2 className="text-4xl font-black text-jeopardy-gold mb-2" style={{ textShadow: '2px 2px 0 #000' }}>
-            YOU BUZZED IN!
-          </h2>
-          <p className="text-white text-xl">{name}</p>
-        </div>
-      )}
+        {/* Final Jeopardy takes over once it starts */}
+        {phase !== 'join' && phase !== 'finished' && phase !== 'closed' && gameState?.finalJeopardy && myId && (
+          <PlayerFinal gameState={gameState} myId={myId} />
+        )}
 
-      {/* TOO LATE phase */}
-      {!gameState?.finalJeopardy && phase === 'too-late' && (
-        <div className="text-center flip-in">
-          <div className="text-6xl mb-4">❌</div>
-          <h2 className="text-3xl font-black text-red-400 mb-2">Too slow!</h2>
-          <p className="text-gray-400">{winnerName} buzzed in first</p>
-        </div>
-      )}
+        {/* Daily Double wager — only the assigned contestant sees this */}
+        {phase !== 'join' && !gameState?.finalJeopardy && isDDWagering && gameState?.dailyDouble && (
+          <DDPlayerWager dailyDouble={gameState.dailyDouble} />
+        )}
 
-      {/* Players list (compact) */}
-      {!gameState?.finalJeopardy && gameState && gameState.players.length > 0 && phase !== 'join' && phase !== 'finished' && phase !== 'closed' && (
-        <div className="mt-12 w-full max-w-sm">
-          <h3 className="text-gray-500 text-xs uppercase tracking-widest mb-2 text-center">Scoreboard</h3>
-          <div className="space-y-1">
-            {[...gameState.players].sort((a, b) => b.score - a.score).map(p => (
-              <div key={p.id} className="flex justify-between items-center px-3 py-1 rounded bg-gray-900">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-                  <span className={`text-sm ${p.id === myId ? 'text-white font-bold' : 'text-gray-400'}`}>{p.name}</span>
-                </div>
-                <span className="font-bold text-sm" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
-                  {formatMoney(p.score)}
+        {phase !== 'join' && !gameState?.finalJeopardy && gameState?.dailyDouble && (
+          <AnswerCountdown gameState={gameState} />
+        )}
+      </main>
+
+      {showBuzzer && (
+        <>
+          <section className="player-buzzer-station">
+            <div className="player-buzzer-identity">
+              <p className="text-2xl font-black text-white break-words" title={displayName}>{displayName}</p>
+              <p className="text-jeopardy-gold font-black text-2xl mt-2">{formatScore(myScore)}</p>
+            </div>
+            <div className="player-buzz-area">
+              <button
+                className={`player-buzz-button ${phase === 'open' ? '' : 'player-buzz-button--inactive'} ${phase === 'locked-out' || phase === 'incorrect' ? 'player-buzz-button--locked' : ''}`}
+                style={{ touchAction: 'manipulation' }}
+                disabled={!canBuzz}
+                onClick={buzz}
+                onTouchStart={event => { event.preventDefault(); buzz(); }}
+              >
+                <span className="player-buzz-feedback" role="status">
+                  <span>{statusTitle}</span>
+                  {statusHint && <span className="player-buzz-hint">{statusHint}</span>}
+                  {phase === 'winner' && answerTimer && answerSeconds != null && (
+                    <span role="timer" aria-label="Answer countdown" className={`player-buzz-timer ${answerSeconds <= 3 ? 'player-buzz-timer--urgent' : ''}`}>
+                      {answerSeconds === 0 ? 'Time’s up!' : `${answerSeconds}s`}
+                    </span>
+                  )}
                 </span>
-              </div>
-            ))}
+              </button>
+            </div>
+          </section>
+          <div className="player-buzzer-dock">
+            {gameState && (
+              <section className="player-scoreboard" aria-labelledby="player-scoreboard-title">
+                <h2 id="player-scoreboard-title" className="text-gray-400 text-xs uppercase tracking-widest text-center">Scoreboard</h2>
+                <div className="player-scoreboard__list" tabIndex={0} role="region" aria-label="Player scores">
+                  {scoreboardRows}
+                </div>
+              </section>
+            )}
           </div>
-        </div>
+        </>
       )}
+
     </div>
   );
 }

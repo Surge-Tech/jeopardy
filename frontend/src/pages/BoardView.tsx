@@ -1,15 +1,21 @@
+import { getCompetitors } from '@shared/competitors';
+import ResponseMedia from '../components/shared/ResponseMedia';
+import QuestionClueMedia from '../components/shared/QuestionClueMedia';
+import BoardBuzzerDock from '../components/shared/BoardBuzzerDock';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import { useGameStore } from '../store/gameStore';
 import type { Board, GameState, Question } from '@shared/types';
 import { SOCKET_EVENTS } from '@shared/socketEvents';
-import { playDailyDouble, playBuzzerReady, playBuzzIn, playQuestionOpen, playCorrect, playWrong } from '../utils/sounds';
+import { playDailyDouble, playBuzzerReady, playBuzzIn, playWrong } from '../utils/sounds';
 import FinalBoardScreen from '../components/final/FinalBoardScreen';
+import LobbyBoardScreen from '../components/shared/LobbyBoardScreen';
 import Leaderboard from '../components/shared/Leaderboard';
+import SoundControl from '../components/shared/SoundControl';
 import { getRound, isRoundComplete } from '../utils/rounds';
-import { getYouTubeEmbedUrl } from '../utils/media';
-import { formatMoney } from '../utils/format';
+import { formatScore } from '../utils/format';
+import { useBoardImagePreload } from '../hooks/useBoardImagePreload';
 
 const API = '/api';
 
@@ -23,6 +29,23 @@ export default function BoardView() {
   const [roomClosed, setRoomClosed] = useState(false);
   const prevBuzzerState = useRef<string>('idle');
   const prevActiveId = useRef<string | null>(null);
+  useBoardImagePreload(board, gameState?.currentRoundIndex ?? 0, gameState?.activeQuestionId);
+
+  useEffect(() => {
+    function relay(command: import('@shared/mediaControls').MediaCommand) {
+      window.dispatchEvent(new CustomEvent('board-media-command', { detail: command }));
+    }
+    function report(event: Event) {
+      if (!roomCode) return;
+      socket.emit(SOCKET_EVENTS.HOST_MEDIA_STATUS, { roomCode, ...(event as CustomEvent<import('@shared/mediaControls').MediaPlaybackStatus>).detail });
+    }
+    socket.on(SOCKET_EVENTS.BOARD_MEDIA_COMMAND, relay);
+    window.addEventListener('board-media-status', report);
+    return () => {
+      socket.off(SOCKET_EVENTS.BOARD_MEDIA_COMMAND, relay);
+      window.removeEventListener('board-media-status', report);
+    };
+  }, [roomCode]);
 
   // Re-join the host:<roomCode> room after a socket reconnect (WiFi blip,
   // browser sleep, backend restart) so this board keeps receiving host-only state.
@@ -53,13 +76,13 @@ export default function BoardView() {
       setTimeout(() => setBuzzWinner(null), 1500);
     });
     socket.on(SOCKET_EVENTS.SCORE_RESULT, ({ correct }: { correct: boolean }) => {
-      correct ? playCorrect() : playWrong();
+      if (!correct) playWrong();
     });
     socket.on(SOCKET_EVENTS.ROUND_CHANGED, ({ index, name }: { index: number; name: string | null }) => {
       setRoundSplash({ index, name });
       setTimeout(() => setRoundSplash(null), 3000);
     });
-    socket.on(SOCKET_EVENTS.GAME_ENDED, () => setRoomClosed(true));
+    socket.on(SOCKET_EVENTS.GAME_ENDED, () => { setRoomClosed(true); });
     socket.emit(SOCKET_EVENTS.GET_STATE, { roomCode });
     return () => {
       socket.off('game:state');
@@ -79,9 +102,11 @@ export default function BoardView() {
     const round = getRound(board, gameState);
     const q = round.categories.flatMap(c => c.questions).find(q => q.id === gameState.activeQuestionId);
     setShowQuestion(q ?? null);
-    if (q?.isDailyDouble) playDailyDouble();
-    else if (q) playQuestionOpen();
   }, [gameState?.activeQuestionId, board, gameState?.currentRoundIndex]);
+
+  useEffect(() => {
+    if (gameState?.dailyDouble) playDailyDouble();
+  }, [gameState?.activeQuestionId, !!gameState?.dailyDouble]);
 
   if (roomClosed) {
     return (
@@ -97,6 +122,7 @@ export default function BoardView() {
   if (!gameState || !board) {
     return (
       <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center">
+        <SoundControl />
         <div className="text-center">
           <h1 className="text-4xl font-black text-jeopardy-gold mb-4">Connecting...</h1>
           <p className="text-gray-400">Room: {roomCode}</p>
@@ -105,9 +131,16 @@ export default function BoardView() {
     );
   }
 
+  if (gameState.phase === 'lobby') {
+    // Keep the same root and SoundControl position across board phases so audio
+    // readiness is preserved when React switches from the lobby to the game.
+    return <div><SoundControl /><LobbyBoardScreen gameState={gameState} boardName={board.name} /></div>;
+  }
+
   if (gameState.phase === 'finished') {
     return (
       <div className="min-h-screen bg-jeopardy-dark flex items-center justify-center py-12" style={{ fontFamily: 'Arial Black, Impact, sans-serif' }}>
+        <SoundControl />
         <Leaderboard gameState={gameState} />
       </div>
     );
@@ -117,15 +150,16 @@ export default function BoardView() {
   const round = getRound(board, gameState);
   const roundComplete = isRoundComplete(board, gameState.answeredQuestions, gameState.currentRoundIndex);
   const isLastRound = gameState.currentRoundIndex >= board.rounds.length - 1;
-  const isDDSplash = showQuestion?.isDailyDouble && (
-    !gameState.dailyDoubleRevealed || (gameState.dailyDouble != null && gameState.dailyDouble.stage !== 'ready')
+  const isDDSplash = showQuestion?.isDailyDouble && gameState.dailyDouble != null && (
+    !gameState.dailyDoubleRevealed || gameState.dailyDouble.stage !== 'ready'
   );
 
   return (
     <div className="min-h-screen bg-jeopardy-dark flex flex-col overflow-hidden" style={{ fontFamily: 'Arial Black, Impact, sans-serif' }}>
+      <SoundControl />
 
       {/* Final Jeopardy takes over the whole screen once it starts */}
-      {gameState.finalJeopardy && <FinalBoardScreen gameState={gameState} />}
+      {gameState.finalJeopardy && <FinalBoardScreen gameState={gameState} onRecordingEnded={recordingId => socket.emit(SOCKET_EVENTS.HOST_FJ_RECORDING_ENDED, { roomCode, recordingId })} />}
 
       {/* Round splash — shown briefly when the host advances to a new round */}
       {roundSplash && !gameState.finalJeopardy && (
@@ -147,15 +181,11 @@ export default function BoardView() {
           <p className="text-gray-400 text-xl animate-pulse">Waiting for the host to start the next round…</p>
         </div>
       )}
-      {/* Buzz winner overlay */}
+      {/* Brief buzz announcement; the persistent card keeps the timer visible. */}
       {buzzWinner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-jeopardy-blue border-8 border-jeopardy-gold rounded-2xl px-16 py-10 text-center flip-in">
-            <div className="text-3xl text-gray-300 mb-2">BUZZED IN</div>
-            <div className="text-6xl font-black text-jeopardy-gold" style={{ textShadow: '3px 3px 0 #000' }}>
-              {buzzWinner.playerName}
-            </div>
-          </div>
+        <div className="buzz-announcement" aria-hidden="true">
+          <span className="buzzer-status__eyebrow">First buzz</span>
+          <span className="buzz-announcement__name">{buzzWinner.playerName}</span>
         </div>
       )}
 
@@ -172,38 +202,25 @@ export default function BoardView() {
             DOUBLE!
           </div>
           <div className="mt-8 text-white text-xl font-bold opacity-60 animate-pulse">
-            ${showQuestion?.value}
+            {showQuestion?.value}
           </div>
         </div>
       )}
 
-      {/* Question overlay — shown after DD reveal or immediately for regular questions */}
-      {showQuestion && !isDDSplash && (
-        <div className="fixed inset-0 bg-jeopardy-blue z-40 flex flex-col items-center justify-center p-8 flip-in">
+      {/* Question overlay — shown only after the host reveals the clue */}
+      {showQuestion && !isDDSplash && (showQuestion.isDailyDouble ? gameState.dailyDoubleRevealed : gameState.clueVisible) && (
+        <div className="fixed inset-0 bg-jeopardy-blue z-40 overflow-hidden flip-in">
+          <div className={`board-clue-content ${showQuestion.isDailyDouble ? 'board-clue-content--solo' : ''}`}>
+          <div className={`my-auto flex w-full shrink-0 flex-col items-center ${showQuestion.mediaType === 'image' ? 'board-clue-with-image' : ''} ${gameState.responseVisible ? 'board-clue-content--answered' : ''}`}>
           <div className="text-jeopardy-gold font-black text-2xl mb-4 tracking-widest">
-            ${showQuestion.value}
+            {showQuestion.value}
             {showQuestion.isDailyDouble && (
               <span className="ml-4 bg-yellow-400 text-black px-3 py-1 rounded text-xl">DAILY DOUBLE!</span>
             )}
           </div>
 
           {/* Media */}
-          {showQuestion.mediaType === 'image' && showQuestion.mediaUrl && (
-            <img src={showQuestion.mediaUrl} alt="clue" className="max-h-64 max-w-full object-contain mb-6 rounded" />
-          )}
-          {showQuestion.mediaType === 'video' && showQuestion.mediaUrl && (
-            <video src={showQuestion.mediaUrl} autoPlay controls className="max-h-64 max-w-2xl mb-6 rounded w-full" />
-          )}
-          {showQuestion.mediaType === 'youtube' && showQuestion.mediaUrl && (
-            <div className="mb-6 w-full max-w-2xl aspect-video">
-              <iframe
-                className="w-full h-full rounded"
-                src={getYouTubeEmbedUrl(showQuestion.mediaUrl)}
-                allow="autoplay; fullscreen"
-                allowFullScreen
-              />
-            </div>
-          )}
+          <QuestionClueMedia key={showQuestion.id} question={showQuestion} gameState={gameState} roomCode={roomCode!} />
 
           {/* Clue text */}
           <div className="text-white text-center text-3xl md:text-5xl font-black max-w-4xl leading-tight"
@@ -213,46 +230,23 @@ export default function BoardView() {
 
           {/* Answer — shown when host clicks "Show Answer" */}
           {gameState.responseVisible && (
-            <div className="mt-8 fade-up bg-black/60 border-2 border-jeopardy-gold rounded-xl px-8 py-4 text-center max-w-3xl">
+            <div className={`board-answer mt-8 fade-up bg-black/90 border-2 border-jeopardy-gold rounded-xl px-8 py-4 text-center w-full max-w-3xl ${['image', 'video', 'youtube'].includes(showQuestion.mediaType ?? '') ? `board-answer-overlay ${showQuestion.isDailyDouble ? 'board-answer-overlay--solo' : ''}` : ''}`}>
               <div className="text-gray-400 text-lg mb-1 uppercase tracking-widest">Answer</div>
-              <div className="text-jeopardy-gold font-black text-3xl md:text-4xl" style={{ textShadow: '2px 2px 0 #000' }}>
+              <div className="text-jeopardy-gold font-black text-2xl md:text-3xl" style={{ textShadow: '2px 2px 0 #000' }}>
                 {showQuestion.response}
               </div>
+              {showQuestion.responseMediaType && showQuestion.responseMediaUrl && (
+                <div className={`board-answer-media board-answer-media--${showQuestion.responseMediaType}`}>
+                  <ResponseMedia {...showQuestion} autoPlay controlId={`${showQuestion.id}:response`} />
+                </div>
+              )}
             </div>
           )}
 
-          {/* Buzzer state indicator */}
-          <div className="mt-6">
-            {gameState.buzzerState === 'open' && (
-              <div className="text-green-400 text-2xl font-bold animate-pulse">🔔 BUZZERS OPEN</div>
-            )}
-            {gameState.buzzerState === 'locked' && gameState.buzzedPlayerName && (
-              <div className="text-jeopardy-gold text-2xl font-bold">
-                ⚡ {gameState.buzzedPlayerName}
-              </div>
-            )}
+          </div>
           </div>
 
-          {/* Buzz order panel */}
-          {gameState?.buzzQueue && gameState.buzzQueue.length > 0 && (
-            <div className="absolute bottom-4 right-4 bg-gray-900 bg-opacity-90 border border-gray-600 rounded-lg p-3 text-sm min-w-[160px]">
-              <div className="text-[10px] text-gray-500 uppercase mb-2">Buzz Order</div>
-              {gameState.buzzQueue.map((entry, i) => (
-                <div
-                  key={entry.playerId}
-                  className={`flex items-center gap-2 py-0.5 ${
-                    entry.attemptedAnswer ? 'text-gray-600 line-through' :
-                    entry.playerId === gameState.buzzedPlayerId ? 'text-yellow-400 font-bold' :
-                    'text-gray-300'
-                  }`}
-                >
-                  <span className="text-gray-500 w-4 text-xs">{i + 1}.</span>
-                  <span className="flex-1 text-xs">{entry.playerName}</span>
-                  <span className="text-gray-500 text-xs tabular-nums">{entry.reactionMs}ms</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <BoardBuzzerDock gameState={gameState} />
         </div>
       )}
 
@@ -285,7 +279,7 @@ export default function BoardView() {
                   ${isAnswered ? 'bg-jeopardy-dark text-gray-800' : 'bg-jeopardy-blue text-jeopardy-gold'}`}
                 style={{ fontSize: 'clamp(18px, 3vw, 48px)', textShadow: isAnswered ? 'none' : '2px 2px 0 #000', minHeight: '60px' }}
               >
-                {isAnswered ? '' : `$${pv}`}
+                {isAnswered ? '' : pv}
               </div>
             );
           })
@@ -294,7 +288,7 @@ export default function BoardView() {
 
       {/* Score bar */}
       <div className="bg-black border-t-4 border-jeopardy-gold flex">
-        {gameState.players.map(player => (
+        {getCompetitors(gameState).map(player => (
           <div
             key={player.id}
             className="flex-1 text-center py-2 border-r border-gray-700 last:border-0"
@@ -305,7 +299,7 @@ export default function BoardView() {
               className="font-black text-xl"
               style={{ color: player.score < 0 ? '#ef4444' : '#FFD700' }}
             >
-              {formatMoney(player.score)}
+              {formatScore(player.score)}
             </div>
           </div>
         ))}

@@ -11,8 +11,11 @@ export interface Question {
   id: string;
   value: number;
   clue: string;
+  clueAudioUrl?: string;
   response: string;
-  mediaType?: 'image' | 'video' | 'youtube';
+  responseMediaType?: 'image' | 'video' | 'audio' | 'youtube';
+  responseMediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio' | 'youtube';
   mediaUrl?: string;
   isDailyDouble?: boolean;
 }
@@ -26,8 +29,11 @@ export interface Category {
 export interface FinalJeopardyBoard {
   category: string;
   clue: string;
+  clueAudioUrl?: string;
   response: string;
-  mediaType?: 'image' | 'video' | 'youtube';
+  responseMediaType?: 'image' | 'video' | 'audio' | 'youtube';
+  responseMediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio' | 'youtube';
   mediaUrl?: string;
   timerSeconds?: number;
 }
@@ -54,7 +60,18 @@ export interface PlayerStats {
   earlyBuzzes: number;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  color: string;
+  score: number;
+  captainPlayerId: string | null;
+  // Team-level Final Jeopardy outcomes; ordinary clue stats remain on members.
+  stats?: PlayerStats;
+}
+
 export interface Player {
+  teamId?: string | null;
   id: string;
   name: string;
   score: number;
@@ -65,6 +82,7 @@ export interface Player {
 export type FinalStage = 'intro' | 'wagering' | 'clue' | 'answering' | 'locked' | 'reveal' | 'response' | 'final';
 export type FinalRevealStep = 'name' | 'wager' | 'answer' | 'judged';
 
+// playerId is the competitor ID: a player in individual mode, a team in team mode.
 export interface FinalContestant {
   playerId: string;
   playerName: string;
@@ -86,7 +104,9 @@ export interface FinalPublicState {
   stage: FinalStage;
   category: string | null;
   clue: string | null;
-  mediaType?: 'image' | 'video' | 'youtube';
+  clueAudioUrl?: string;
+  clueRecordingId?: string | null;
+  mediaType?: 'image' | 'video' | 'audio' | 'youtube';
   mediaUrl?: string;
   deadline: number | null;
   serverNow: number;
@@ -96,9 +116,13 @@ export interface FinalPublicState {
   currentReveal: { wager: number; answer: string } | null;
   revealed: Record<string, FinalRevealEntry>;
   response: string | null;
+  responseMediaType?: 'image' | 'video' | 'audio' | 'youtube';
+  responseMediaUrl?: string;
 }
 
 export interface DailyDoubleState {
+  timer?: { startedAt: number; deadline: number; serverNow: number } | null;
+  outcome?: 'correct' | 'wrong';
   stage: 'picking' | 'wagering' | 'ready';
   playerId: string | null;
   maxWager: number;
@@ -121,6 +145,8 @@ export interface BuzzEntry {
 export const PERMANENT_LOCKOUT = Number.MAX_SAFE_INTEGER;
 
 export interface GameState {
+  mode: 'individual' | 'teams';
+  teams: Team[];
   boardId: string;
   roomCode: string;
   players: Player[];
@@ -130,18 +156,26 @@ export interface GameState {
   buzzedPlayerId: string | null;
   buzzedPlayerName: string | null;
   buzzTimestamp: number | null;
+  answerTimer: { deadline: number; serverNow: number } | null;
+  // Host's 30-second waiting budget; a null deadline means it is paused.
+  questionTimer: { remainingMs: number; deadline: number | null; serverNow: number } | null;
   phase: 'lobby' | 'playing' | 'finished';
+  clueVisible: boolean;  // regular clue explicitly revealed by host
+  // Unique to this reading; completion from a previous clue must be ignored.
+  clueRecordingId?: string | null;
   dailyDoubleRevealed: boolean;  // false until host clicks "Reveal Question"
   responseVisible: boolean;       // true after host clicks "Show Answer"
   finalJeopardy: FinalPublicState | null;
   dailyDouble: DailyDoubleState | null;
   lastCorrectPlayerId: string | null;
   buzzLockouts: Record<string, number>;
-  buzzQueue: BuzzEntry[];
+  // Results for the current buzz attempt; never used to assign the next turn.
+  buzzHistory: BuzzEntry[];
+  buzzWindow: { deadline: number; serverNow: number } | null;
   settings: {
     lockoutMs: number;
-    autoLockEnabled: boolean;
-    autoLockTimeoutS: number;
+    dailyDoubleTimeS: number; // 0 disables the Daily Double countdown
+    answerTimeS: number; // 0 disables the answer countdown
   };
   currentRoundIndex: number;
 }

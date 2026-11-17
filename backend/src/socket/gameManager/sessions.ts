@@ -1,5 +1,6 @@
 import { randomUUID as uuidv4 } from 'crypto';
 import type { GameState, Player } from '../../types.js';
+import { getStartGameError } from '../../shared/lobby.js';
 import { LIMITS } from '../../shared/limits.js';
 import { sessions, lastActivityAt, resetBuzzerFields } from './state.js';
 
@@ -17,21 +18,27 @@ export function createSession(boardId: string): GameState {
     boardId,
     roomCode,
     players: [],
+    mode: 'teams',
+    teams: [],
     answeredQuestions: [],
     activeQuestionId: null,
     buzzerState: 'idle',
     buzzedPlayerId: null,
     buzzedPlayerName: null,
     buzzTimestamp: null,
+    answerTimer: null,
+    questionTimer: null,
     phase: 'lobby',
+    clueVisible: false,
     dailyDoubleRevealed: false,
     responseVisible: false,
     finalJeopardy: null,
     dailyDouble: null,
     lastCorrectPlayerId: null,
     buzzLockouts: {},
-    buzzQueue: [],
-    settings: { lockoutMs: 250, autoLockEnabled: true, autoLockTimeoutS: 7 },
+    buzzHistory: [],
+    buzzWindow: null,
+    settings: { lockoutMs: 250, answerTimeS: 10, dailyDoubleTimeS: 15 },
     currentRoundIndex: 0,
   };
   sessions.set(roomCode, state);
@@ -41,7 +48,14 @@ export function createSession(boardId: string): GameState {
 
 export function getSession(roomCode: string): GameState | undefined {
   const session = sessions.get(roomCode);
-  if (session) lastActivityAt.set(roomCode, Date.now());
+  if (session) {
+    const now = Date.now();
+    lastActivityAt.set(roomCode, now);
+    if (session.buzzWindow) session.buzzWindow.serverNow = now;
+    if (session.dailyDouble?.timer) session.dailyDouble.timer.serverNow = now;
+    if (session.answerTimer) session.answerTimer.serverNow = now;
+    if (session.questionTimer) session.questionTimer.serverNow = now;
+  }
   return session;
 }
 
@@ -74,9 +88,9 @@ export function isNameTaken(session: GameState, name: string, excludePlayerId?: 
 
 export function addPlayer(roomCode: string, name: string, color: string): Player | null {
   const session = sessions.get(roomCode);
-  if (!session) return null;
+  if (!session || (session.mode === 'teams' && session.phase !== 'lobby')) return null;
   if (isNameTaken(session, name)) return null;
-  const player: Player = { id: uuidv4(), name, score: 0, color };
+  const player: Player = { id: uuidv4(), name, score: 0, color, teamId: null };
   session.players.push(player);
   return player;
 }
@@ -84,6 +98,8 @@ export function addPlayer(roomCode: string, name: string, color: string): Player
 export function removePlayer(roomCode: string, playerId: string) {
   const session = sessions.get(roomCode);
   if (!session) return;
+  if (session.mode === 'teams' && session.phase !== 'lobby') return;
+  for (const team of session.teams) if (team.captainPlayerId === playerId) team.captainPlayerId = null;
   session.players = session.players.filter(p => p.id !== playerId);
 }
 
@@ -99,14 +115,15 @@ export function renamePlayer(roomCode: string, playerId: string, newName: string
 
 export function startGame(roomCode: string): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || getStartGameError(session)) return false;
+  resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
   session.phase = 'playing';
   return true;
 }
 
 export function endGame(roomCode: string): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || session.phase !== 'playing') return false;
   session.phase = 'finished';
   session.activeQuestionId = null;
   resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
@@ -116,7 +133,7 @@ export function endGame(roomCode: string): boolean {
 
 export function resumeGame(roomCode: string): boolean {
   const session = sessions.get(roomCode);
-  if (!session) return false;
+  if (!session || session.phase !== 'finished') return false;
   session.phase = 'playing';
   return true;
 }

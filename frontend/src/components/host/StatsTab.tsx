@@ -1,6 +1,6 @@
 import type { Player } from '@shared/types';
 import type { LogEntry } from '../../store/gameStore';
-import { formatMoney } from '../../utils/format';
+import { formatScore } from '../../utils/format';
 
 export interface PlayerStat extends Player {
   correct: number;
@@ -32,7 +32,7 @@ export default function StatsTab({
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
               <span className="flex-1 text-sm font-bold truncate">{p.name}</span>
               <span className="font-black text-sm" style={{ color: p.score < 0 ? '#ef4444' : '#FFD700' }}>
-                {formatMoney(p.score)}
+                {formatScore(p.score)}
               </span>
             </div>
           ))}

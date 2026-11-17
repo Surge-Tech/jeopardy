@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { getCompetitor, getCompetitors, getTeam } from '../shared/competitors.js';
 import type { Server, Socket } from 'socket.io';
 import * as gm from './gameManager.js';
 import * as boardStorage from '../storage/boardStorage.js';
@@ -57,6 +59,7 @@ function setFj(roomCode: string, fj: FinalPublicState | null) {
 export async function startFinal(io: Server, roomCode: string): Promise<{ ok: boolean; error?: string }> {
   const session = gm.getSession(roomCode);
   if (!session) return { ok: false, error: 'Room not found' };
+  if (session.phase !== 'playing') return { ok: false, error: 'Start the game before starting Final Jeopardy' };
   const board = await boardStorage.getBoard(session.boardId);
   const fjBoard = board?.finalJeopardy;
   if (!fjBoard || !fjBoard.category.trim() || !fjBoard.clue.trim()) {
@@ -64,7 +67,8 @@ export async function startFinal(io: Server, roomCode: string): Promise<{ ok: bo
   }
 
   // Snapshot reveal order: ascending score, ties broken by join order (index in players array).
-  const order = [...session.players]
+  const competitors = getCompetitors(session);
+  const order = [...competitors]
     .map((p, idx) => ({ p, idx }))
     .sort((a, b) => a.p.score - b.p.score || a.idx - b.idx)
     .map(({ p }) => p.id);
@@ -72,9 +76,9 @@ export async function startFinal(io: Server, roomCode: string): Promise<{ ok: bo
   const wagers = new Map<string, number>();
 
   const contestants: FinalContestant[] = order.map(playerId => {
-    const player = session.players.find(p => p.id === playerId)!;
+    const player = competitors.find(p => p.id === playerId)!;
     const maxWager = Math.max(player.score, 0);
-    // Players at $0 or below have only one legal wager ($0), so lock it in now
+    // Players at 0 or below have only one legal wager (0), so lock it in now
     // rather than making them submit — they can't be stuck waiting on the phone.
     const autoLocked = maxWager === 0;
     if (autoLocked) wagers.set(playerId, 0);
@@ -130,7 +134,18 @@ export function revealCategory(io: Server, roomCode: string) {
   hostLog(io, roomCode, `Category revealed: ${secret.board.category}`);
 }
 
+function submissionId(roomCode: string, playerId: string): string | null {
+  const session = gm.getSession(roomCode);
+  if (!session?.players.some(p => p.id === playerId)) return null;
+  if (session.mode !== 'teams') return playerId;
+  const team = getTeam(session, playerId);
+  return team?.captainPlayerId === playerId ? team.id : null;
+}
+
 export function submitWager(io: Server, roomCode: string, playerId: string, amount: number): { ok: boolean; error?: string } {
+  const competitorId = submissionId(roomCode, playerId);
+  if (!competitorId) return { ok: false, error: 'Only the current team captain can submit' };
+  playerId = competitorId;
   const fj = getFj(roomCode);
   const secret = secrets.get(roomCode);
   if (!fj || !secret) return { ok: false, error: 'No Final Jeopardy in progress' };
@@ -146,7 +161,7 @@ export function submitWager(io: Server, roomCode: string, playerId: string, amou
   setFj(roomCode, fj);
   broadcastState(io, roomCode);
   broadcastHostState(io, roomCode);
-  hostLog(io, roomCode, `${contestant.playerName} wagered $${amount}`);
+  hostLog(io, roomCode, `${contestant.playerName} wagered ${amount}`);
   return { ok: true };
 }
 
@@ -160,7 +175,7 @@ export function setForPlayer(io: Server, roomCode: string, playerId: string, wag
   if (wager !== undefined && Number.isFinite(wager) && Number.isInteger(wager) && wager >= 0 && wager <= contestant.maxWager) {
     secret.wagers.set(playerId, wager);
     contestant.hasWagered = true;
-    hostLog(io, roomCode, `Host set ${contestant.playerName}'s wager to $${wager}`);
+    hostLog(io, roomCode, `Host set ${contestant.playerName}'s wager to ${wager}`);
   }
   if (answer !== undefined) {
     const trimmed = answer.trim().slice(0, LIMITS.ANSWER_MAX);
@@ -182,7 +197,7 @@ export function revealClue(io: Server, roomCode: string, force: boolean): { ok: 
   if (missing.length && !force) {
     return { ok: false, error: `Missing wagers: ${missing.map(m => m.playerName).join(', ')}` };
   }
-  // Force reveal: missing wagers default to $0.
+  // Force reveal: missing wagers default to 0.
   for (const c of missing) {
     secret.wagers.set(c.playerId, 0);
     c.hasWagered = true;
@@ -191,12 +206,20 @@ export function revealClue(io: Server, roomCode: string, force: boolean): { ok: 
   fj.clue = secret.board.clue;
   fj.mediaType = secret.board.mediaType;
   fj.mediaUrl = secret.board.mediaUrl;
+  fj.clueAudioUrl = secret.board.clueAudioUrl;
+  fj.clueRecordingId = fj.clueAudioUrl ? randomUUID() : null;
   fj.serverNow = Date.now();
   setFj(roomCode, fj);
   broadcastState(io, roomCode);
   broadcastHostState(io, roomCode);
   hostLog(io, roomCode, 'Clue revealed');
   return { ok: true };
+}
+
+export function finishRecording(io: Server, roomCode: string, recordingId: string) {
+  const fj = getFj(roomCode);
+  if (!fj || fj.stage !== 'clue' || !recordingId || fj.clueRecordingId !== recordingId) return;
+  startTimer(io, roomCode);
 }
 
 export function startTimer(io: Server, roomCode: string) {
@@ -206,6 +229,7 @@ export function startTimer(io: Server, roomCode: string) {
   if (fj.stage !== 'clue') return;
   const seconds = secret.board.timerSeconds ?? 30;
   const deadline = Date.now() + seconds * 1000;
+  fj.clueRecordingId = null;
   fj.stage = 'answering';
   fj.deadline = deadline;
   fj.serverNow = Date.now();
@@ -218,9 +242,13 @@ export function startTimer(io: Server, roomCode: string) {
 }
 
 export function saveDraft(io: Server, roomCode: string, playerId: string, text: string): { ok: boolean; error?: string } {
+  const competitorId = submissionId(roomCode, playerId);
+  if (!competitorId) return { ok: false, error: 'Only the current team captain can submit' };
+  playerId = competitorId;
   const fj = getFj(roomCode);
   const secret = secrets.get(roomCode);
   if (!fj || !secret) return { ok: false, error: 'No Final Jeopardy in progress' };
+  if (!fj.contestants.some(c => c.playerId === playerId)) return { ok: false, error: 'You are not in Final Jeopardy' };
   if (fj.stage !== 'answering') return { ok: false, error: 'Not accepting answers right now' };
   if (secret.answers.has(playerId)) return { ok: false, error: 'Answer already submitted' };
   secret.drafts.set(playerId, text.slice(0, LIMITS.ANSWER_MAX));
@@ -229,9 +257,13 @@ export function saveDraft(io: Server, roomCode: string, playerId: string, text: 
 }
 
 export function submitAnswer(io: Server, roomCode: string, playerId: string, text: string): { ok: boolean; error?: string } {
+  const competitorId = submissionId(roomCode, playerId);
+  if (!competitorId) return { ok: false, error: 'Only the current team captain can submit' };
+  playerId = competitorId;
   const fj = getFj(roomCode);
   const secret = secrets.get(roomCode);
   if (!fj || !secret) return { ok: false, error: 'No Final Jeopardy in progress' };
+  if (!fj.contestants.some(c => c.playerId === playerId)) return { ok: false, error: 'You are not in Final Jeopardy' };
   if (fj.stage !== 'answering') return { ok: false, error: 'Not accepting answers right now' };
   if (!fj.deadline || Date.now() > fj.deadline + 750) return { ok: false, error: 'Time is up' };
   if (secret.answers.has(playerId)) return { ok: false, error: 'Answer already submitted' };
@@ -329,6 +361,12 @@ export function judge(io: Server, roomCode: string, playerId: string, correct: b
   const answer = secret.answers.get(playerId) ?? '';
   const delta = correct ? wager : -wager;
   gm.updateScore(roomCode, playerId, delta);
+  const previous = fj.revealed[playerId];
+  const competitor = getCompetitor(gm.getSession(roomCode)!, playerId);
+  if (previous && competitor?.stats) {
+    const key = previous.correct ? 'correct' : 'wrong';
+    competitor.stats[key] = Math.max(0, competitor.stats[key] - 1);
+  }
   gm.recordOutcome(roomCode, playerId, correct ? 'correct' : 'wrong');
   secret.appliedDelta.set(playerId, delta);
 
@@ -337,7 +375,7 @@ export function judge(io: Server, roomCode: string, playerId: string, correct: b
   fj.currentReveal = null;
   setFj(roomCode, fj);
   broadcastState(io, roomCode);
-  hostLog(io, roomCode, `${contestant.playerName} was judged ${correct ? 'correct' : 'wrong'} (${correct ? '+' : '-'}$${wager})`);
+  hostLog(io, roomCode, `${contestant.playerName} was judged ${correct ? 'correct' : 'wrong'} (${correct ? '+' : '-'}${wager})`);
 }
 
 export function undo(io: Server, roomCode: string) {
@@ -355,7 +393,7 @@ export function undo(io: Server, roomCode: string) {
   if (entry) {
     // Revert the stats counter too.
     const session = gm.getSession(roomCode);
-    const player = session?.players.find(p => p.id === playerId);
+    const player = session ? getCompetitor(session, playerId) : undefined;
     if (player?.stats) {
       if (entry.correct) player.stats.correct = Math.max(0, player.stats.correct - 1);
       else player.stats.wrong = Math.max(0, player.stats.wrong - 1);
@@ -389,6 +427,8 @@ export function showResponse(io: Server, roomCode: string) {
   if (!fj || !secret) return;
   fj.stage = 'response';
   fj.response = secret.board.response;
+  fj.responseMediaType = secret.board.responseMediaType;
+  fj.responseMediaUrl = secret.board.responseMediaUrl;
   setFj(roomCode, fj);
   broadcastState(io, roomCode);
   hostLog(io, roomCode, 'Correct response revealed');
@@ -422,6 +462,17 @@ export function registerFinalHandlers(
   socket: Socket,
   socketPlayers: Map<string, { roomCode: string; playerId: string; playerName: string }>,
 ) {
+  // A newly mounted host panel may have missed the initial private broadcast.
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_GET_STATE, ({ roomCode }: { roomCode: string }) => {
+    const secret = secrets.get(roomCode);
+    if (!secret) return;
+    socket.emit(SOCKET_EVENTS.FJ_HOST_STATE, {
+      wagers: Object.fromEntries(secret.wagers),
+      answers: Object.fromEntries(secret.answers),
+      drafts: Object.fromEntries(secret.drafts),
+    });
+  });
+
   onHost(socket, SOCKET_EVENTS.HOST_FJ_START, async ({ roomCode }: { roomCode: string }) => {
     const res = await startFinal(io, roomCode);
     if (!res.ok) socket.emit('error', { message: res.error });
@@ -434,6 +485,10 @@ export function registerFinalHandlers(
   onHost(socket, SOCKET_EVENTS.HOST_FJ_REVEAL_CLUE, ({ roomCode, force }: { roomCode: string; force?: boolean }) => {
     const res = revealClue(io, roomCode, !!force);
     if (!res.ok) socket.emit('error', { message: res.error });
+  });
+
+  onHost(socket, SOCKET_EVENTS.HOST_FJ_RECORDING_ENDED, ({ roomCode, recordingId }: { roomCode: string; recordingId: string }) => {
+    if (typeof recordingId === 'string') finishRecording(io, roomCode, recordingId);
   });
 
   onHost(socket, SOCKET_EVENTS.HOST_FJ_START_TIMER, ({ roomCode }: { roomCode: string }) => {

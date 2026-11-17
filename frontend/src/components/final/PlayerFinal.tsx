@@ -1,3 +1,4 @@
+import { getCompetitor, getTeam } from '@shared/competitors';
 import { useEffect, useRef, useState } from 'react';
 import { socket } from '../../socket';
 import type { GameState } from '@shared/types';
@@ -6,13 +7,16 @@ import { LIMITS } from '@shared/limits';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import WagerInput from '../shared/WagerInput';
-import { formatMoney } from '../../utils/format';
+import { formatScore } from '../../utils/format';
 
 type Ack = { ok: boolean; error?: string };
 
 export default function PlayerFinal({ gameState, myId }: { gameState: GameState; myId: string }) {
   const fj = gameState.finalJeopardy!;
-  const contestant = fj.contestants.find(c => c.playerId === myId);
+  const team = getTeam(gameState, myId);
+  const competitorId = team?.id ?? myId;
+  const canSubmit = !team || team.captainPlayerId === myId;
+  const contestant = fj.contestants.find(c => c.playerId === competitorId);
   const remainingMs = useCountdown(fj.deadline, fj.serverNow, 'second');
 
   const [wagerLocked, setWagerLocked] = useState(false);
@@ -33,6 +37,14 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
       setAnswerLocked(false);
     }
   }, [fj.stage]);
+
+  useEffect(() => {
+    setWagerLocked(false);
+    setAnswerLocked(false);
+    setAnswerText('');
+    return () => { if (draftTimer.current) window.clearTimeout(draftTimer.current); };
+  }, [team?.captainPlayerId]);
+  useEffect(() => () => { if (draftTimer.current) window.clearTimeout(draftTimer.current); }, [fj.stage]);
 
   function lockWager(amount: number) {
     socket.emit(SOCKET_EVENTS.FJ_WAGER, { amount }, (res: Ack) => {
@@ -73,14 +85,24 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
     );
   }
 
+  if (!canSubmit && (fj.stage === 'wagering' || fj.stage === 'answering' || fj.stage === 'locked')) {
+    return <div className="text-center max-w-sm">
+      <h2 className="text-2xl font-black text-jeopardy-gold">{team?.name} · Final Jeopardy</h2>
+      <p className="text-white mt-3">{fj.category}</p>
+      {fj.clue && <p className="text-gray-300 mt-3">{fj.clue}</p>}
+      <p className="text-gray-400 mt-3">{fj.stage === 'locked' ? "Answers locked. Watch the board." : 'Your captain submits the team wager and answer.'}</p>
+      {fj.stage === 'answering' && <p className="text-jeopardy-gold text-2xl mt-3">{Math.ceil((remainingMs ?? 0) / 1000)}s</p>}
+    </div>;
+  }
+
   if (fj.stage === 'wagering') {
     return (
       <WagerInput
         heading={fj.category ?? undefined}
-        subtitle={`Your score: $${contestant.preScore} · Max wager: $${contestant.maxWager}`}
+        subtitle={`${team ? team.name + ' score' : 'Your score'}: ${contestant.preScore} · Max wager: ${contestant.maxWager}`}
         maxWager={contestant.maxWager}
         locked={wagerLocked || contestant.hasWagered}
-        lockedAmount={wagerLocked ? lockedWagerAmount : contestant.maxWager}
+        lockedAmount={wagerLocked ? lockedWagerAmount : contestant.maxWager === 0 ? 0 : undefined}
         waitingText="Waiting for other contestants…"
         onLock={lockWager}
         error={wagerError}
@@ -100,7 +122,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
 
   if (fj.stage === 'answering') {
     const seconds = remainingMs != null ? Math.ceil(remainingMs / 1000) : null;
-    if (answerLocked) {
+    if (answerLocked || contestant.hasAnswered) {
       return (
         <div className="text-center">
           <div className="text-jeopardy-gold font-black text-3xl mb-2">{seconds ?? 0}s</div>
@@ -138,7 +160,7 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
   }
 
   if (fj.stage === 'reveal' || fj.stage === 'response') {
-    const revealed = fj.revealed[myId];
+    const revealed = fj.revealed[competitorId];
     if (!revealed) {
       return (
         <div className="text-center">
@@ -146,15 +168,15 @@ export default function PlayerFinal({ gameState, myId }: { gameState: GameState;
         </div>
       );
     }
-    const myScore = gameState.players.find(p => p.id === myId)?.score ?? 0;
+    const myScore = getCompetitor(gameState, myId)?.score ?? 0;
     return (
       <div className="text-center">
         <div className={`inline-block font-black text-2xl px-6 py-3 rounded-xl mb-3 ${revealed.correct ? 'bg-green-600' : 'bg-red-600'} text-white`}>
           {revealed.correct ? '✓ Correct!' : '✗ Wrong'}
         </div>
-        <p className="text-gray-300">Wager: ${revealed.wager}</p>
+        <p className="text-gray-300">Wager: {revealed.wager}</p>
         <p className="text-jeopardy-gold font-black text-xl mt-2">
-          {formatMoney(myScore)}
+          {formatScore(myScore)}
         </p>
       </div>
     );

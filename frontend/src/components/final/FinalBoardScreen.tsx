@@ -1,9 +1,12 @@
+import { getCompetitors } from '@shared/competitors';
+import ResponseMedia from '../shared/ResponseMedia';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '@shared/types';
 import { useCountdown } from './useCountdown';
 import Leaderboard from '../shared/Leaderboard';
 import { playFinalJeopardy, playTick, playTimesUp, playReveal, playThinkingPulse, stopThinkingPulse } from '../../utils/sounds';
-import { getYouTubeEmbedUrl } from '../../utils/media';
+import ClueMedia from '../shared/ClueMedia';
+import FinalClueMedia from './FinalClueMedia';
 
 function CountdownRing({ remainingMs, totalMs }: { remainingMs: number; totalMs: number }) {
   const pct = totalMs > 0 ? Math.max(0, Math.min(1, remainingMs / totalMs)) : 0;
@@ -32,7 +35,7 @@ function CountdownRing({ remainingMs, totalMs }: { remainingMs: number; totalMs:
   );
 }
 
-export default function FinalBoardScreen({ gameState }: { gameState: GameState }) {
+export default function FinalBoardScreen({ gameState, onRecordingEnded }: { gameState: GameState; onRecordingEnded?: (recordingId: string) => void }) {
   const fj = gameState.finalJeopardy!;
   const remainingMs = useCountdown(fj.deadline, fj.serverNow);
   const prevStage = useRef<string | null>(null);
@@ -104,17 +107,9 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
       {(fj.stage === 'clue' || fj.stage === 'answering') && (
         <div className="text-center max-w-4xl">
           <div className="text-jeopardy-gold font-black text-2xl mb-4 uppercase tracking-widest">{fj.category}</div>
-          {fj.mediaType === 'image' && fj.mediaUrl && (
-            <img src={fj.mediaUrl} alt="clue" className="max-h-64 max-w-full object-contain mb-6 rounded mx-auto" />
-          )}
-          {fj.mediaType === 'video' && fj.mediaUrl && (
-            <video src={fj.mediaUrl} autoPlay controls className="max-h-64 max-w-2xl mb-6 rounded w-full mx-auto" />
-          )}
-          {fj.mediaType === 'youtube' && fj.mediaUrl && (
-            <div className="mb-6 w-full max-w-2xl aspect-video mx-auto">
-              <iframe className="w-full h-full rounded" src={getYouTubeEmbedUrl(fj.mediaUrl)} allow="autoplay; fullscreen" allowFullScreen />
-            </div>
-          )}
+          <div className="w-full max-w-2xl mx-auto">
+            <FinalClueMedia finalJeopardy={fj} onRecordingEnded={onRecordingEnded} />
+          </div>
           <div className="text-white text-3xl md:text-5xl font-black leading-tight" style={{ textShadow: '2px 2px 0 #000' }}>
             {fj.clue}
           </div>
@@ -153,7 +148,7 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
           </div>
           {(fj.revealStep === 'wager' || fj.revealStep === 'answer' || fj.revealStep === 'judged') && liveWager !== undefined && (
             <div className="fade-up text-jeopardy-gold font-black text-3xl mb-4">
-              Wagered ${liveWager}
+              Wagered {liveWager}
             </div>
           )}
           {(fj.revealStep === 'answer' || fj.revealStep === 'judged') && liveAnswer !== undefined && (
@@ -169,7 +164,7 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
                 {revealed.correct ? '✓ CORRECT' : '✗ WRONG'}
               </div>
               <div className="count-pop mt-4 text-jeopardy-gold font-black text-3xl">
-                ${gameState.players.find(p => p.id === contestant.playerId)?.score ?? 0}
+                {getCompetitors(gameState).find(p => p.id === contestant.playerId)?.score ?? 0}
               </div>
             </div>
           )}
@@ -177,10 +172,14 @@ export default function FinalBoardScreen({ gameState }: { gameState: GameState }
       )}
 
       {fj.stage === 'response' && (
-        <div className="text-center fade-up">
+        <div className="text-center fade-up w-full max-w-4xl">
           <div className="text-gray-400 text-xl uppercase tracking-widest mb-3">Correct Response</div>
           <div className="bg-black/60 border-4 border-jeopardy-gold rounded-2xl px-12 py-8 text-jeopardy-gold font-black text-3xl md:text-5xl max-w-4xl" style={{ textShadow: '2px 2px 0 #000' }}>
             {fj.response}
+            <ResponseMedia {...fj} autoPlay controlId="final:response" />
+            {['audio', 'video', 'youtube'].includes(fj.mediaType ?? '') && (!fj.responseMediaUrl || !['audio', 'video', 'youtube'].includes(fj.responseMediaType ?? '')) && (
+              <ClueMedia mediaType={fj.mediaType} mediaUrl={fj.mediaUrl} paused={false} hideVideo={false} controlId="final:clue" />
+            )}
           </div>
         </div>
       )}

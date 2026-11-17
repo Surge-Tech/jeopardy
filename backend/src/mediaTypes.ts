@@ -6,6 +6,17 @@ export const EXT_BY_MIME: Record<string, string> = {
   'video/mp4': '.mp4',
   'video/webm': '.webm',
   'video/ogg': '.ogv',
+  'audio/mpeg': '.mp3',
+  'audio/mp3': '.mp3',
+  'audio/wav': '.wav',
+  'audio/x-wav': '.wav',
+  'audio/ogg': '.ogg',
+  'audio/mp4': '.m4a',
+  'audio/x-m4a': '.m4a',
+  'audio/aac': '.aac',
+  'audio/flac': '.flac',
+  'audio/x-flac': '.flac',
+  'audio/webm': '.weba',
 };
 
 export const CONTENT_TYPE_BY_EXT: Record<string, string> = {
@@ -16,4 +27,11 @@ export const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
   '.ogv': 'video/ogg',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.flac': 'audio/flac',
+  '.weba': 'audio/webm',
 };

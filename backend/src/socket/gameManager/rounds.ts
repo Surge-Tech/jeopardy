@@ -27,6 +27,7 @@ export function setLastCorrectPlayer(roomCode: string, playerId: string): boolea
 export function advanceRound(roomCode: string, roundCount: number): { ok: boolean; error?: string } {
   const session = sessions.get(roomCode);
   if (!session) return { ok: false, error: 'Room not found' };
+  if (session.phase !== 'playing') return { ok: false, error: 'Start the game before advancing rounds' };
   if (session.activeQuestionId) return { ok: false, error: 'A question is still active' };
   if (session.finalJeopardy) return { ok: false, error: 'Final Jeopardy is in progress' };
   if (session.currentRoundIndex >= roundCount - 1) return { ok: false, error: 'Already on the last round' };
@@ -34,6 +35,7 @@ export function advanceRound(roomCode: string, roundCount: number): { ok: boolea
   session.currentRoundIndex += 1;
   session.activeQuestionId = null;
   resetBuzzerFields(session, { buzzerState: 'idle', clearLockouts: true });
+  session.clueVisible = false;
   session.dailyDoubleRevealed = false;
   session.responseVisible = false;
   session.dailyDouble = null;

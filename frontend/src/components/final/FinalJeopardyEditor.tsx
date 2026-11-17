@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FinalJeopardyBoard } from '@shared/types';
-import { hostFetch } from '../../lib/hostAuth';
+import MediaEditor from '../shared/MediaEditor';
 
 export default function FinalJeopardyEditor({
   finalJeopardy, onSave, onRemove, onClose,
@@ -12,34 +12,23 @@ export default function FinalJeopardyEditor({
 }) {
   const [category, setCategory] = useState(finalJeopardy?.category ?? '');
   const [clue, setClue] = useState(finalJeopardy?.clue ?? '');
+  const [clueAudioUrl, setClueAudioUrl] = useState(finalJeopardy?.clueAudioUrl ?? '');
   const [response, setResponse] = useState(finalJeopardy?.response ?? '');
   const [mediaType, setMediaType] = useState<FinalJeopardyBoard['mediaType']>(finalJeopardy?.mediaType);
   const [mediaUrl, setMediaUrl] = useState(finalJeopardy?.mediaUrl ?? '');
+  const [responseMediaType, setResponseMediaType] = useState<FinalJeopardyBoard['responseMediaType']>(finalJeopardy?.responseMediaType);
+  const [responseMediaUrl, setResponseMediaUrl] = useState(finalJeopardy?.responseMediaUrl ?? '');
   const [timerSeconds, setTimerSeconds] = useState(finalJeopardy?.timerSeconds ?? 30);
   const [uploading, setUploading] = useState(false);
-
-  async function handleFileUpload(file: File) {
-    setUploading(true);
-    const form = new FormData();
-    form.append('file', file);
-    try {
-      const res = await hostFetch('/api/media/upload', { method: 'POST', body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Upload failed');
-      setMediaType(data.mediaType);
-      setMediaUrl(data.url);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  }
 
   function save() {
     onSave({
       category: category.trim(),
       clue,
+      clueAudioUrl: clueAudioUrl || undefined,
       response,
+      responseMediaType,
+      responseMediaUrl: responseMediaUrl || undefined,
       mediaType,
       mediaUrl: mediaUrl || undefined,
       timerSeconds: Number(timerSeconds) || 30,
@@ -52,7 +41,7 @@ export default function FinalJeopardyEditor({
       <div className="bg-gray-900 border-2 border-jeopardy-gold rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <h2 className="text-xl font-bold text-jeopardy-gold">⚡ Final Jeopardy</h2>
-          <button className="text-gray-400 hover:text-white text-2xl" onClick={onClose}>✕</button>
+          <button className="text-gray-400 hover:text-white text-2xl" onClick={onClose} disabled={uploading}>✕</button>
         </div>
 
         <div className="p-4 space-y-4">
@@ -67,27 +56,57 @@ export default function FinalJeopardyEditor({
             />
           </div>
 
-          {/* Clue */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Clue (shown to contestants)</label>
-            <textarea
-              className="input-field h-24 resize-none"
-              placeholder="This is the Final Jeopardy clue..."
-              value={clue}
-              onChange={e => setClue(e.target.value)}
+          <fieldset className="rounded-lg border border-gray-700 bg-gray-800/30 p-4 space-y-3">
+            <legend className="px-2 text-lg font-bold text-jeopardy-gold">Clue</legend>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Clue (shown to contestants)</label>
+              <textarea
+                className="input-field h-24 resize-none"
+                placeholder="This is the Final Jeopardy clue..."
+                value={clue}
+                onChange={e => setClue(e.target.value)}
+              />
+            </div>
+            <MediaEditor
+              disabled={uploading}
+              label="Clue media (optional)"
+              mediaType={mediaType}
+              mediaUrl={mediaUrl}
+              onChange={media => { setMediaType(media.mediaType); setMediaUrl(media.mediaUrl ?? ''); }}
+              onUploadingChange={setUploading}
             />
-          </div>
+            <MediaEditor
+              disabled={uploading}
+              label="Clue recording (optional)"
+              audioOnly
+              mediaType={clueAudioUrl ? 'audio' : undefined}
+              mediaUrl={clueAudioUrl}
+              onChange={({ mediaUrl }) => setClueAudioUrl(mediaUrl ?? '')}
+              onUploadingChange={setUploading}
+            />
+            <p className="text-sm text-gray-400">Plays when the clue is shown. Other clue audio and video wait until the recording finishes. The answer timer starts automatically when the recording ends. You can also start it manually from the host.</p>
+          </fieldset>
 
-          {/* Response */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Response (correct answer)</label>
-            <input
-              className="input-field"
-              placeholder="What is...?"
-              value={response}
-              onChange={e => setResponse(e.target.value)}
+          <fieldset className="rounded-lg border border-gray-700 bg-gray-800/30 p-4 space-y-3">
+            <legend className="px-2 text-lg font-bold text-jeopardy-gold">Response</legend>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Response (correct answer)</label>
+              <input
+                className="input-field"
+                placeholder="What is...?"
+                value={response}
+                onChange={e => setResponse(e.target.value)}
+              />
+            </div>
+            <MediaEditor
+              disabled={uploading}
+              label="Response media (shown when the answer is revealed)"
+              mediaType={responseMediaType}
+              mediaUrl={responseMediaUrl}
+              onChange={media => { setResponseMediaType(media.mediaType); setResponseMediaUrl(media.mediaUrl ?? ''); }}
+              onUploadingChange={setUploading}
             />
-          </div>
+          </fieldset>
 
           {/* Timer */}
           <div>
@@ -102,57 +121,15 @@ export default function FinalJeopardyEditor({
             />
           </div>
 
-          {/* Media */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Media (optional)</label>
-            <div className="flex gap-2 mb-3 flex-wrap">
-              <label className={`btn-ghost text-sm py-1 px-3 cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
-                {uploading ? 'Uploading...' : '📁 Upload Image/Video'}
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*,video/*"
-                  disabled={uploading}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
-                />
-              </label>
-              <button
-                className="btn-ghost text-sm py-1 px-3"
-                onClick={() => { setMediaType('youtube'); setMediaUrl(''); }}
-              >▶ YouTube URL</button>
-              {mediaUrl && (
-                <button
-                  className="btn-danger text-sm py-1 px-3"
-                  onClick={() => { setMediaType(undefined); setMediaUrl(''); }}
-                >Remove Media</button>
-              )}
-            </div>
-
-            {mediaType === 'youtube' && (
-              <input
-                className="input-field"
-                placeholder="https://www.youtube.com/watch?v=..."
-                value={mediaUrl}
-                onChange={e => setMediaUrl(e.target.value)}
-              />
-            )}
-
-            {mediaUrl && mediaType === 'image' && (
-              <img src={mediaUrl} alt="preview" className="max-h-40 rounded border border-gray-600 mt-2" />
-            )}
-            {mediaUrl && mediaType === 'video' && (
-              <video src={mediaUrl} controls className="max-h-40 rounded border border-gray-600 mt-2 w-full" />
-            )}
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 p-4 border-t border-gray-700">
           {finalJeopardy ? (
-            <button className="btn-danger text-sm" onClick={() => { onRemove(); onClose(); }}>Remove Final Jeopardy</button>
+            <button className="btn-danger text-sm" disabled={uploading} onClick={() => { onRemove(); onClose(); }}>Remove Final Jeopardy</button>
           ) : <div />}
           <button
             className="btn-primary"
-            disabled={!category.trim() || !clue.trim()}
+            disabled={uploading || !category.trim() || !clue.trim()}
             onClick={save}
           >Save</button>
         </div>

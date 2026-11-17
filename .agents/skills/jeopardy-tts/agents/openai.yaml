@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jeopardy Clue Recordings"
+  short_description: "Generate and attach spoken Jeopardy clue recordings"
+  default_prompt: "Use $jeopardy-tts to generate and attach recordings for the clues in my Jeopardy board."

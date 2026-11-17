@@ -46,10 +46,10 @@ npm run dev
 
 | Server | URL | What it is |
 |---|---|---|
-| Frontend | http://localhost:5173 | Dashboard, Editor, Host, Board, Buzzer |
-| Backend | http://localhost:3001 | API + Socket.io |
+| Frontend | http://localhost:3001 | Dashboard, Editor, Host, Board, Buzzer |
+| Backend (internal) | http://localhost:3002 | API + Socket.io |
 
-The frontend automatically proxies API and socket requests to the backend in dev mode.
+The frontend automatically proxies API, media, and socket requests to the backend in dev mode.
 
 ---
 
@@ -67,7 +67,7 @@ npm run dev
 - **Windows:** `ipconfig` → look for `IPv4 Address`
 - **Linux:** `ip addr show`
 
-The backend also prints LAN URLs on startup:
+Vite prints the app URLs on startup:
 ```
 Local:   http://localhost:3001
 Network: http://192.168.1.42:3001
@@ -77,9 +77,9 @@ Network: http://192.168.1.42:3001
 
 | Device | URL |
 |---|---|
-| Host laptop | http://localhost:5173/host/ROOM_CODE |
-| TV / projector | http://localhost:5173/board/ROOM_CODE |
-| Player phones | http://192.168.1.42:5173/buzzer/ROOM_CODE |
+| Host laptop | http://localhost:3001/host/ROOM_CODE |
+| TV / projector | http://localhost:3001/board/ROOM_CODE |
+| Player phones | http://192.168.1.42:3001/buzzer/ROOM_CODE |
 
 > Replace `192.168.1.42` with your actual LAN IP and `ROOM_CODE` with the code shown on the Dashboard when you start a game.
 

@@ -20,6 +20,6 @@ export function onHost<T extends { roomCode: string }>(
       else socket.emit('error', { message });
       return;
     }
-    handler(payload, ack);
+    return handler(payload, ack);
   });
 }

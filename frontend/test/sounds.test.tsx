@@ -34,28 +34,14 @@ class FakeContext {
   allowResume = false;
   gains: FakeGain[] = [];
   oscillators: FakeOscillator[] = [];
-  sources: FakeSource[] = [];
-  async decodeAudioData() { return {} as AudioBuffer; }
-  createBufferSource() { const node = new FakeSource(); this.sources.push(node); return node; }
   createGain() { const node = new FakeGain(); this.gains.push(node); return node; }
   createOscillator() { const node = new FakeOscillator(); this.oscillators.push(node); return node; }
   async resume() { if (this.allowResume) this.state = 'running'; }
 }
 
-class FakeSource extends FakeNode {
-  buffer: AudioBuffer | null = null;
-  onended?: () => void;
-  started = false;
-  stopped = false;
-  start() { this.started = true; }
-  stop() { this.stopped = true; }
-}
-
 test('audio unlocks before playback, all cues reach the output, and envelopes fade cleanly', async () => {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'AudioContext');
   const context = new FakeContext();
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(new Uint8Array([1, 2, 3]));
   Object.defineProperty(globalThis, 'AudioContext', { configurable: true, value: class { constructor() { return context; } } });
   try {
     sounds.playWrong();
@@ -86,25 +72,7 @@ test('audio unlocks before playback, all cues reach the output, and envelopes fa
       oscillator.onended?.();
       assert.ok(oscillator.disconnected && envelope.disconnected);
     }
-    await sounds.preloadGameIntro();
-    const stop = sounds.playGameIntro();
-    await Promise.resolve();
-    assert.equal(context.sources.length, 1);
-    assert.equal(context.sources[0].started, true);
-    assert.equal(context.sources[0].target, output);
-    stop();
-    assert.equal(context.sources[0].stopped, true);
-    assert.equal(context.sources[0].disconnected, true);
-    const cancelBeforeLoaded = sounds.playGameIntro();
-    cancelBeforeLoaded();
-    await Promise.resolve();
-    assert.equal(context.sources.length, 1, 'cancelled pending playback never starts');
-    context.state = 'suspended';
-    sounds.playGameIntro();
-    await Promise.resolve();
-    assert.equal(context.sources.length, 1, 'blocked intro is not queued');
   } finally {
-    globalThis.fetch = originalFetch;
     if (original) Object.defineProperty(globalThis, 'AudioContext', original);
     else Reflect.deleteProperty(globalThis, 'AudioContext');
   }

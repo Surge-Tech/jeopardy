@@ -15,5 +15,3 @@ export interface MediaPlaybackStatus {
 }
 
 export const SPEAKER_TEST_MEDIA_ID = 'lobby:speaker-test';
-
-export const THEME_MEDIA_ID = 'game:theme';

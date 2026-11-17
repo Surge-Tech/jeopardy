@@ -39,7 +39,6 @@ test('projected Daily Double waits for activation before announcing or showing t
         builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const socket = globalThis.__previewSocket;', loader: 'js' }));
         builder.onResolve({ filter: /\/utils\/sounds$/ }, () => ({ path: 'sounds', namespace: 'sounds' }));
         builder.onLoad({ filter: /.*/, namespace: 'sounds' }, () => ({ contents: `export const playDailyDouble = globalThis.__previewAnnouncement;
-          export const preloadGameIntro = async () => {}; export const playGameIntro = () => () => {};
           export const playBuzzerReady = () => {}; export const playBuzzIn = () => {}; export const playWrong = () => {};
           export const playTick = () => {}; export const playTimesUp = () => {}; export const playFinalJeopardy = () => {};
           export const playReveal = () => {}; export const playWinnerFanfare = () => {}; export const enableSounds = async () => {}; export const playThinkingPulse = () => {}; export const stopThinkingPulse = () => {};`, loader: 'js' }));

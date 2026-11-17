@@ -1,21 +1,3 @@
-# Danish game intro
-
-`jeopardy-intro-da.mp3` is the opening 20 seconds of Bent Fabricius-Bjerre's
-**Temaet Fra "Jeopardy"**, with a three-second fade-out. Source: the
-[official artist channel recording](https://www.youtube.com/watch?v=8CCQ7a8kfqg),
-provided by Parlophone Denmark, ℗ 1995 Parlophone Music Denmark (Warner Music Group).
-This third-party recording retains its original copyright and is not covered by
-the repository's MIT license.
-
-The projected board preloads it in the lobby and plays it once on the live
-`lobby` → `playing` transition. Selecting a clue, leaving play, closing the room,
-or leaving the board stops it. Opening an ongoing game or reconnecting does not
-replay it. Enable sound on the board before starting, using the existing sound
-control. Playback uses the same Web Audio output as game cues.
-
-The host's **Play theme** button, next to **Board View**, can replay the theme
-without opening a clue. Replaying stops the previous theme before starting again.
-
 # Lobby speaker test
 
 The lobby plays `speaker-test-da.mp3` on the board view using the same native audio playback and default volume as clue recordings. Host controls remotely start, replay, or stop the board's player; the host does not play a second copy.
